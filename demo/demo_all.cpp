@@ -1,164 +1,237 @@
+#pragma once
+
 #include <iostream>
-#include <cstdint>
+#include <memory>
+#include <type_traits>
 
-// =====================================================
-// SHARED IDENTITY SYSTEM (used across all stages)
-// =====================================================
-
-using TypeID = std::size_t;
-
-template<class T>
-struct TypeInfo
+// ======================================================
+// TYPE SYSTEM (DEMO ONLY)
+// ======================================================
+namespace CRG
 {
-    static TypeID Get()
+    using TypeID = std::size_t;
+
+    inline TypeID& GlobalCounter()
     {
-        static TypeID id = reinterpret_cast<TypeID>(&id);
-        return id;
-    }
-};
-
-// =====================================================
-// STAGE 1 — EMERGENT LIST
-// =====================================================
-
-struct Node
-{
-    static Node* head;
-    Node* next = nullptr;
-
-    Node()
-    {
-        next = head;
-        head = this;
+        static TypeID c = 0;
+        return c;
     }
 
-    virtual ~Node() = default;
-    virtual void Run() const = 0;
-};
-
-Node* Node::head = nullptr;
-
-// =====================================================
-// STAGE 2 — IDENTITY EXTENSION
-// =====================================================
-
-struct NodeWithID : Node
-{
-    virtual TypeID GetID() const = 0;
-};
-
-// =====================================================
-// STAGE 3 — BASE CONCRETE TYPES
-// =====================================================
-
-struct A : NodeWithID
-{
-    void Run() const override { std::cout << "A\n"; }
-    TypeID GetID() const override { return TypeInfo<A>::Get(); }
-};
-
-struct B : NodeWithID
-{
-    void Run() const override { std::cout << "B\n"; }
-    TypeID GetID() const override { return TypeInfo<B>::Get(); }
-};
-
-struct C : NodeWithID
-{
-    void Run() const override { std::cout << "C\n"; }
-    TypeID GetID() const override { return TypeInfo<C>::Get(); }
-};
-
-// =====================================================
-// STAGE 4 — EXTERNAL BEHAVIOR SPACE
-// =====================================================
-
-struct Behavior
-{
-    static Behavior* head;
-    Behavior* next = nullptr;
-
-    TypeID targetID;
-
-    Behavior(TypeID id)
-        : targetID(id)
+    template<class T>
+    struct TypeIDOf
     {
-        next = head;
-        head = this;
-    }
-
-    virtual void Execute(const NodeWithID& n) const = 0;
-};
-
-Behavior* Behavior::head = nullptr;
-
-// -----------------------------------------------------
-
-template<class T>
-struct PrintBehavior : Behavior
-{
-    PrintBehavior()
-        : Behavior(TypeInfo<T>::Get())
-    {}
-
-    void Execute(const NodeWithID&) const override
-    {
-        std::cout << "[Behavior] bound execution\n";
-    }
-};
-
-// =====================================================
-// STAGE 5 — FUSION RESOLUTION
-// =====================================================
-
-const Behavior* FindBehavior(TypeID id)
-{
-    for (Behavior* b = Behavior::head; b; b = b->next)
-        if (b->targetID == id)
-            return b;
-    return nullptr;
+        static TypeID Get()
+        {
+            static const TypeID id = ++GlobalCounter();
+            return id;
+        }
+    };
 }
 
-// =====================================================
-// INSTANTIATION (THE TWO SPACES)
-// =====================================================
+// ======================================================
+// TYPELIST
+// ======================================================
+template<class...>
+struct TypeList;
 
-// Identity space instances
-A a;
-B b;
-C c;
-
-// Behavior space instances (external definitions)
-PrintBehavior<A> ba;
-PrintBehavior<B> bb;
-PrintBehavior<C> bc;
-
-// =====================================================
-// MAIN — PROGRESSION DEMO
-// =====================================================
-
-int main()
+// ======================================================
+// TYPE ERASURE TRANSPORT (TES)
+// ======================================================
+class TypeErasedShell
 {
-    std::cout << "=============================\n";
-    std::cout << " STAGE 1–5 EMERGENT SYSTEM\n";
-    std::cout << "=============================\n\n";
+public:
+    using TypeID = CRG::TypeID;
 
-    std::cout << "Traversing identity space + resolving behavior:\n\n";
-
-    for (Node* n = Node::head; n; n = n->next)
+    struct Concept
     {
-        auto* typed = dynamic_cast<NodeWithID*>(n);
-        if (!typed) continue;
+        virtual ~Concept() = default;
+        virtual TypeID GetTypeID() const = 0;
+    };
 
-        std::cout << "Node ID = " << typed->GetID() << " -> ";
+    template<class T>
+    struct Model final : Concept
+    {
+        T value;
 
-        if (auto* behavior = FindBehavior(typed->GetID()))
+        Model(T v) : value(std::move(v)) {}
+
+        TypeID GetTypeID() const override
         {
-            behavior->Execute(*typed);
+            return CRG::TypeIDOf<T>::Get();
+        }
+    };
+
+    template<class T>
+    void Set(T v)
+    {
+        ptr = std::make_unique<Model<T>>(std::move(v));
+    }
+
+    TypeID GetTypeID() const
+    {
+        return ptr->GetTypeID();
+    }
+
+    template<class T>
+    const T& Get() const
+    {
+        return static_cast<Model<T>*>(ptr.get())->value;
+    }
+
+private:
+    std::unique_ptr<Concept> ptr;
+};
+
+// ======================================================
+// INTERFACES
+// ======================================================
+struct IPrintName
+{
+    virtual ~IPrintName() = default;
+    virtual void Execute(const TypeErasedShell&) const = 0;
+};
+
+struct IPrintTypeID
+{
+    virtual ~IPrintTypeID() = default;
+    virtual void Execute(const TypeErasedShell&) const = 0;
+};
+
+// ======================================================
+// DEFINITIONS
+// ======================================================
+template<class T>
+struct PrintNameDefinition : IPrintName
+{
+    void Execute(const TypeErasedShell& t) const override
+    {
+        std::cout << "Generic: " << t.Get<T>().name << "\n";
+    }
+};
+
+template<>
+struct PrintNameDefinition<int> : IPrintName
+{
+    void Execute(const TypeErasedShell&) const override
+    {
+        std::cout << "Special int case\n";
+    }
+};
+
+template<class T>
+struct PrintTypeIDDefinition : IPrintTypeID
+{
+    void Execute(const TypeErasedShell& t) const override
+    {
+        std::cout << "TypeID=" << t.GetTypeID() << "\n";
+    }
+};
+
+// ======================================================
+// CORE MATRIX (ENGINE PRIMITIVE)
+// ======================================================
+template<class ModelList, template<class> class... Defs>
+struct BehaviorMatrix;
+
+// ------------------------------------------------------
+// INTERNAL DISPATCH (hidden implementation detail)
+// ------------------------------------------------------
+template<class... Models, template<class> class... Defs>
+struct BehaviorMatrix<TypeList<Models...>, Defs...>
+{
+    template<class Interface>
+    static const Interface* Find(const TypeErasedShell& tes)
+    {
+        const auto id = tes.GetTypeID();
+        const Interface* result = nullptr;
+
+        ((id == CRG::TypeIDOf<Models>::Get() &&
+          (result = Get<Interface, Models>())), ...);
+
+        return result;
+    }
+
+private:
+    template<class Interface, class Model>
+    static const Interface* Get()
+    {
+        return GetImpl<Interface, Model, Defs...>();
+    }
+
+    template<class Interface, class Model,
+             template<class> class Def,
+             template<class> class... Rest>
+    static const Interface* GetImpl()
+    {
+        if constexpr (std::is_base_of_v<Interface, Def<Model>>)
+        {
+            static Def<Model> instance;
+            return &instance;
+        }
+        else if constexpr (sizeof...(Rest) > 0)
+        {
+            return GetImpl<Interface, Model, Rest...>();
         }
         else
         {
-            std::cout << "no behavior\n";
+            return nullptr;
         }
     }
+};
+
+// ======================================================
+// DOMAIN TYPES
+// ======================================================
+struct NPC    { std::string name{"NPC"}; };
+struct Boss   { std::string name{"Boss"}; };
+struct Player { std::string name{"Player"}; };
+
+// ======================================================
+// MODEL LIST
+// ======================================================
+using Models = TypeList<NPC, Boss, Player>;
+
+// ======================================================
+// DOMAIN BEHAVIOR (IMPORTANT TEMPLATE ALIAS)
+// ======================================================
+template<class M>
+using Behavior = BehaviorMatrix<
+    M,
+    PrintNameDefinition,
+    PrintTypeIDDefinition
+>;
+
+// ======================================================
+// STATIC DOMAIN INSTANCE
+// ======================================================
+static const Behavior<Models> gs_Behavior;
+
+// ======================================================
+// API
+// ======================================================
+template<class Interface>
+void Call(const TypeErasedShell& tes)
+{
+    const Interface* iface = gs_Behavior.template Find<Interface>(tes);
+    iface->Execute(tes);
+}
+
+// ======================================================
+// MAIN (WAOUH DEMO)
+// ======================================================
+int main()
+{
+    TypeErasedShell tes;
+
+    tes.Set(NPC{"Grunt"});
+    Call<IPrintName>(tes);
+    Call<IPrintTypeID>(tes);
+
+    tes.Set(Boss{"Dragon"});
+    Call<IPrintName>(tes);
+    Call<IPrintTypeID>(tes);
+
+    tes.Set(Player{"Alex"});
+    Call<IPrintName>(tes);
+    Call<IPrintTypeID>(tes);
 }
