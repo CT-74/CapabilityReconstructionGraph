@@ -75,7 +75,7 @@ private:
 // NODE LIST (runtime linked registry)
 // ======================================================
 template<class Derived, class Interface>
-class LinkedNode
+class LinkedNode : public Interface
 {
 public:
     LinkedNode()
@@ -120,8 +120,7 @@ struct Player { std::string name{"Player"}; };
 // ======================================================
 template<class T>
 struct PrintNameDefinition
-    : IPrintName
-    , LinkedNode<PrintNameDefinition<T>, IPrintName>
+    : LinkedNode<PrintNameDefinition<T>, IPrintName>
 {
     void Execute(const TypeErasedShell& t) const override
     {
@@ -131,8 +130,7 @@ struct PrintNameDefinition
 
 template<>
 struct PrintNameDefinition<Boss>
-    : IPrintName
-    , LinkedNode<PrintNameDefinition<Boss>, IPrintName>
+    : LinkedNode<PrintNameDefinition<Boss>, IPrintName>
 {
     void Execute(const TypeErasedShell& t) const override
     {
@@ -142,8 +140,7 @@ struct PrintNameDefinition<Boss>
 
 template<>
 struct PrintNameDefinition<Player>
-    : IPrintName
-    , LinkedNode<PrintNameDefinition<Player>, IPrintName>
+    : LinkedNode<PrintNameDefinition<Player>, IPrintName>
 {
     void Execute(const TypeErasedShell& t) const override
     {
@@ -153,8 +150,7 @@ struct PrintNameDefinition<Player>
 
 template<class T>
 struct PrintTypeIDDefinition
-    : IPrintTypeID
-    , LinkedNode<PrintTypeIDDefinition<T>, IPrintTypeID>
+    : LinkedNode<PrintTypeIDDefinition<T>, IPrintTypeID>
 {
     void Execute(const TypeErasedShell& t) const override
     {

@@ -1,32 +1,33 @@
-Title:
+# Title:
 A Runtime Capability Graph for External Behavior Composition in C++
 
-Abstract:
+## Abstract:
+
 This talk presents a structural model for composing behavior in C++ systems where functionality is not embedded in objects, but emerges from the interaction of independent runtime-defined spaces.
 
-Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore how a capability system can emerge from two simple and independent structures: an identity space and a behavior definition space.
+Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore how a capability system can emerge from three minimal and independent structures: a structural graph, an identity space, and a behavior definition space.
 
-The key idea is that no explicit capability graph is ever constructed. Instead, what appears as a graph is the result of traversing and matching two independently evolving lists at runtime.
+The key idea is that no explicit capability graph is ever constructed. Instead, what appears as a graph is the result of traversing and correlating these independently evolving runtime spaces.
 
 The talk progressively builds this model in five stages:
 
-1. Emergent Structure  
-   A self-registering list forms without any external container or registry.
+1. Structural Primitive (CRG-v0)  
+   A runtime-linked graph forms through intrusive self-registration of nodes. No container or registry exists; structure is defined purely by traversal.
 
-2. Identity Attachment  
-   Each element gains a stable runtime identity, without introducing lookup semantics.
+2. Identity Space  
+   Each element is extended with a stable runtime identity. This identity exists independently of structure and introduces no behavior semantics.
 
-3. Emergent Lookup  
-   Lookup behavior is introduced as a traversal over structure, not as a map.
+3. Identity-Based Resolution  
+   A traversal-based lookup layer is introduced over the identity space. This is not a map or registry, but a runtime resolution mechanism based on scanning existing structures.
 
 4. External Behavior Definitions  
-   Behavior is extracted from identity and defined externally in a separate emergent space.
+   Behavior is fully decoupled from identity and defined in a separate external space. Multiple definitions may exist for the same identity domain.
 
-5. Fusion  
-   Two independent spaces — identity and behavior — combine through traversal-based resolution, producing a full capability matrix without any explicit graph or registry.
+5. Composition (CRG-v1 Conceptual Extension)  
+   Three independent spaces — structure, identity, and behavior — interact through traversal-based resolution. From this interaction, a runtime capability matrix emerges without any explicit graph, registry, or centralized mapping structure.
 
-The result is a system where "capabilities" are not stored or designed directly, but observed as an emergent property of structure.
+The result is a system where "capabilities" are not stored or explicitly modeled, but observed as an emergent property of interacting runtime structures.
 
 Implementation details are intentionally minimal to focus on architectural implications rather than specific C++ techniques.
 
-The talk concludes by reframing capability graphs not as data structures, but as emergent observations of interacting systems.
+The talk concludes by reframing capability graphs not as data structures, but as emergent projections of interacting systems.

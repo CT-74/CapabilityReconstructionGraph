@@ -16,7 +16,7 @@ These approaches typically introduce:
 
 Enable a system where:
 
-- identity and behavior are decoupled
+- structure, identity, and behavior are decoupled
 - behavior can be defined externally
 - composition emerges without central orchestration
 - runtime structure can be discovered, not predeclared
@@ -27,14 +27,15 @@ while avoiding commitment to any specific implementation mechanism.
 
 ## 3. Core Insight
 
-Instead of constructing a capability graph directly, we observe that it can *emerge* from two independent spaces:
+A capability system does not need to be explicitly stored.
 
-- an identity space
-- a behavior definition space
+Instead, it emerges from the interaction of three independent spaces:
 
-and a simple traversal-based resolution mechanism.
+- a structural space (runtime-linked graph)
+- an identity space (runtime type/model identity)
+- a behavior space (external definitions)
 
-No explicit graph is stored.
+No explicit capability graph is constructed or stored.
 
 ---
 
@@ -44,59 +45,78 @@ The system is introduced through five stages.
 
 ---
 
-### Stage 1 — Emergent Structure (Self-Registering List)
+### Stage 1 — Structural Primitive (CRG-v0)
 
-A set of nodes automatically forms a linked structure at runtime through construction side effects.
+A runtime-linked graph is formed through object lifetime side effects.
 
-No container exists; structure emerges from object lifetime.
+This corresponds to the LinkedNode primitive:
+
+- intrusive linking at construction time
+- no identity meaning
+- no behavior semantics
+- purely structural membership
+
+The graph exists only through traversal.
 
 ---
 
-### Stage 2 — Identity Attachment
+### Stage 2 — Identity Space
 
-Each node is extended with a stable runtime identity.
+A stable runtime identity is introduced.
 
-This identity is not used for lookup yet — it simply exists as a property of traversal.
+This corresponds to TypeErasedShell (or equivalent model identity carrier).
+
+At this stage:
+- identity exists independently of structure
+- identity is not yet mapped to behavior
+- no routing or lookup system is introduced yet
+
+Structure and identity remain orthogonal.
 
 ---
 
-### Stage 3 — Emergent Lookup
+### Stage 3 — Identity-Based Resolution (Routing Layer)
 
-A lookup operation is introduced, but not as a map.
+A resolution mechanism is introduced over the identity space.
 
-Instead, it is defined as a traversal over the emergent structure.
+This corresponds to the BehaviorMatrix layer:
 
-This creates the illusion of associative access without introducing a container.
+- identity is used as a selection key
+- resolution determines applicable interface
+- traversal-based or lightweight scanning is used
+- no explicit mapping structure is stored
+
+This layer connects identity to behavior interfaces.
 
 ---
 
 ### Stage 4 — External Behavior Definitions
 
-Behavior is removed from the identity nodes and defined externally.
+Behavior is fully decoupled from identity nodes.
 
-A second emergent structure is introduced: a list of behavior definitions bound to identity values.
+A separate definition space is introduced:
 
-At this stage:
-- identity space exists independently
-- behavior space exists independently
-- resolution is performed by scanning both spaces
+- multiple behavior definitions may exist per identity space
+- behavior is defined externally from identity carriers
+- definitions are independently discoverable via traversal
+
+This creates a behavior space independent from identity space.
 
 ---
 
-### Stage 5 — Fusion (Identity × Behavior Emergence)
+### Stage 5 — Composition (CRG-v1 Conceptual Extension)
 
-The final system combines two independent type-driven spaces:
+The system now consists of three independent spaces:
 
-- IdentityList
-- DefinitionList
+- structural graph (LinkedNode)
+- identity space (TypeErasedShell / ModelList)
+- behavior space (DefinitionList)
 
-From these two uncoordinated structures, a full runtime capability matrix emerges.
+From the interaction of these spaces, a runtime capability matrix emerges.
 
-No explicit mapping is constructed.
+This matrix is not stored.
 
-No central registry exists.
-
-The system is the result of traversal over two independent emergent lists.
+It is observed at runtime through traversal-based resolution.
 
 ---
 
@@ -106,10 +126,10 @@ The resulting model exhibits:
 
 - no centralized registry
 - no explicit capability graph structure
-- no ownership of behavior by identity
-- fully distributed definition model
+- strict separation of structure, identity, and behavior
+- multiple behavior definitions per identity space (CRG-v1 capability)
 - deterministic resolution via traversal
-- emergent many-to-many binding
+- emergent many-to-many binding across independent spaces
 
 ---
 
@@ -117,13 +137,13 @@ The resulting model exhibits:
 
 What appears as a "capability graph" is not stored.
 
-It is the runtime consequence of:
+It emerges from the interaction of:
 
-- identity traversal
-- behavior traversal
-- structural matching during resolution
+- structural traversal (LinkedNode graph)
+- identity evaluation (TypeErasedShell / Model space)
+- behavior resolution (external definition space)
 
-The graph is an observation, not a data structure.
+The graph is an observed runtime projection, not a data structure.
 
 ---
 
