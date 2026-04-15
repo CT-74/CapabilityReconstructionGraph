@@ -2,7 +2,7 @@
 
 ## 1. Problem Statement
 
-Modern C++ systems struggle with extensibility when behavior is tightly coupled to type hierarchies, ECS layouts, or centralized plugin registries.
+Modern C++ systems struggle with extensibility when behavior is tightly coupled to type hierarchies, ECS layouts, or centralized registries.
 
 These approaches typically introduce:
 - structural coupling between identity and behavior
@@ -14,148 +14,126 @@ These approaches typically introduce:
 
 ## 2. Design Goal
 
-Enable:
+Enable a system where:
 
-- behavior extension without modifying core systems
-- cross-module behavior composition
-- runtime discovery of capabilities
-- deterministic identity-based lookup
+- identity and behavior are decoupled
+- behavior can be defined externally
+- composition emerges without central orchestration
+- runtime structure can be discovered, not predeclared
 
-while avoiding centralized registries and rigid structural coupling.
-
----
-
-## 3. Scope Clarification
-
-This paper describes a structural architecture.
-
-Implementation details (type erasure, memory layout, dispatch strategy) are intentionally left open.
-
-The focus is on how behavior is represented, distributed, and resolved, not on specific C++ techniques.
+while avoiding commitment to any specific implementation mechanism.
 
 ---
 
-## 4. Core Insight
+## 3. Core Insight
 
-The system is not built around a central registry or stored graph.
+Instead of constructing a capability graph directly, we observe that it can *emerge* from two independent spaces:
 
-Instead, it is composed of distributed nodes that self-register into overlapping linked structures.
+- an identity space
+- a behavior definition space
 
-These structures collectively form a runtime capability graph.
+and a simple traversal-based resolution mechanism.
 
-This graph is:
-
-- not explicitly declared
-- not centrally stored
-- not constructed in a single place
-
-It emerges from independently defined components.
+No explicit graph is stored.
 
 ---
 
-## 5. Structural Layers
+## 4. Progressive Construction
 
-The system can be understood as three interacting layers:
-
-### 5.1 Identity Layer (Models)
-
-Each entity exposes a stable runtime identity.
-
-This identity acts as an anchor for behavior resolution.
+The system is introduced through five stages.
 
 ---
 
-### 5.2 Interface Layer (Contracts)
+### Stage 1 — Emergent Structure (Self-Registering List)
 
-Interfaces define behavior contracts.
+A set of nodes automatically forms a linked structure at runtime through construction side effects.
 
-Each interface carries its own unique identifier, allowing runtime lookup without central coordination.
-
----
-
-### 5.3 Definition Layer (Bindings)
-
-Definitions bind:
-
-- a model (identity)
-- an interface (contract)
-- an implementation (behavior)
-
-Definitions are not registered in a container.
-
-They are instantiated as independent objects that self-link into the system.
+No container exists; structure emerges from object lifetime.
 
 ---
 
-## 6. Emergent Structure
+### Stage 2 — Identity Attachment
 
-From these layers, the system forms a distributed structure:
+Each node is extended with a stable runtime identity.
 
-- models form an identity space
-- definitions attach behavior to identities
-- interfaces provide lookup keys
-
-This creates an implicit many-to-many relationship between identities and behaviors.
-
-This relationship is not stored as a matrix.
-
-It is materialized through the presence of definition nodes.
+This identity is not used for lookup yet — it simply exists as a property of traversal.
 
 ---
 
-## 7. Resolution Model
+### Stage 3 — Emergent Lookup
 
-Behavior resolution is performed by:
+A lookup operation is introduced, but not as a map.
 
-1. selecting a model (identity)
-2. selecting an interface (behavior contract)
-3. traversing the associated linked structure to locate a matching definition
+Instead, it is defined as a traversal over the emergent structure.
 
-This is not a traditional lookup in a container.
-
-It is a structural resolution over a distributed graph.
+This creates the illusion of associative access without introducing a container.
 
 ---
 
-## 8. Key Properties
+### Stage 4 — External Behavior Definitions
 
-- No central ownership of behavior
-- No explicit registration system
-- Additive modular composition
-- Deterministic resolution
-- Cross-module extensibility
+Behavior is removed from the identity nodes and defined externally.
 
-The system evolves by adding new definitions, not by modifying existing structures.
+A second emergent structure is introduced: a list of behavior definitions bound to identity values.
 
----
-
-## 9. Conceptual Interpretation
-
-The system can be interpreted as a conceptual matrix:
-
-Identity × Behavior
-
-However:
-
-- this matrix is not stored
-- not precomputed
-- not explicitly declared
-
-It emerges from distributed definitions.
+At this stage:
+- identity space exists independently
+- behavior space exists independently
+- resolution is performed by scanning both spaces
 
 ---
 
-## 10. Key Insight
+### Stage 5 — Fusion (Identity × Behavior Emergence)
 
-By removing the need for centralized storage and explicit relationships, the system enables:
+The final system combines two independent type-driven spaces:
 
-> behavior to be defined independently, discovered dynamically, and resolved structurally.
+- IdentityList
+- DefinitionList
 
-This shifts the architecture from:
+From these two uncoordinated structures, a full runtime capability matrix emerges.
 
-- ownership-driven design
-to
-- composition through emergence
+No explicit mapping is constructed.
+
+No central registry exists.
+
+The system is the result of traversal over two independent emergent lists.
+
+---
+
+## 5. System Properties
+
+The resulting model exhibits:
+
+- no centralized registry
+- no explicit capability graph structure
+- no ownership of behavior by identity
+- fully distributed definition model
+- deterministic resolution via traversal
+- emergent many-to-many binding
+
+---
+
+## 6. Interpretation
+
+What appears as a "capability graph" is not stored.
+
+It is the runtime consequence of:
+
+- identity traversal
+- behavior traversal
+- structural matching during resolution
+
+The graph is an observation, not a data structure.
+
+---
+
+## 7. Application Domains
+
+- plugin architectures without registries
+- gameplay systems with external behavior binding
+- runtime extensibility systems
+- debugging and instrumentation layers
+- compositional engine architectures
 
 ---
 

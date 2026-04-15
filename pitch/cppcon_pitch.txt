@@ -1,15 +1,32 @@
-Title:  
+Title:
 A Runtime Capability Graph for External Behavior Composition in C++
 
-Abstract:  
-This talk introduces a structural approach to behavior composition in C++ where functionality is defined externally and discovered at runtime through a distributed capability graph.
+Abstract:
+This talk presents a structural model for composing behavior in C++ systems where functionality is not embedded in objects, but emerges from the interaction of independent runtime-defined spaces.
 
-Instead of relying on inheritance hierarchies, centralized registries, or ECS-style coupling, the system is built from independently defined components that self-assemble into a coherent resolution structure.
+Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore how a capability system can emerge from two simple and independent structures: an identity space and a behavior definition space.
 
-Each behavior is implemented as a definition that binds a model (identity) to an interface (contract). These definitions are not registered in a container—they are instantiated as independent objects that automatically link into the system. From these distributed nodes, a runtime capability graph emerges.
+The key idea is that no explicit capability graph is ever constructed. Instead, what appears as a graph is the result of traversing and matching two independently evolving lists at runtime.
 
-Behavior lookup is performed by combining a runtime identity and an interface, resolving through the graph without any centralized ownership or explicit mapping.
+The talk progressively builds this model in five stages:
 
-The talk progressively builds this model from a minimal self-registering structure to a full system where feeding two type lists—identities and behavior definitions—materializes a complete identity × behavior matrix.
+1. Emergent Structure  
+   A self-registering list forms without any external container or registry.
 
-The focus is not on specific C++ techniques, but on the architectural implications of replacing ownership-based design with composition through emergence.
+2. Identity Attachment  
+   Each element gains a stable runtime identity, without introducing lookup semantics.
+
+3. Emergent Lookup  
+   Lookup behavior is introduced as a traversal over structure, not as a map.
+
+4. External Behavior Definitions  
+   Behavior is extracted from identity and defined externally in a separate emergent space.
+
+5. Fusion  
+   Two independent spaces — identity and behavior — combine through traversal-based resolution, producing a full capability matrix without any explicit graph or registry.
+
+The result is a system where "capabilities" are not stored or designed directly, but observed as an emergent property of structure.
+
+Implementation details are intentionally minimal to focus on architectural implications rather than specific C++ techniques.
+
+The talk concludes by reframing capability graphs not as data structures, but as emergent observations of interacting systems.
