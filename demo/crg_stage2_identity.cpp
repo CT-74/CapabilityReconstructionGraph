@@ -10,7 +10,7 @@
 //
 // @key_insight:
 // Identity becomes a first-class citizen. (Note: Demo uses unique_ptr for simplicity, 
-// but the engine uses SBO for a zero-allocation, super-light transport).
+// but the engine will evolve to SBO for a zero-allocation transport).
 //
 // @what_is_not:
 // No traversal system yet, no behavior system, no registry.
@@ -23,20 +23,25 @@
 // what they can do.”
 // ======================================================
 
-
 #include <iostream>
 #include <memory>
 #include <typeinfo>
+#include <string>
 
 using TypeID = std::size_t;
 
 template<class T>
-struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
+struct TypeIDOf { 
+    static TypeID Get() { return typeid(T).hash_code(); } 
+};
 
-class ErasedTransport
+class HardwareShell
 {
 public:
-    struct Concept { virtual ~Concept() = default; virtual TypeID GetTypeID() const = 0; };
+    struct Concept { 
+        virtual ~Concept() = default; 
+        virtual TypeID GetTypeID() const = 0; 
+    };
 
     template<class T>
     struct Model : Concept
@@ -47,23 +52,30 @@ public:
     };
 
     template<class T>
-    void Set(T v) { ptr = std::make_unique<Model<T>>(std::move(v)); }
+    void Set(T v) { 
+        ptr = std::make_unique<Model<T>>(std::move(v)); 
+    }
 
     TypeID GetTypeID() const { return ptr->GetTypeID(); }
 
     template<class T>
-    const T& Get() const { return static_cast<Model<T>*>(ptr.get())->value; }
+    const T& Get() const { 
+        return static_cast<Model<T>*>(ptr.get())->value; 
+    }
 
 private:
     std::unique_ptr<Concept> ptr;
 };
 
-struct NPC { std::string name{"NPC"}; };
-struct Boss { std::string name{"Boss"}; };
-struct Player { std::string name{"Player"}; };
+struct HeavyLifter { std::string id{"HeavyLifter"}; };
 
 int main()
 {
-    ErasedTransport t;
-    t.Set(Boss{"Dragon"});
+    HardwareShell shell;
+    shell.Set(HeavyLifter{"Loader-99"});
+
+    std::cout << "[SHELL] Stored Identity Hash: " << shell.GetTypeID() << "\n";
+    std::cout << "[SHELL] Stored Payload ID: " << shell.Get<HeavyLifter>().id << "\n";
+
+    return 0;
 }

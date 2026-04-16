@@ -26,6 +26,7 @@
 #include <iostream>
 #include <string>
 #include <typeinfo>
+#include <cstddef>
 
 using TypeID = std::size_t;
 
@@ -53,11 +54,11 @@ protected:
 };
 
 template<class T>
-struct PrintName : INode
+struct RunDiagnostic : INode
 {
     void Execute(const void* obj) const override
     {
-        std::cout << static_cast<const T*>(obj)->name << "\n";
+        std::cout << static_cast<const T*>(obj)->id << " passes diagnostics.\n";
     }
 
     TypeID TargetType() const override
@@ -66,9 +67,8 @@ struct PrintName : INode
     }
 };
 
-struct NPC { std::string name{"NPC"}; };
-struct Boss { std::string name{"Boss"}; };
-struct Player { std::string name{"Player"}; };
+struct Drone { std::string id{"Drone"}; };
+struct HeavyLifter { std::string id{"HeavyLifter"}; };
 
 template<class T>
 const INode* Resolve()
@@ -88,20 +88,21 @@ template<class T>
 void Call(const T& obj)
 {
     if (auto* n = Resolve<T>())
+    {
         n->Execute(&obj);
+    }
 }
 
 int main()
 {
-    PrintName<NPC> npc;
-    PrintName<Boss> boss;
-    PrintName<Player> player;
+    RunDiagnostic<Drone> droneDiag;
+    RunDiagnostic<HeavyLifter> lifterDiag;
 
-    NPC n{"Grunt"};
-    Boss b{"Dragon"};
-    Player p{"Alex"};
+    Drone d{"Scout-1"};
+    HeavyLifter h{"Loader-X"};
 
-    Call(n);
-    Call(b);
-    Call(p);
+    Call(d);
+    Call(h);
+
+    return 0;
 }

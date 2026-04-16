@@ -24,16 +24,38 @@
 // world we are trying to escape.”
 // ======================================================
 
-
 #include <iostream>
 #include <string>
+#include <memory>
 
-struct NPC { std::string name{"NPC"}; void Print() const { std::cout << name << "\n"; } };
-struct Boss { std::string name{"Boss"}; void Print() const { std::cout << name << "\n"; } };
-struct Player { std::string name{"Player"}; void Print() const { std::cout << name << "\n"; } };
+struct IHardware { virtual ~IHardware() = default; };
+
+struct Drone : IHardware { 
+    std::string id{"Drone"}; 
+    void Diag() const { std::cout << id << "\n"; } 
+};
+
+struct HeavyLifter : IHardware { 
+    std::string id{"HeavyLifter"}; 
+    void Diag() const { std::cout << id << "\n"; } 
+};
+
+class FacilityManager {
+public:
+    void Execute(IHardware* h) {
+        if (auto* d = dynamic_cast<Drone*>(h)) {
+            std::cout << "[MANAGER] Testing rotors: " << d->id << "\n";
+        } 
+        else if (auto* l = dynamic_cast<HeavyLifter*>(h)) {
+            std::cout << "[MANAGER] Testing hydraulics: " << l->id << "\n";
+        }
+    }
+};
 
 int main()
 {
-    NPC npc; Boss boss; Player player;
-    npc.Print(); boss.Print(); player.Print();
+    FacilityManager manager;
+    auto d = std::make_unique<Drone>();
+    manager.Execute(d.get());
+    return 0;
 }

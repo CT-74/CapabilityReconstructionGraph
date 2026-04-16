@@ -1,1 +1,6 @@
-canon/CANON_INTERNAL.md
+build/
+*.exe
+*.o
+*.obj
+.DS_Store
+generate_repo.py

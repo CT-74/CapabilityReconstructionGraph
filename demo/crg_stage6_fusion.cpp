@@ -6,7 +6,8 @@
 // Introduce deterministic identity-based resolution over projected behavior space.
 //
 // @what_changed:
-// Formalization of the "One thing is selected" rule. This is our first BIG Waouh.
+// Formalization of the "One thing is selected" rule using TypeList and Matrix.
+// This is our first BIG Waouh.
 //
 // @key_insight:
 // Fusion is the reconstruction of a capability from identity, global behavior, 
@@ -23,16 +24,13 @@
 // reconstructed from pure logic.”
 // ======================================================
 
-
 #include <iostream>
 #include <memory>
 #include <type_traits>
 #include <typeinfo>
 #include <string>
+#include <cstddef>
 
-// ======================================================
-// TYPE SYSTEM
-// ======================================================
 using TypeID = std::size_t;
 
 template<class T>
@@ -41,55 +39,40 @@ struct TypeIDOf
     static TypeID Get() { return typeid(T).hash_code(); }
 };
 
-// ======================================================
-// TYPE ERASURE TRANSPORT
-// ======================================================
-class TypeErasedShell
+// SBO Handle
+class HardwareHandle
 {
+    static constexpr std::size_t SBO_SIZE = 48;
 public:
-    struct Concept
-    {
-        virtual ~Concept() = default;
-        virtual TypeID GetTypeID() const = 0;
+    struct Concept { 
+        virtual ~Concept() = default; 
+        virtual TypeID GetTypeID() const = 0; 
     };
-
-    template<class T>
-    struct Model : Concept
-    {
+    template<class T> struct Model : Concept {
         T value;
-
         Model(T v) : value(std::move(v)) {}
-
-        TypeID GetTypeID() const override
-        {
-            return TypeIDOf<T>::Get();
-        }
+        TypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
     };
 
-    template<class T>
-    void Set(T v)
-    {
-        ptr = std::make_unique<Model<T>>(std::move(v));
+    HardwareHandle() = default;
+    ~HardwareHandle() { Reset(); }
+
+    template<class T> void Set(T v) {
+        static_assert(sizeof(Model<T>) <= SBO_SIZE, "SBO Capacity Exceeded!");
+        Reset();
+        new (&m_buffer) Model<T>(std::move(v));
+        m_set = true;
     }
 
-    TypeID GetTypeID() const
-    {
-        return ptr->GetTypeID();
-    }
-
-    template<class T>
-    const T& Get() const
-    {
-        return static_cast<Model<T>*>(ptr.get())->value;
-    }
+    TypeID GetTypeID() const { return reinterpret_cast<const Concept*>(&m_buffer)->GetTypeID(); }
+    template<class T> const T& Get() const { return static_cast<const Model<T>*>(reinterpret_cast<const Concept*>(&m_buffer))->value; }
 
 private:
-    std::unique_ptr<Concept> ptr;
+    void Reset() { if(m_set) { reinterpret_cast<Concept*>(&m_buffer)->~Concept(); m_set = false; } }
+    alignas(std::max_align_t) std::byte m_buffer[SBO_SIZE];
+    bool m_set = false;
 };
 
-// ======================================================
-// NODE LIST (runtime linked registry)
-// ======================================================
 template<class Derived, class Interface>
 class LinkedNode
 {
@@ -101,7 +84,6 @@ public:
     }
 
     Interface* GetNext() const { return m_next; }
-
     static Interface* GetHead() { return s_head; }
 
 private:
@@ -109,86 +91,55 @@ private:
     Interface* m_next = nullptr;
 };
 
-// ======================================================
-// INTERFACES
-// ======================================================
-struct IPrintName
+// Interfaces
+struct IDiagnostic
 {
-    virtual ~IPrintName() = default;
-    virtual void Execute(const TypeErasedShell&) const = 0;
+    virtual ~IDiagnostic() = default;
+    virtual void Execute(const HardwareHandle&) const = 0;
 };
 
-struct IPrintTypeID
+struct ITelemetry
 {
-    virtual ~IPrintTypeID() = default;
-    virtual void Execute(const TypeErasedShell&) const = 0;
+    virtual ~ITelemetry() = default;
+    virtual void Execute(const HardwareHandle&) const = 0;
 };
 
-// ======================================================
-// DOMAIN TYPES
-// ======================================================
-struct NPC    { std::string name{"NPC"}; };
-struct Boss   { std::string name{"Boss"}; };
-struct Player { std::string name{"Player"}; };
+// Domain
+struct Drone { std::string id{"Drone"}; };
+struct HeavyLifter { std::string id{"HeavyLifter"}; };
 
-// ======================================================
-// DEFINITIONS = NODE INSTANCES
-// ======================================================
+// Definitions
 template<class T>
-struct PrintNameDefinition
-    : IPrintName
-    , LinkedNode<PrintNameDefinition<T>, IPrintName>
+struct DiagDef : IDiagnostic, LinkedNode<DiagDef<T>, IDiagnostic>
 {
-    void Execute(const TypeErasedShell& t) const override
-    {
-        std::cout << "Generic: " << t.Get<T>().name << "\n";
+    void Execute(const HardwareHandle& h) const override {
+        std::cout << "Generic Diag: " << h.Get<T>().id << "\n";
     }
 };
 
 template<>
-struct PrintNameDefinition<Boss>
-    : IPrintName
-    , LinkedNode<PrintNameDefinition<Boss>, IPrintName>
+struct DiagDef<HeavyLifter> : IDiagnostic, LinkedNode<DiagDef<HeavyLifter>, IDiagnostic>
 {
-    void Execute(const TypeErasedShell& t) const override
-    {
-        std::cout << "🔥 BOSS: " << t.Get<Boss>().name << "\n";
-    }
-};
-
-template<>
-struct PrintNameDefinition<Player>
-    : IPrintName
-    , LinkedNode<PrintNameDefinition<Player>, IPrintName>
-{
-    void Execute(const TypeErasedShell& t) const override
-    {
-        std::cout << "Player: " << t.Get<Player>().name << "\n";
+    void Execute(const HardwareHandle& h) const override {
+        std::cout << "🔥 HEAVY DIAG: " << h.Get<HeavyLifter>().id << "\n";
     }
 };
 
 template<class T>
-struct PrintTypeIDDefinition
-    : IPrintTypeID
-    , LinkedNode<PrintTypeIDDefinition<T>, IPrintTypeID>
+struct TelemetryDef : ITelemetry, LinkedNode<TelemetryDef<T>, ITelemetry>
 {
-    void Execute(const TypeErasedShell& t) const override
-    {
-        std::cout << "TypeID=" << t.GetTypeID() << "\n";
+    void Execute(const HardwareHandle& h) const override {
+        std::cout << "Telemetry for TypeID=" << h.GetTypeID() << "\n";
     }
 };
 
 // ======================================================
-// MODEL LIST
+// THE MATRIX
 // ======================================================
-template<class...>
-struct TypeList;
+template<class...> struct TypeList;
 
-using Models = TypeList<NPC, Boss, Player>;
+using Models = TypeList<Drone, HeavyLifter>;
 
-// ======================================================
-// BEHAVIOR MATRIX (routing only)
-// ======================================================
 template<class ModelList, template<class> class... Defs>
 struct BehaviorMatrix;
 
@@ -196,19 +147,19 @@ template<class... Models, template<class> class... Defs>
 struct BehaviorMatrix<TypeList<Models...>, Defs...>
 {
     template<class Interface, class... Subset>
-    const Interface* Find(const TypeErasedShell& tes)
+    static const Interface* Find(const HardwareHandle& h)
     {
-        const auto id = tes.GetTypeID();
+        const auto id = h.GetTypeID();
         const Interface* result = nullptr;
 
         if constexpr (sizeof...(Subset) > 0)
         {
             const bool allowed = ((id == TypeIDOf<Subset>::Get()) || ...);
-            if (!allowed)
-                return nullptr;
+            if (!allowed) return nullptr;
         }
 
-        ((id == CRG::TypeIDOf<Models>::Get() &&
+        // Fold expression resolution over the variadic pack
+        ((id == TypeIDOf<Models>::Get() &&
             (result = Resolve<Interface>())), ...);
 
         return result;
@@ -218,55 +169,37 @@ private:
     template<class Interface>
     static const Interface* Resolve()
     {
-        Interface* head = Interface::GetHead();
-
-        // runtime node selection placeholder:
-        // iterate linked nodes and pick matching one if needed
-
-        return head;
+        // Runtime node selection
+        return Interface::GetHead();
     }
 };
 
-
-// ======================================================
-// DOMAIN BINDING
-// ======================================================
 using Behavior = BehaviorMatrix<
     Models,
-    PrintNameDefinition,
-    PrintTypeIDDefinition
+    DiagDef,
+    TelemetryDef
 >;
 
-static const Behavior gs_Behaviors;
-
-// ======================================================
-// API
-// ======================================================
 template<class Interface, class... Subset>
-void Call(const TypeErasedShell& tes)
+void Call(const HardwareHandle& h)
 {
-    if (const Interface* iface = Behavior::Find<Interface, Subset...>(tes))
+    if (const Interface* iface = Behavior::Find<Interface, Subset...>(h))
     {
-        iface->Execute(tes);
+        iface->Execute(h);
     }
 }
 
-// ======================================================
-// MAIN
-// ======================================================
 int main()
 {
-    TypeErasedShell tes;
+    HardwareHandle h;
 
-    tes.Set(NPC{"Grunt"});
-    Call<IPrintName>(tes);
-    Call<IPrintTypeID>(tes);
+    h.Set(Drone{"Scout-1"});
+    Call<IDiagnostic>(h);
+    Call<ITelemetry>(h);
 
-    tes.Set(Boss{"Dragon"});
-    Call<IPrintName>(tes);
-    Call<IPrintTypeID>(tes);
+    h.Set(HeavyLifter{"Loader-99"});
+    Call<IDiagnostic>(h);
+    Call<ITelemetry>(h);
 
-    tes.Set(Player{"Alex"});
-    Call<IPrintName>(tes);
-    Call<IPrintTypeID>(tes);
+    return 0;
 }

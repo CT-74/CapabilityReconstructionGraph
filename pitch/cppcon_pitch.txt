@@ -1,46 +1,23 @@
-================================================================================
-TITLE: A Runtime Capability Graph for External Behavior Composition in C++
-SUBTITLE: From Discovery to N-Dimensional Hypergraphs
-================================================================================
+# CppCon 2026 Pitch: Reconstructing Capabilities: The N-Dimensional Hypergraph
+**Speaker:** Cyril Tissier
+**Duration:** 60 Minutes
+**Target Audience:** Intermediate/Advanced C++ Software Architects, Robotics Engineers
 
---- THE HOOK (The "Killer Phrase") ---
-In most engines, adding a feature means touching a central registry. In the 
-Capability Reconstruction Graph (CRG) pattern, adding a feature is a purely 
-additive operation: you add a file, and the topology of the system expands 
-automatically. The "Manager" doesn't manage; it observes.
+### The Hook (00:00 - 05:00)
+"The Matrix doesn't manage; it observes." 
+Start with the pain every developer knows: the 3000-line `FacilityManager.cpp` filled with `dynamic_cast`. Show how adding one drone breaks the factory. Establish the goal: Zero heap, zero registries, infinite scalability.
 
---- ABSTRACT ---
-As systems scale, the "God Object" and the "Central Registry" become the 
-ultimate bottlenecks for build times and architectural sanity. We often turn 
-to ECS or Type Erasure to decouple data from logic, but we remain 
-structurally coupled to the "Manager" that binds them.
+### Act 1: The Zero-Heap Foundation (05:00 - 20:00)
+- **Stage 2:** The Type-Erased Shell. It's beautiful, but it uses `std::unique_ptr`. In robotics, the heap is lava.
+- **Stage 3:** The `HardwareHandle`. Live-code the Small Buffer Optimization (SBO) implementation. Show the `static_assert` that protects the stack. 
 
-This talk introduces the Capability Reconstruction Graph (CRG), an architectural 
-pattern that eliminates centralized registries in favor of emergent runtime 
-projections. By leveraging intrusive linked structures and variadic template 
-matrices, CRG allows behaviors to be defined externally and discovered 
-automatically across binary boundaries.
+### Act 2: Emergent Topology & The Trap (20:00 - 35:00)
+- **Stage 4 & 5:** Build the intrusive linked list. The graph emerges from static initialization.
+- **Stage 7 (The False Peak):** The RAII Trap. Demonstrate why using C++ scopes to register/unregister behaviors at runtime is a thread-safety nightmare. We don't mutate reality; we must change our lens.
 
-We will live-code (progression style) through 9 stages:
-1. Decentralized Discovery: Building a zero-boilerplate plugin system with 
-   simple intrusive topology.
-2. Identity & Fusion: Using Type Erasure to bind stable identities to 
-   external behavior definitions without structural storage.
-3. The N-Dimensional Shift: Moving beyond 2D mapping (Type -> Behavior) to 
-   hyper-contextual resolution where capabilities emerge from the 
-   intersection of Time (Epochs), Space (Biomes), and Authority.
+### Act 3: The N-Dimensional Matrix (35:00 - 50:00)
+- **Stage 8:** Introduce the Temporal Axis (SystemState). The graph is immutable; the coordinate changes.
+- **Stage 9:** The Grand Finale. Variadic fold expressions. We drop in `Args...` (Weather, Power, Security). The Matrix resolves the exact behavior intersection in O(1). 
 
-Attendees will leave with a new mental model for system composition: one where 
-the capability graph isn't a data structure you maintain, but a projection 
-you observe.
-
---- KEY TAKEAWAYS ---
-* How to implement a zero-allocation, registry-free discovery layer.
-* Why intrusive structures are the secret weapon for cross-DLL extensibility.
-* Techniques for N-dimensional behavior resolution using modern C++17/20 templates.
-* Performance strategies: SBO (Small Buffer Optimization) and static cache theory.
-
---- TARGET AUDIENCE ---
-Intermediate to Advanced C++ Developers, Engine Architects, and anyone 
-struggling with massive, tightly-coupled modular systems.
-================================================================================
+### Q&A (50:00 - 60:00)
+Buffer for audience questions regarding SBO cache-misses and template compilation times.

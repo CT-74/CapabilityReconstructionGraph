@@ -23,10 +23,10 @@
 // subset of reality is now visible.”
 // ======================================================
 
-
 #include <iostream>
 #include <string>
 #include <typeinfo>
+#include <cstddef>
 
 using TypeID = std::size_t;
 
@@ -54,11 +54,11 @@ protected:
 };
 
 template<class T>
-struct PrintName : INode
+struct RunDiagnostic : INode
 {
     void Execute(const void* obj) const override
     {
-        std::cout << static_cast<const T*>(obj)->name << "\n";
+        std::cout << static_cast<const T*>(obj)->id << " passes projection.\n";
     }
 
     TypeID TargetType() const override
@@ -67,9 +67,8 @@ struct PrintName : INode
     }
 };
 
-struct NPC { std::string name{"NPC"}; };
-struct Boss { std::string name{"Boss"}; };
-struct Player { std::string name{"Player"}; };
+struct Drone { std::string id{"Drone"}; };
+struct HeavyLifter { std::string id{"HeavyLifter"}; };
 
 template<class T, class... Subset>
 const INode* Resolve()
@@ -80,7 +79,9 @@ const INode* Resolve()
     {
         const bool allowed = ((id == TypeIDOf<Subset>::Get()) || ...);
         if (!allowed)
+        {
             return nullptr;
+        }
     }
 
     for (auto* n = INode::head; n; n = n->next)
@@ -96,22 +97,30 @@ template<class T, class... Subset>
 void Call(const T& obj)
 {
     if (auto* n = Resolve<T, Subset...>())
+    {
         n->Execute(&obj);
+    }
+    else
+    {
+        std::cout << obj.id << " dropped by projection filter.\n";
+    }
 }
 
 int main()
 {
-    PrintName<NPC> npc;
-    PrintName<Boss> boss;
-    PrintName<Player> player;
+    RunDiagnostic<Drone> droneDiag;
+    RunDiagnostic<HeavyLifter> lifterDiag;
 
-    NPC n{"Grunt"};
-    Boss b{"Dragon"};
-    Player p{"Alex"};
+    Drone d{"Scout-1"};
+    HeavyLifter h{"Loader-X"};
 
-    Call(n);
-    Call(b);
-    Call(p);
+    Call(d);
+    Call(h);
 
-    Call<Boss, Boss>(b);
+    // Apply projection: Only HeavyLifters are visible in this call
+    std::cout << "\nApplying Subset Projection...\n";
+    Call<HeavyLifter, HeavyLifter>(h);
+    Call<Drone, HeavyLifter>(d); // Will be dropped
+
+    return 0;
 }

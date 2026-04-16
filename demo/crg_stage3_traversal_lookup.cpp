@@ -1,12 +1,13 @@
 // ======================================================
-// STAGE 3 — IDENTITY-BASED RESOLUTION
+// STAGE 3 — IDENTITY-BASED RESOLUTION (SBO)
 // ======================================================
 //
 // @intent:
-// Introduce lookup via traversal instead of mapping.
+// Introduce lookup via traversal instead of mapping, and move to zero-allocation.
 //
 // @what_changed:
 // Traversal-based resolution over linked nodes using TypeID matching.
+// HardwareShell evolves into HardwareHandle using Small Buffer Optimization (SBO).
 //
 // @key_insight:
 // We don't need a hash map. Lookup is an emergent property of walking 
@@ -23,21 +24,26 @@
 // starting to reconstruct information.”
 // ======================================================
 
-
 #include <iostream>
-#include <memory>
+#include <cstddef>
 #include <typeinfo>
+#include <string>
 
 using TypeID = std::size_t;
 
 template<class T>
 struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
 
-// --- identity ---
-class ErasedTransport
+// --- Identity (SBO Transport) ---
+class HardwareHandle
 {
+    static constexpr std::size_t SBO_SIZE = 48;
+
 public:
-    struct Concept { virtual ~Concept() = default; virtual TypeID GetTypeID() const = 0; };
+    struct Concept { 
+        virtual ~Concept() = default; 
+        virtual TypeID GetTypeID() const = 0; 
+    };
 
     template<class T>
     struct Model : Concept
@@ -47,30 +53,58 @@ public:
         TypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
     };
 
-    template<class T>
-    void Set(T v) { ptr = std::make_unique<Model<T>>(std::move(v)); }
+    HardwareHandle() = default;
+    
+    ~HardwareHandle() { Reset(); }
 
-    TypeID GetTypeID() const { return ptr->GetTypeID(); }
+    template<class T>
+    void Set(T v) 
+    {
+        static_assert(sizeof(Model<T>) <= SBO_SIZE, "SBO Capacity Exceeded!");
+        Reset();
+        new (&m_buffer) Model<T>(std::move(v));
+        m_set = true;
+    }
+
+    TypeID GetTypeID() const { 
+        return reinterpret_cast<const Concept*>(&m_buffer)->GetTypeID(); 
+    }
 
     template<class T>
-    const T& Get() const { return static_cast<Model<T>*>(ptr.get())->value; }
+    const T& Get() const { 
+        return static_cast<const Model<T>*>(reinterpret_cast<const Concept*>(&m_buffer))->value; 
+    }
 
 private:
-    std::unique_ptr<Concept> ptr;
+    void Reset() 
+    {
+        if (m_set) 
+        { 
+            reinterpret_cast<Concept*>(&m_buffer)->~Concept(); 
+            m_set = false; 
+        }
+    }
+
+    alignas(std::max_align_t) std::byte m_buffer[SBO_SIZE];
+    bool m_set = false;
 };
 
-// --- behavior space ---
+// --- Behavior Space ---
 struct INode
 {
     virtual ~INode() = default;
-    virtual void Execute(const ErasedTransport&) const = 0;
+    virtual void Execute(const HardwareHandle&) const = 0;
     virtual TypeID TargetType() const = 0;
 
     INode* GetNext() const { return m_next; }
     static INode* GetHead() { return s_head; }
 
 protected:
-    INode() { m_next = s_head; s_head = this; }
+    INode() 
+    { 
+        m_next = s_head; 
+        s_head = this; 
+    }
 
 private:
     inline static INode* s_head = nullptr;
@@ -78,11 +112,11 @@ private:
 };
 
 template<class T>
-struct PrintNode : INode
+struct DiagNode : INode
 {
-    void Execute(const ErasedTransport& t) const override
+    void Execute(const HardwareHandle& h) const override
     {
-        std::cout << t.Get<T>().name << "\n";
+        std::cout << h.Get<T>().id << " diagnostic complete.\n";
     }
 
     TypeID TargetType() const override
@@ -91,27 +125,34 @@ struct PrintNode : INode
     }
 };
 
-struct NPC { std::string name{"NPC"}; };
-struct Boss { std::string name{"Boss"}; };
-struct Player { std::string name{"Player"}; };
+struct Drone { std::string id{"Drone"}; };
+struct HeavyLifter { std::string id{"HeavyLifter"}; };
 
 template<class Interface>
-const Interface* Find(const ErasedTransport& t)
+const Interface* Find(const HardwareHandle& h)
 {
     for (auto* n = INode::GetHead(); n; n = n->GetNext())
-        if (n->TargetType() == t.GetTypeID())
+    {
+        if (n->TargetType() == h.GetTypeID())
+        {
             return static_cast<const Interface*>(n);
-
+        }
+    }
     return nullptr;
 }
 
 int main()
 {
-    PrintNode<NPC> a; PrintNode<Boss> b; PrintNode<Player> c;
+    DiagNode<Drone> a; 
+    DiagNode<HeavyLifter> b;
 
-    ErasedTransport t;
-    t.Set(Boss{"Dragon"});
+    HardwareHandle h;
+    h.Set(HeavyLifter{"Loader-99"});
 
-    if (auto* n = Find<INode>(t))
-        n->Execute(t);
+    if (auto* n = Find<INode>(h))
+    {
+        n->Execute(h);
+    }
+
+    return 0;
 }

@@ -23,13 +23,12 @@
 // in the wake of our objects.”
 // ======================================================
 
-
 #include <iostream>
 
 struct INode
 {
     virtual ~INode() = default;
-    virtual void Print() const = 0;
+    virtual void Diag() const = 0;
 
     INode* GetNext() const { return m_next; }
     static INode* GetHead() { return s_head; }
@@ -46,14 +45,23 @@ private:
     INode* m_next = nullptr;
 };
 
-struct NPCNode : INode { void Print() const override { std::cout << "NPC\n"; } };
-struct BossNode : INode { void Print() const override { std::cout << "Boss\n"; } };
-struct PlayerNode : INode { void Print() const override { std::cout << "Player\n"; } };
+struct DroneNode : INode { 
+    void Diag() const override { std::cout << "Drone Node Active\n"; } 
+};
+
+struct HeavyLifterNode : INode { 
+    void Diag() const override { std::cout << "HeavyLifter Node Active\n"; } 
+};
 
 int main()
 {
-    NPCNode a; BossNode b; PlayerNode c;
+    DroneNode a; 
+    HeavyLifterNode b; 
 
     for (auto* n = INode::GetHead(); n; n = n->GetNext())
-        n->Print();
+    {
+        n->Diag();
+    }
+
+    return 0;
 }
