@@ -1,5 +1,11 @@
 # Canon v1 — Capability Graph Structural Model (Public View)
 
+**Author & Architect:** Cyril Tissier
+
+*Disclaimer: This document defines an abstract architectural pattern. It is a conceptual model for educational purposes and does not represent proprietary implementation details.*
+
+---
+
 ## 1. Purpose
 
 This document defines the stable conceptual model behind a runtime capability graph for external behavior composition in C++ systems.
@@ -8,80 +14,78 @@ It describes structural properties of the system, not implementation details.
 
 ---
 
-## 2. Core Principle
+## 2. Core Principle: The N-Dimensional Intersection
 
-The system models behavior as a structural relationship between:
+The system models behavior not as a stored property, but as a **reconstructed projection** at the intersection of independent spaces:
 
-- Identity (stable runtime anchors)
-- Behavior (externally defined capabilities)
+- **Identity Space:** Stable runtime anchors (Type-Erased handles).
+- **Behavior Space:** Externally defined capabilities (Interfaces).
+- **Contextual Axes:** Orthogonal domain coordinates (Time/Epochs, Space/Biomes, Network Authority).
 
-These relationships form a distributed capability space.
-
----
-
-## 3. Key Property: Distributed Definition
-
-Capabilities are not centrally stored.
-
-They are defined across independent modules and collectively form a coherent graph-like structure.
+The capability graph is the observed result of intersecting these dimensions.
 
 ---
 
-## 4. Two Views of the Same System
+## 3. Key Property: Distributed & Emergent Definition
 
-The capability space is not a single structure, but is interpreted through two complementary views:
+Capabilities are not centrally stored in registries or hash maps.
+
+They are defined across independent modules and collectively form a coherent, emergent structure. The graph "exists" only through the logic of its resolution rules.
+
+---
+
+## 4. Views of the System
+
+The capability space is interpreted through complementary views derived from the same underlying definitions:
 
 ### 4.1 Discovery View (List-mode)
-- Enumerates all available capability bindings
-- Provides traversal over the full set of defined relationships
-- Answers: “what exists?”
+- Enumerates all available capability bindings.
+- Provides traversal over the full set of defined relationships.
+- Answers: “What exists in the global behavior space?”
 
-### 4.2 Resolution View (Map-mode)
-- Enables deterministic lookup of behavior by identity or key
-- Provides structured access to capabilities
-- Answers: “what applies to this identity?”
-
-Both views are derived from the same underlying definitions.
+### 4.2 Resolution View (Map-mode / Matrix-mode)
+- Enables deterministic lookup of behavior by intersecting Identity and Contextual coordinates.
+- Provides structured, type-safe access to capabilities.
+- Answers: “What applies to this identity at this specific coordinate (Time, Space, Role)?”
 
 ---
 
 ## 5. Structural Reconstruction
 
-The capability graph is not stored as a persistent global structure.
+The capability graph is not a persistent global data structure.
 
-Instead, it is reconstructed from distributed definitions when needed.
-
-This reconstruction produces different representations depending on the access pattern (discovery vs resolution).
+It is reconstructed from distributed definitions upon request. This reconstruction is:
+- **Lazy:** Processed only when a query occurs.
+- **Projected:** Only the requested subset of the N-Dimensional space is materialized.
+- **Deterministic:** The same inputs (Identity + Context) always yield the same Capability.
 
 ---
 
-## 6. Lifecycle Model
+## 6. Lifecycle & Context Model
 
-Behavior associations are persistent structural relationships that exist throughout the system lifecycle.
+Behavior associations are durable bindings, but their **activation** is governed by contextual coordinates.
 
-They are not transient effects, but durable bindings between identity and behavior definitions.
-
-Runtime mutation is possible but not the primary organizing principle of the model.
+- **Persistence:** Relationships exist throughout the system lifecycle.
+- **Fluidity:** The "active" capability graph morphs seamlessly as contextual axes (like Time) evolve, without requiring structural mutation of the underlying nodes.
 
 ---
 
 ## 7. System Properties
 
-- No central ownership of behavior definitions
-- Many-to-many relationship between identities and behaviors
-- Deterministic reconstruction of capability views
-- Modular extension through independent definitions
-- Emergent structure rather than precomputed graph storage
+- **No Central Ownership:** Modules define their own behavior-identity-context triplets.
+- **N-Dimensional Scaling:** New axes (dimensions) can be added without refactoring existing ones.
+- **Many-to-Many-to-Many:** Infinite cardinality between identities, behaviors, and contexts.
+- **O(1) Structural Cost:** Topological changes are intrusive and do not require heap allocations.
+- **Emergent Projection:** The graph is a view, not a container.
 
 ---
 
 ## 8. Application Domains
 
-- large-scale C++ systems
-- plugin-capable architectures
-- runtime extensibility layers
-- debugging and introspection systems
-- modular simulation architectures
+- Large-scale, high-performance C++ systems (Engines, Simulators).
+- Plugin-capable architectures with zero-registry overhead.
+- Hyper-contextual gameplay systems (Complex AI/Combat logic).
+- Runtime extensibility layers and modular instrumentation.
 
 ---
 
