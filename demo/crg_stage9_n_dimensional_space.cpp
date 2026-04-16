@@ -9,16 +9,16 @@
 // @what_changed:
 // - The matrix blindly forwards N-dimensional arguments (Args...) to Resolve.
 // - Definitions use semantic NTTP wrappers (When<>, In<>, Auth<>).
-// - Aliases map hyper-coordinates to the single domain matrix instance.
+// - Matrix support for variadic template-template parameters.
 //
 // @key_insight:
-// The matrix doesn't know what 'Time' is. It just evaluates an intersection of 
-// orthogonal coordinates. If we can pass time, we can pass space, authority, and factions.
+// The matrix doesn't know what 'Time' or 'Space' is. It just evaluates an 
+// intersection of orthogonal coordinates. The "Manager" doesn't manage; it observes.
 //
 // @what_is_not:
-// No hardcoded dimensions
-// No centralized maps
-// No structural allocations
+// No hardcoded dimensions.
+// No centralized maps.
+// No structural allocations.
 //
 // @transition:
 // [End of Talk - Conclusion]
@@ -35,7 +35,7 @@
 #include <string>
 
 // ======================================================
-// STAGE 9: N-DIMENSIONAL DOMAIN AXES
+// N-DIMENSIONAL DOMAIN AXES
 // ======================================================
 enum class Epoch { Any, Init, Combat };
 enum class Biome { Any, Desert, Tundra };
@@ -47,31 +47,31 @@ template<auto V> using In   = std::integral_constant<decltype(V), V>;
 template<auto V> using Auth = std::integral_constant<decltype(V), V>;
 
 // ======================================================
-// TYPE SYSTEM
+// TYPE SYSTEM & IDENTITY
 // ======================================================
 using TypeID = std::size_t;
 
 template<class T>
-struct TypeIDOf
-{
+struct TypeIDOf {
     static TypeID Get() { return typeid(T).hash_code(); }
 };
+
+struct NPC    { std::string name; };
+struct Boss   { std::string name; };
+struct Player { std::string name; };
 
 // ======================================================
 // TYPE ERASURE TRANSPORT (EPHEMERAL HANDLE)
 // ======================================================
-class TypeErasedShell
-{
+class TypeErasedShell {
 public:
-    struct Concept
-    {
+    struct Concept {
         virtual ~Concept() = default;
         virtual TypeID GetTypeID() const = 0;
     };
 
     template<class T>
-    struct Model : Concept
-    {
+    struct Model : Concept {
         T value;
         Model(T v) : value(std::move(v)) {}
         TypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
@@ -90,211 +90,153 @@ private:
 };
 
 // ======================================================
-// NODE LIST
+// CORE ARCHITECTURE: THE INTRUSIVE DISCOVERY LAYER
 // ======================================================
 template<class Derived, class Interface>
-class LinkedNode
-{
+class LinkedNode {
 public:
-    LinkedNode()
-    {
+    LinkedNode() {
         m_next = s_head;
         s_head = static_cast<Interface*>(static_cast<Derived*>(this));
     }
-
     Interface* GetNext() const { return m_next; }
     static Interface* GetHead() { return s_head; }
-
 private:
     inline static Interface* s_head = nullptr;
     Interface* m_next = nullptr;
 };
 
 // ======================================================
-// INTERFACES (N-DIMENSIONAL MATCHING)
+// THE CAPABILITY INTERFACE (N-DIMENSIONAL MATCHING)
 // ======================================================
-struct IExecuteAction
-{
+struct IExecuteAction {
     virtual ~IExecuteAction() = default;
     virtual void Execute(const TypeErasedShell&) const = 0;
     
-    // The Interface explicitly dictates the dimensions it evaluates
+    // Variadic Match for N-Dimensional coordinates
     virtual bool Match(TypeID id, Epoch e, Biome b, Role r) const = 0;
 };
 
-// ======================================================
-// DOMAIN TYPES
-// ======================================================
-struct NPC    { std::string name{"NPC"}; };
-struct Boss   { std::string name{"Boss"}; };
-struct Player { std::string name{"Player"}; };
-
-// ======================================================
-// DEFINITIONS = NODE INSTANCES
-// ======================================================
-template<
-    class T, 
-    class T_Epoch = When<Epoch::Any>, 
-    class T_Biome = In<Biome::Any>, 
-    class T_Role  = Auth<Role::Any>
->
-struct ActionDefinition
-    : IExecuteAction
-    , LinkedNode<ActionDefinition<T, T_Epoch, T_Biome, T_Role>, IExecuteAction>
-{
-    bool Match(TypeID id, Epoch e, Biome b, Role r) const override 
-    {
+// Base template for definitions
+template<class T, class T_E = When<Epoch::Any>, class T_B = In<Biome::Any>, class T_R = Auth<Role::Any>>
+struct ActionDefinition : IExecuteAction, LinkedNode<ActionDefinition<T, T_E, T_B, T_R>, IExecuteAction> {
+    bool Match(TypeID id, Epoch e, Biome b, Role r) const override {
         return id == TypeIDOf<T>::Get() && 
-               (T_Epoch::value == Epoch::Any || T_Epoch::value == e) &&
-               (T_Biome::value == Biome::Any || T_Biome::value == b) &&
-               (T_Role::value  == Role::Any  || T_Role::value  == r);
+               (T_E::value == Epoch::Any || T_E::value == e) &&
+               (T_B::value == Biome::Any || T_B::value == b) &&
+               (T_R::value == Role::Any  || T_R::value == r);
     }
-
-    void Execute(const TypeErasedShell& t) const override
-    {
-        std::cout << "[GENERIC ACTION] " << t.Get<T>().name << " does something generic.\n";
-    }
-};
-
-// --- SPECIALIZATIONS ---
-
-// The Hyper-Contextual Definition: Boss, in Combat, in the Desert, on the Server!
-template<>
-struct ActionDefinition<Boss, When<Epoch::Combat>, In<Biome::Desert>, Auth<Role::Server>>
-    : IExecuteAction
-    , LinkedNode<ActionDefinition<Boss, When<Epoch::Combat>, In<Biome::Desert>, Auth<Role::Server>>, IExecuteAction>
-{
-    bool Match(TypeID id, Epoch e, Biome b, Role r) const override 
-    {
-        return id == TypeIDOf<Boss>::Get() && 
-               e == Epoch::Combat && 
-               b == Biome::Desert && 
-               r == Role::Server;
-    }
-
-    void Execute(const TypeErasedShell& t) const override
-    {
-        std::cout << "[SERVER-AUTHORITATIVE] 🔥 " << t.Get<Boss>().name << " casts DESERT SANDSTORM!\n";
+    void Execute(const TypeErasedShell& t) const override {
+        std::cout << "[GENERIC] " << t.Get<T>().name << " performs a standard action.\n";
     }
 };
 
 // ======================================================
-// ALIASES FOR BEHAVIOR MATRIX PACK EXPANSION
-// ======================================================
-template<class T> 
-using GenericActionDef = ActionDefinition<T>;
-
-template<class T> 
-using SandstormActionDef = ActionDefinition<T, When<Epoch::Combat>, In<Biome::Desert>, Auth<Role::Server>>;
-
-// ======================================================
-// MODEL LIST
+// BEHAVIOR MATRIX (THE OBSERVER)
 // ======================================================
 template<class...> struct TypeList;
 using Models = TypeList<NPC, Boss, Player>;
 
-// ======================================================
-// BEHAVIOR MATRIX (AUTO-REGISTRATION + N-DIMENSIONAL ROUTING)
-// ======================================================
-template<class ModelT, template<class> class... Defs>
-struct BehaviorMatrixSingle : public Defs<ModelT>... 
-{
-};
+// Fixed: template<class...> for variadic template-template support
+template<class ModelT, template<class...> class... Defs>
+struct BehaviorMatrixSingle : public Defs<ModelT>... {};
 
-template<class ModelList, template<class> class... Defs>
+template<class ModelList, template<class...> class... Defs>
 struct BehaviorMatrix;
 
-template<class... Models, template<class> class... Defs>
-struct BehaviorMatrix<TypeList<Models...>, Defs...> 
-    : public BehaviorMatrixSingle<Models, Defs...>...
-{
-    // The Matrix blindly forwards variadic Args... to the Interface
+template<class... Models, template<class...> class... Defs>
+struct BehaviorMatrix<TypeList<Models...>, Defs...> : public BehaviorMatrixSingle<Models, Defs...>... {
+    
     template<class Interface, class... Subset, class... Args>
-    static const Interface* Find(const TypeErasedShell& tes, Args... args)
-    {
+    static const Interface* Find(const TypeErasedShell& tes, Args... args) {
         const auto id = tes.GetTypeID();
         const Interface* result = nullptr;
 
-        if constexpr (sizeof...(Subset) > 0)
-        {
-            const bool allowed = ((id == TypeIDOf<Subset>::Get()) || ...);
-            if (!allowed)
-                return nullptr;
+        // Optional Projection Filter (Static subsetting)
+        if constexpr (sizeof...(Subset) > 0) {
+            if (!((id == TypeIDOf<Subset>::Get()) || ...)) return nullptr;
         }
 
-        // Strict compile-time identity gate routing
-        ((id == TypeIDOf<Models>::Get() &&
-            (result = Resolve<Interface>(id, args...))), ...);
-
+        // Search in all registered models
+        ((id == TypeIDOf<Models>::Get() && (result = Resolve<Interface>(id, args...))), ...);
         return result;
     }
 
 private:
     template<class Interface, class... Args>
-    static const Interface* Resolve(TypeID id, Args... args)
-    {
-        for (Interface* n = Interface::GetHead(); n != nullptr; n = n->GetNext()) 
-        {
-            // The N-Dimensional intersection occurs here
-            if (n->Match(id, args...)) 
-            {
-                return n;
-            }
+    static const Interface* Resolve(TypeID id, Args... args) {
+        for (Interface* n = Interface::GetHead(); n != nullptr; n = n->GetNext()) {
+            if (n->Match(id, args...)) return n;
         }
         return nullptr;
     }
 };
 
-// ======================================================
-// DOMAIN BINDING
-// ======================================================
-using ActionDomainBehavior = BehaviorMatrix<
-    Models,
-    GenericActionDef,
-    SandstormActionDef
->;
+// Aliases for matrix expansion
+template<class T> using GenericDef = ActionDefinition<T>;
+template<class T> using SandstormDef = ActionDefinition<T, When<Epoch::Combat>, In<Biome::Desert>, Auth<Role::Server>>;
 
-// A single static instantiation builds the entire N-Dimensional Hypergraph!
-static const ActionDomainBehavior gs_Behaviors;
+using ActionDomain = BehaviorMatrix<Models, GenericDef, SandstormDef>;
+static const ActionDomain gs_Registry; // The matrix observes the topology
 
 // ======================================================
 // API
 // ======================================================
 template<class Interface, class... Subset, class... Args>
-void Call(const TypeErasedShell& tes, Args... args)
-{
-    if (const Interface* iface = ActionDomainBehavior::Find<Interface, Subset...>(tes, args...))
-    {
+void Call(const TypeErasedShell& tes, Args... args) {
+    if (const Interface* iface = ActionDomain::Find<Interface, Subset...>(tes, args...)) {
         iface->Execute(tes);
+    } else {
+        std::cout << "No capability found for this coordinate.\n";
     }
 }
 
 // ======================================================
-// MAIN
+// DECENTRALIZED MODULES (The "Invisible" Logic)
 // ======================================================
-int main()
-{
+
+namespace { // Simulate Plugin_Core.cpp
+    static GenericDef<NPC>    g_regNPC;
+    static GenericDef<Boss>   g_regBoss;
+    static GenericDef<Player> g_regPlayer;
+}
+
+namespace { // Simulate Plugin_DesertCombat_Server.cpp
+    // This specialization is invisible to the rest of the file.
+    struct DesertSandstorm : IExecuteAction, LinkedNode<DesertSandstorm, IExecuteAction> {
+        bool Match(TypeID id, Epoch e, Biome b, Role r) const override {
+            return id == TypeIDOf<Boss>::Get() && 
+                   e == Epoch::Combat && 
+                   b == Biome::Desert && 
+                   r == Role::Server;
+        }
+        void Execute(const TypeErasedShell& t) const override {
+            std::cout << "[SERVER-ONLY] 🔥 " << t.Get<Boss>().name << " unleashes a LETHAL SANDSTORM!\n";
+        }
+    };
+    static DesertSandstorm auto_reg_sandstorm; 
+}
+
+// ======================================================
+// MAIN: THE HYPER-COORDINATE TEST
+// ======================================================
+int main() {
     TypeErasedShell boss; boss.Set(Boss{"Scorpion King"});
     TypeErasedShell npc;  npc.Set(NPC{"Merchant"});
 
-    std::cout << "--- STAGE 9: N-DIMENSIONAL RESOLUTION TESTS ---\n\n";
+    std::cout << "--- STAGE 9: N-DIMENSIONAL RECONSTRUCTION ---\n\n";
 
-    // Test 1: NPC in standard context
-    std::cout << "NPC (Combat, Desert, Client):\n  -> ";
-    Call<IExecuteAction>(npc, Epoch::Combat, Biome::Desert, Role::Client);
-
-    // Test 2: Boss spawning (Generic fallback)
-    std::cout << "\nBoss (Init, Tundra, Server):\n  -> ";
-    Call<IExecuteAction>(boss, Epoch::Init, Biome::Tundra, Role::Server);
-
-    // Test 3: Boss in combat, in Desert, but on Client!
-    std::cout << "\nBoss (Combat, Desert, Client):\n  -> ";
+    // Test 1: Boss in Combat, but on Client (Security: fallbacks to generic)
+    std::cout << "Boss (Combat, Desert, Client):\n  -> ";
     Call<IExecuteAction>(boss, Epoch::Combat, Biome::Desert, Role::Client);
-    // (Uses the generic action, protecting game state on the client)
 
-    // Test 4: The Exact Hyper-Coordinate!
+    // Test 2: The Exact Hyper-Coordinate (Specialization found)
     std::cout << "\nBoss (Combat, Desert, Server):\n  -> ";
     Call<IExecuteAction>(boss, Epoch::Combat, Biome::Desert, Role::Server);
+
+    // Test 3: NPC in the same coordinate (No sandstorm, falls back to generic)
+    std::cout << "\nNPC (Combat, Desert, Server):\n  -> ";
+    Call<IExecuteAction>(npc, Epoch::Combat, Biome::Desert, Role::Server);
 
     return 0;
 }

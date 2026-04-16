@@ -1,45 +1,46 @@
-# Title:
-A Runtime Capability Graph for External Behavior Composition in C++
+================================================================================
+TITLE: A Runtime Capability Graph for External Behavior Composition in C++
+SUBTITLE: From Discovery to N-Dimensional Hypergraphs
+================================================================================
 
-## Abstract:
+--- THE HOOK (The "Killer Phrase") ---
+In most engines, adding a feature means touching a central registry. In the 
+Capability Reconstruction Graph (CRG) pattern, adding a feature is a purely 
+additive operation: you add a file, and the topology of the system expands 
+automatically. The "Manager" doesn't manage; it observes.
 
-This talk presents a structural model for composing behavior in C++ systems where functionality is not embedded in objects, but emerges from the interaction of independent runtime-defined spaces.
+--- ABSTRACT ---
+As systems scale, the "God Object" and the "Central Registry" become the 
+ultimate bottlenecks for build times and architectural sanity. We often turn 
+to ECS or Type Erasure to decouple data from logic, but we remain 
+structurally coupled to the "Manager" that binds them.
 
-Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore how a capability system can emerge from orthogonal and independent structures: a structural graph, an identity space, a behavior definition space, and N-Dimensional contextual axes.
+This talk introduces the Capability Reconstruction Graph (CRG), an architectural 
+pattern that eliminates centralized registries in favor of emergent runtime 
+projections. By leveraging intrusive linked structures and variadic template 
+matrices, CRG allows behaviors to be defined externally and discovered 
+automatically across binary boundaries.
 
-The key idea is that no explicit capability graph is ever constructed. Instead, what appears as a graph is the result of traversing and correlating these independently evolving runtime spaces.
+We will live-code (progression style) through 9 stages:
+1. Decentralized Discovery: Building a zero-boilerplate plugin system with 
+   simple intrusive topology.
+2. Identity & Fusion: Using Type Erasure to bind stable identities to 
+   external behavior definitions without structural storage.
+3. The N-Dimensional Shift: Moving beyond 2D mapping (Type -> Behavior) to 
+   hyper-contextual resolution where capabilities emerge from the 
+   intersection of Time (Epochs), Space (Biomes), and Authority.
 
-The talk progressively builds this model in nine stages:
+Attendees will leave with a new mental model for system composition: one where 
+the capability graph isn't a data structure you maintain, but a projection 
+you observe.
 
-1. Structural Primitive (CRG-v0)  
-   A runtime-linked graph forms through intrusive self-registration of nodes. No container or registry exists; structure is defined purely by traversal.
+--- KEY TAKEAWAYS ---
+* How to implement a zero-allocation, registry-free discovery layer.
+* Why intrusive structures are the secret weapon for cross-DLL extensibility.
+* Techniques for N-dimensional behavior resolution using modern C++17/20 templates.
+* Performance strategies: SBO (Small Buffer Optimization) and static cache theory.
 
-2. Identity Space  
-   Each element is extended with a stable runtime identity. This identity exists independently of structure and introduces no behavior semantics.
-
-3. Identity-Based Resolution  
-   A traversal-based lookup layer is introduced over the identity space. This is not a map or registry, but a runtime resolution mechanism based on scanning existing structures.
-
-4. External Behavior Definitions  
-   Behavior is fully decoupled from identity and defined in a separate external space. Multiple definitions may exist for the same identity domain.
-
-5. Projection (Visibility)  
-   A compile-time constraint layer is introduced. It acts as a visibility lens, restricting which nodes are mathematically observable without altering the underlying graph structure.
-
-6. Fusion (Deterministic Selection)  
-   Deterministic runtime resolution binds identity to behavior under projection constraints. The system acts as a flat 2D capability map where one concrete capability is reconstructed.
-
-7. Contextual Lifecycle (The False Peak)  
-   An attempt to control capability over time using C++ lifetime semantics (RAII). This introduces dynamic scoping but proves structurally weak, thread-unsafe, and insufficient to model true domain state progression.
-
-8. The Temporal Axis (3D Space)  
-   A true domain axis is introduced to model time. Identity is evaluated against a temporal coordinate (Logical Epochs), transitioning the system to a 3D phase space where capabilities shift dynamically as time evolves.
-
-9. The N-Dimensional Context Space (Hypergraph)  
-   The resolution matrix is abstracted to support variadic, orthogonal coordinate axes (Space, Authority, Factions). An infinitely complex, hyper-contextual capability hypergraph emerges at runtime.
-
-The result is a system where "capabilities" are not stored or explicitly modeled, but observed as an emergent property of N-Dimensional interacting structures.
-
-While the core progression focuses on architectural implications, the talk grounds these concepts in AAA production realities. We demonstrate how Small Buffer Optimization (SBO) guarantees zero-allocation ephemeral identity transport, and how C++17 Non-Type Template Parameters (NTTPs) provide a zero-friction, type-safe API for developers.
-
-The talk concludes by reframing capability graphs not as data structures, but as emergent, zero-cost projections of interacting systems.
+--- TARGET AUDIENCE ---
+Intermediate to Advanced C++ Developers, Engine Architects, and anyone 
+struggling with massive, tightly-coupled modular systems.
+================================================================================
