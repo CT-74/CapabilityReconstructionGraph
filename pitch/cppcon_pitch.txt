@@ -5,11 +5,11 @@ A Runtime Capability Graph for External Behavior Composition in C++
 
 This talk presents a structural model for composing behavior in C++ systems where functionality is not embedded in objects, but emerges from the interaction of independent runtime-defined spaces.
 
-Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore how a capability system can emerge from three minimal and independent structures: a structural graph, an identity space, and a behavior definition space.
+Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore how a capability system can emerge from orthogonal and independent structures: a structural graph, an identity space, a behavior definition space, and N-Dimensional contextual axes.
 
 The key idea is that no explicit capability graph is ever constructed. Instead, what appears as a graph is the result of traversing and correlating these independently evolving runtime spaces.
 
-The talk progressively builds this model in five stages:
+The talk progressively builds this model in nine stages:
 
 1. Structural Primitive (CRG-v0)  
    A runtime-linked graph forms through intrusive self-registration of nodes. No container or registry exists; structure is defined purely by traversal.
@@ -23,11 +23,23 @@ The talk progressively builds this model in five stages:
 4. External Behavior Definitions  
    Behavior is fully decoupled from identity and defined in a separate external space. Multiple definitions may exist for the same identity domain.
 
-5. Composition (CRG-v1 Conceptual Extension)  
-   Three independent spaces — structure, identity, and behavior — interact through traversal-based resolution. From this interaction, a runtime capability matrix emerges without any explicit graph, registry, or centralized mapping structure.
+5. Projection (Visibility)  
+   A compile-time constraint layer is introduced. It acts as a visibility lens, restricting which nodes are mathematically observable without altering the underlying graph structure.
 
-The result is a system where "capabilities" are not stored or explicitly modeled, but observed as an emergent property of interacting runtime structures.
+6. Fusion (Deterministic Selection)  
+   Deterministic runtime resolution binds identity to behavior under projection constraints. The system acts as a flat 2D capability map where one concrete capability is reconstructed.
 
-Implementation details are intentionally minimal to focus on architectural implications rather than specific C++ techniques.
+7. Contextual Lifecycle (The False Peak)  
+   An attempt to control capability over time using C++ lifetime semantics (RAII). This introduces dynamic scoping but proves structurally weak, thread-unsafe, and insufficient to model true domain state progression.
 
-The talk concludes by reframing capability graphs not as data structures, but as emergent projections of interacting systems.
+8. The Temporal Axis (3D Space)  
+   A true domain axis is introduced to model time. Identity is evaluated against a temporal coordinate (Logical Epochs), transitioning the system to a 3D phase space where capabilities shift dynamically as time evolves.
+
+9. The N-Dimensional Context Space (Hypergraph)  
+   The resolution matrix is abstracted to support variadic, orthogonal coordinate axes (Space, Authority, Factions). An infinitely complex, hyper-contextual capability hypergraph emerges at runtime.
+
+The result is a system where "capabilities" are not stored or explicitly modeled, but observed as an emergent property of N-Dimensional interacting structures.
+
+While the core progression focuses on architectural implications, the talk grounds these concepts in AAA production realities. We demonstrate how Small Buffer Optimization (SBO) guarantees zero-allocation ephemeral identity transport, and how C++17 Non-Type Template Parameters (NTTPs) provide a zero-friction, type-safe API for developers.
+
+The talk concludes by reframing capability graphs not as data structures, but as emergent, zero-cost projections of interacting systems.

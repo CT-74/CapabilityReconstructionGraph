@@ -1,3 +1,31 @@
+// ======================================================
+// STAGE 7 — CONTEXTUAL LIFECYCLE (THE FALSE PEAK)
+// ======================================================
+//
+// @intent:
+// Attempt to control behavior over time using C++ lifetime semantics (RAII).
+//
+// @what_changed:
+// Behavior nodes are bound to RAII scopes. They register and unregister dynamically.
+//
+// @key_insight:
+// This is a trap. RAII is about execution control, not domain state. Taking the lens 
+// cap off a camera doesn't age the subject in front of it.
+//
+// @what_is_not:
+// Not thread-safe (mutates static pointers)
+// Not a true temporal dimension
+// Not a domain state progression
+//
+// @transition:
+// Discard RAII mutation and introduce a true, thread-safe domain axis.
+//
+// @spoken_line:
+// “We told ourselves we had solved time. But this is a thread-safety nightmare, 
+// and worse... it’s a flat lie.”
+// ======================================================
+
+
 #include <iostream>
 #include <memory>
 #include <type_traits>
@@ -74,9 +102,42 @@ public:
         s_head = static_cast<Interface*>(static_cast<Derived*>(this));
     }
 
-    Interface* GetNext() const { return m_next; }
+    ~LinkedNode()
+    {
+        Unregister();
+    }
 
+    Interface* GetNext() const { return m_next; }
     static Interface* GetHead() { return s_head; }
+
+private:
+    void Unregister()
+    {
+        Interface* self = static_cast<Interface*>(static_cast<Derived*>(this));
+
+        // Case 1: head removal
+        if (s_head == self)
+        {
+            s_head = m_next;
+            m_next = nullptr;
+            return;
+        }
+
+        // Case 2: find previous and unlink
+        Interface* current = s_head;
+        while (current)
+        {
+            auto* node = static_cast<LinkedNode*>(current);
+            if (node->m_next == self)
+            {
+                node->m_next = m_next;
+                m_next = nullptr;
+                return;
+            }
+
+            current = node->m_next;
+        }
+    }
 
 private:
     inline static Interface* s_head = nullptr;
@@ -205,11 +266,12 @@ private:
 // ======================================================
 // DOMAIN BINDING
 // ======================================================
-using Behavior = BehaviorMatrix<
+using PrintTypeIDBehavior = BehaviorMatrix<
     Models,
-    PrintNameDefinition,
     PrintTypeIDDefinition
 >;
+
+static const PrintTypeIDBehavior gs_PrintTypeIDBehaviors;
 
 // ======================================================
 // API
@@ -230,15 +292,22 @@ int main()
 {
     TypeErasedShell tes;
 
-    tes.Set(NPC{"Grunt"});
-    Call<IPrintName>(tes);
-    Call<IPrintTypeID>(tes);
-
+    std::cout << "OUTSIDE SCOPE:\n";
     tes.Set(Boss{"Dragon"});
     Call<IPrintName>(tes);
     Call<IPrintTypeID>(tes);
 
-    tes.Set(Player{"Alex"});
-    Call<IPrintName>(tes);
-    Call<IPrintTypeID>(tes);
+    {
+       using PrintNameBehavior = BehaviorMatrix<
+            Models,
+            PrintNameDefinition
+        >; 
+
+        PrintNameBehavior scope;
+
+        std::cout << "INSIDE SCOPE:\n";
+        tes.Set(Player{"Alex"});
+        Call<IPrintName>(tes);
+        Call<IPrintTypeID>(tes);
+    }
 }
