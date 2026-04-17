@@ -25,7 +25,7 @@ This repository contains pedagogical demonstration code that progressively build
 
 * **Stages 0 to 3: The Foundations**
   Building zero-allocation transports (SBO) and establishing emergent structures through intrusive linking to escape the "God Controller" anti-pattern.
-  
+
 * **Stages 4 to 6: Emergent Composition (2D Matrix)**
   Identity and Behavior spaces interact to reconstruct a capability matrix. At this stage, the system is functional but "static" or reliant on local mutation for state changes.
 
@@ -35,7 +35,7 @@ This repository contains pedagogical demonstration code that progressively build
 * **Stage 8: The Pivot (The 3rd Dimension: Time)**
   Introducing the Temporal Axis. We move from a 2D matrix to a 3D volume. State transitions are no longer mutations of the matrix, but a shift in coordinates along the Time axis.
 
-* **Stages 9 to 10: The N-Dimensional Hypergraph**
+* **Stage 9: The N-Dimensional Hypergraph**
   Generalizing the model to N-Dimensions using Variadic Axes. The system is no longer a stored structure, but a dynamic projection at the intersection of arbitrary dimensional types.
 
 
