@@ -1,23 +1,42 @@
-# CppCon 2026 Pitch: Reconstructing Capabilities: The N-Dimensional Hypergraph
-**Speaker:** Cyril Tissier
-**Duration:** 60 Minutes
-**Target Audience:** Intermediate/Advanced C++ Software Architects, Robotics Engineers
+# Title:
+Capability Reconstruction Graph: External Behavior Composition in C++
 
-### The Hook (00:00 - 05:00)
-"The Matrix doesn't manage; it observes." 
-Start with the pain every developer knows: the 3000-line `FacilityManager.cpp` filled with `dynamic_cast`. Show how adding one drone breaks the factory. Establish the goal: Zero heap, zero registries, infinite scalability.
+# Author & Architect: 
+Cyril Tissier
 
-### Act 1: The Zero-Heap Foundation (05:00 - 20:00)
-- **Stage 2:** The Type-Erased Shell. It's beautiful, but it uses `std::unique_ptr`. In robotics, the heap is lava.
-- **Stage 3:** The `HardwareHandle`. Live-code the Small Buffer Optimization (SBO) implementation. Show the `static_assert` that protects the stack. 
+## Architectural & Legal Firewall:
+A rigorous distinction is maintained between the **Architectural Model** (the conceptual model, which remains the independent intellectual property of the Author) and any corporate property. The illustrative C++ examples shown in this presentation are functional, clean-room implementations created specifically for CppCon. While they successfully compile and demonstrate the core architectural mechanics, they are intentionally simplified and unoptimized for pedagogical purposes. They are entirely independent of, and do not leak, the highly optimized, proprietary production code or assets developed by the Author in a professional corporate capacity.
 
-### Act 2: Emergent Topology & The Trap (20:00 - 35:00)
-- **Stage 4 & 5:** Build the intrusive linked list. The graph emerges from static initialization.
-- **Stage 7 (The False Peak):** The RAII Trap. Demonstrate why using C++ scopes to register/unregister behaviors at runtime is a thread-safety nightmare. We don't mutate reality; we must change our lens.
+## Abstract:
 
-### Act 3: The N-Dimensional Matrix (35:00 - 50:00)
-- **Stage 8:** Introduce the Temporal Axis (SystemState). The graph is immutable; the coordinate changes.
-- **Stage 9:** The Grand Finale. Variadic fold expressions. We drop in `Args...` (Weather, Power, Security). The Matrix resolves the exact behavior intersection in O(1). 
+This talk presents a structural model for composing behavior in C++ systems where functionality is not embedded in objects, but emerges from the interaction of independent runtime-defined spaces.
 
-### Q&A (50:00 - 60:00)
-Buffer for audience questions regarding SBO cache-misses and template compilation times.
+Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore how a capability system can emerge from three minimal and independent structures: a structural graph, an identity space, and a behavior definition space.
+
+The key idea is that no explicit capability graph is ever constructed. Instead, what appears as a graph is the result of traversing and correlating these independently evolving runtime spaces.
+
+The talk progressively builds this conceptual model in 6 stages (demonstrated through a 10-stage live code evolution):
+
+1. Structural Primitive  
+   A runtime-linked graph forms through intrusive self-registration of nodes. No container or registry exists; structure is defined purely by traversal.
+
+2. Identity Space  
+   Each element is extended with a stable runtime identity. This identity exists independently of structure and introduces no behavior semantics.
+
+3. Identity-Based Resolution  
+   A traversal-based lookup layer is introduced over the identity space. This is not a map or registry, but a runtime resolution mechanism based on scanning existing structures.
+
+4. External Behavior Definitions  
+   Behavior is fully decoupled from identity and defined in a separate external space. Multiple definitions may exist for the same identity domain.
+
+5. Composition  
+   Three independent spaces — structure, identity, and behavior — interact through traversal-based resolution. From this interaction, a runtime capability matrix emerges without any explicit graph, registry, or centralized mapping structure.
+
+6. N-Dimensional Expansion (The Hypergraph)  
+   The conceptual matrix is extended into a phase space. We introduce variadic resolution across orthogonal axes (e.g., Epoch, Biome, Security). "Context Observation" gracefully replaces "State Mutation", solving the thread-safety pitfalls of dynamic registration.
+
+The result is a system where "capabilities" are not stored or explicitly modeled, but observed as an emergent property of interacting runtime structures.
+
+Implementation details are intentionally clean-room and pedagogical to focus on architectural implications rather than specific proprietary C++ techniques.
+
+The talk concludes by reframing capability graphs not as data structures, but as emergent projections of interacting systems.
