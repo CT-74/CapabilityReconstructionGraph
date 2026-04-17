@@ -60,16 +60,14 @@ Interaction of structure, identity, and behavior creates a runtime capability ma
 A working decoupled system, but one that still relies on local state for contextual changes.
 
 ### Stage 7 — The Contextual Lifecycle (The Trap)
-Demonstrating the thread-safety pitfalls of tying registration to object lifecycles (RAII). Dynamically mutating the graph to manage local state is revealed as a fundamental concurrency flaw.
+Demonstrating the thread-safety pitfalls of tying registration to object lifecycles (RAII). Dynamically mutating the 2D matrix to manage local state is revealed as a fundamental concurrency flaw—the "Lifecycle Wall."
 
-### Stage 8 — The Pivot: From Mutation to Observation
-Introducing the **Temporal Axis**. Instead of mutating the graph (adding/removing nodes), we shift the coordinate on a temporal dimension. State transitions are modeled as observations on an immutable topology.
+### Stage 8 — The Pivot: From Mutation to Observation (3rd Dimension)
+Introducing the **Temporal Axis**. We move from a 2D matrix to a 3D volume. Instead of mutating the graph (adding/removing nodes), we shift the coordinate on a temporal dimension. State transitions are modeled as observations on an immutable topology.
 
-### Stage 9 — N-Dimensional Expansion (The Hypergraph)
-Generalizing the pivot to an open set of **Variadic Axes**. Orthogonal contexts (Biome, Security, Authority, etc.) are introduced as arbitrary types. Capabilities are reconstructed via zero-cost transports (SBO).
+### Stage 9 — Emergent Projections (N-Dimensional Hypergraph)
+Final synthesis: Generalizing the pivot to an open set of **Variadic Axes** (Biome, Authority, etc.). The graph is no longer a data structure, but a "slice" of an N-dimensional hypergraph—a runtime projection reconstructed via zero-cost transports (SBO).
 
-### Stage 10 — Emergent Projections
-Final synthesis: The graph is not a data structure, but a "slice" of an N-dimensional hypergraph—a runtime projection.
 
 ---
 
