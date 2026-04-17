@@ -27,7 +27,7 @@ This repository contains the pedagogical demonstration code that progressively b
 
 * **Stages 0 to 3:** Escaping the centralized "God Controller" by building zero-allocation transports (Small Buffer Optimization) and establishing emergent structures through intrusive linking.
 * **Stages 4 to 6:** Decoupling behavior and identity to reconstruct a capability matrix without any centralized maps or registries.
-* **Stage 7:** The RAII Trap — Exploring why mutating the structural graph at runtime to manage state is a thread-safety fallacy.
+* **Stage 7:** The Non-Global Lifecycle Trap (aka The RAII Trap) — Exploring why embedding behavior lifecycles within objects (or dynamically mutating the graph to manage local state) is a fundamental thread-safety fallacy. 
 * **Stages 8 to 9 (The Hypergraph):** Moving from a 2D matrix to an N-dimensional phase space. We introduce variadic resolution across orthogonal axes (e.g., Epoch, Biome, Security). We demonstrate how "Context Observation" gracefully replaces "State Mutation".
 
 ---
@@ -37,7 +37,7 @@ This repository contains the pedagogical demonstration code that progressively b
 * **Zero-Allocation:** Transports utilize SBO to avoid heap allocations on the hot path.
 * **No Centralized Registry:** Structure emerges from object lifetime side-effects.
 * **Orthogonal Contextual Resolution:** Deterministic resolution via variadic traversal.
-* **Zero-Mutation State Transitions:** The graph remains immutable; the observation coordinates change.
+* **Zero-Mutation State Transitions:** The graph remains immutable; the observation coordinates change, solving the non-global lifecycle trap.
 
 ---
 

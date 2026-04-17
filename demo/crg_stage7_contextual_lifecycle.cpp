@@ -1,27 +1,33 @@
 // ======================================================
-// STAGE 7 — CONTEXTUAL LIFECYCLE (THE FALSE PEAK)
+// STAGE 7 — THE NON-GLOBAL LIFECYCLE TRAP (THE FALSE PEAK)
 // ======================================================
 //
 // @intent:
-// Attempt to control behavior over time using C++ lifetime semantics (RAII).
+// Attempt to control behavior over time using non-global lifecycles 
+// (whether stack-based RAII or heap-allocated objects).
 //
 // @what_changed:
-// Behavior nodes are bound to RAII scopes. They register and unregister dynamically.
+// Behavior nodes are bound to object scopes. They register and unregister dynamically.
 //
 // @key_insight:
-// This is a trap. RAII is about execution control, not domain state. Taking the lens 
-// cap off a camera doesn't age the subject in front of it.
+// We often think of RAII as just the stack, but architecturally, an object 
+// allocated on the heap during runtime is just a longer, non-global scope. 
+// THE TRAP: Tying behavior registration to an individual object's life and death 
+// forces you to mutate the shared structural graph at runtime. 
+// Taking the lens cap off a camera doesn't age the subject in front of it.
 //
 // @what_is_not:
-// Not thread-safe (mutates static pointers)
+// Not thread-safe (mutates static pointers during traversal)
 // Not a true temporal dimension
 //
 // @transition:
-// Discard RAII mutation and introduce a true, thread-safe domain axis.
+// Discard dynamic mutation entirely. Introduce a true, thread-safe domain axis.
 //
 // @spoken_line:
-// “We told ourselves we had solved time. But this is a thread-safety nightmare, 
-// and worse... it’s a flat lie.”
+// “Look at this... it works perfectly. We told ourselves we had solved time. 
+// But what happens if a background thread is traversing this graph the exact 
+// microsecond this object is destroyed? It's a thread-safety nightmare, and 
+// worse... it’s an architectural lie.”
 // ======================================================
 
 #include <iostream>
@@ -32,12 +38,14 @@ class LinkedNode
 public:
     LinkedNode()
     {
+        // [WARNING: DYNAMIC MUTATION INITIATED]
         m_next = s_head;
         s_head = static_cast<Interface*>(static_cast<Derived*>(this));
     }
 
     ~LinkedNode()
     {
+        // [WARNING: CONCURRENCY HAZARD]
         Unregister();
     }
 
@@ -77,16 +85,44 @@ private:
 
 struct IBehavior { virtual void Exec() = 0; };
 
-struct RAIIBehavior : IBehavior, LinkedNode<RAIIBehavior, IBehavior> {
-    void Exec() override { std::cout << "Running...\n"; }
+struct ScopedBehavior : IBehavior, LinkedNode<ScopedBehavior, IBehavior> {
+    void Exec() override { std::cout << "   -> Behavior Executing (Graph is mutated!)\n"; }
 };
+
+// Simulated resolution: scans the graph to find available behaviors
+void ResolveAndExecute() {
+    IBehavior* current = LinkedNode<ScopedBehavior, IBehavior>::GetHead();
+    if (!current) {
+        std::cout << "   -> No behavior found.\n";
+    }
+    while (current) {
+        current->Exec();
+        // In a real system, current->GetNext() would be called here
+        break; // Simplified for the demo
+    }
+}
 
 int main()
 {
+    std::cout << "--- Stage 7: The Non-Global Lifecycle Trap ---\n\n";
+
+    std::cout << "[Global State] Before Scope:\n";
+    ResolveAndExecute();
+
     {
-        std::cout << "Entering scope...\n";
-        RAIIBehavior b;
+        std::cout << "\n[Local State] Entering Non-Global Scope (Stack or Heap)...\n";
+        ScopedBehavior b; 
+        
+        std::cout << "[Local State] Inside Scope:\n";
+        ResolveAndExecute(); // IT WORKS! The False Peak.
+        
+        std::cout << "[Local State] Leaving Scope (Destructor triggers graph mutation)...\n";
     }
-    std::cout << "Left scope. Unlinking completed (but unsafely in a multi-threaded context).\n";
+
+    std::cout << "\n[Global State] After Scope:\n";
+    ResolveAndExecute();
+
+    std::cout << "\n[Conclusion] It works locally, but it's fundamentally broken globally.\n";
+    
     return 0;
 }

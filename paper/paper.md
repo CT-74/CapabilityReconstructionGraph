@@ -68,8 +68,8 @@ Compile-time constrained visibility acts as a lens over the behavior space, filt
 ### Stage 6 — Behavioral Composition (Fusion)
 The interaction of structure, identity, and behavior spaces allows a runtime capability matrix to emerge and be reconstructed at runtime.
 
-### Stage 7 — The Contextual Lifecycle (The RAII Trap)
-Demonstrating the thread-safety pitfalls of using C++ scopes (RAII) to dynamically register/unregister behaviors to manage state.
+### Stage 7 — The Contextual Lifecycle (The Non-Global Lifecycle Trap)
+Demonstrating the thread-safety pitfalls of tying behavior registration to object lifecycles (whether stack-based RAII or heap-allocated instances). Dynamically mutating the graph to manage local state is a fundamental concurrency flaw.
 
 ### Stage 8 — The Temporal Axis (3D Space)
 Introducing an immutable topology. Instead of mutating the graph, state transitions are modeled by changing coordinates on a temporal axis.
