@@ -33,9 +33,6 @@
 #include <string>
 #include <cstddef>
 
-// ======================================================
-// AXES
-// ======================================================
 enum class State    { Any, Init, Combat };
 enum class Zone     { Any, Desert, Tundra };
 enum class Security { Any, Client, Server };
@@ -44,74 +41,48 @@ template<auto V> using When = std::integral_constant<decltype(V), V>;
 template<auto V> using In   = std::integral_constant<decltype(V), V>;
 template<auto V> using Auth = std::integral_constant<decltype(V), V>;
 
-// ======================================================
-// TYPE SYSTEM
-// ======================================================
 using TypeID = std::size_t;
-
-template<class T>
-struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
+template<class T> struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
 
 struct Drone       { std::string name; };
 struct HeavyLifter { std::string name; };
 
-// ======================================================
-// SBO TRANSPORT
-// ======================================================
 class HardwareHandle {
     static constexpr std::size_t SBO_SIZE = 48;
 public:
     struct Concept { virtual ~Concept() = default; virtual TypeID GetTypeID() const = 0; };
     template<class T> struct Model : Concept {
-        T value;
-        Model(T v) : value(std::move(v)) {}
+        T value; Model(T v) : value(std::move(v)) {}
         TypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
     };
-
-    HardwareHandle() = default;
-    ~HardwareHandle() { Reset(); }
-
+    HardwareHandle() = default; ~HardwareHandle() { Reset(); }
     template<class T> void Set(T v) {
-        static_assert(sizeof(Model<T>) <= SBO_SIZE, "SBO Capacity Exceeded!");
-        Reset();
-        new (&m_buffer) Model<T>(std::move(v));
-        m_set = true;
+        Reset(); new (&m_buffer) Model<T>(std::move(v)); m_set = true;
     }
-
     TypeID GetTypeID() const { return reinterpret_cast<const Concept*>(&m_buffer)->GetTypeID(); }
     template<class T> const T& Get() const { return static_cast<const Model<T>*>(reinterpret_cast<const Concept*>(&m_buffer))->value; }
-
 private:
     void Reset() { if (m_set) { reinterpret_cast<Concept*>(&m_buffer)->~Concept(); m_set = false; } }
-    alignas(std::max_align_t) std::byte m_buffer[SBO_SIZE];
-    bool m_set = false;
+    alignas(std::max_align_t) std::byte m_buffer[SBO_SIZE]; bool m_set = false;
 };
 
 // ======================================================
-// LINKED NODE
+// NODE & INTERFACE
 // ======================================================
-template<class Derived, class Interface>
+template<class Interface>
 class LinkedNode {
 public:
-    LinkedNode() {
-        m_next = s_head;
-        s_head = static_cast<Interface*>(static_cast<Derived*>(this));
-    }
-    Interface* GetNext() const { return m_next; }
-    static Interface* GetHead() { return s_head; }
+    LinkedNode() { m_next = s_head; s_head = static_cast<const Interface*>(this); }
+    const Interface* GetNext() const { return m_next; }
+    static const Interface* GetHead() { return s_head; }
 private:
-    inline static Interface* s_head = nullptr;
-    Interface* m_next = nullptr;
+    inline static const Interface* s_head = nullptr;
+    const Interface* m_next = nullptr;
 };
 
-// ======================================================
-// INTERFACE
-// ======================================================
-struct IExecuteAction {
+struct IExecuteAction : LinkedNode<IExecuteAction> {
     virtual ~IExecuteAction() = default;
     virtual void Execute(const HardwareHandle&) const = 0;
-    
-    // N-Dimensional Match
     virtual bool Match(TypeID id, State e, Zone b, Security r) const = 0;
 };
 
@@ -119,7 +90,7 @@ struct IExecuteAction {
 // DEFINITIONS
 // ======================================================
 template<class T, class T_E = When<State::Any>, class T_B = In<Zone::Any>, class T_R = Auth<Security::Any>>
-struct ActionDefinition : IExecuteAction, LinkedNode<ActionDefinition<T, T_E, T_B, T_R>, IExecuteAction> {
+struct ActionDefinition : IExecuteAction {
     bool Match(TypeID id, State e, Zone b, Security r) const override {
         return id == TypeIDOf<T>::Get() && 
                (T_E::value == State::Any || T_E::value == e) &&
@@ -150,34 +121,43 @@ struct BehaviorMatrix<TypeList<Models...>, Defs...> : public BehaviorMatrixSingl
     static const Interface* Find(const HardwareHandle& h, Args... args) {
         const auto id = h.GetTypeID();
         const Interface* result = nullptr;
-
         if constexpr (sizeof...(Subset) > 0) {
             if (!((id == TypeIDOf<Subset>::Get()) || ...)) return nullptr;
         }
-
         ((id == TypeIDOf<Models>::Get() && (result = Resolve<Interface>(id, args...))), ...);
         return result;
     }
-
 private:
     template<class Interface, class... Args>
     static const Interface* Resolve(TypeID id, Args... args) {
-        for (Interface* n = Interface::GetHead(); n != nullptr; n = n->GetNext()) {
+        for (const Interface* n = Interface::GetHead(); n != nullptr; n = n->GetNext()) {
             if (n->Match(id, args...)) return n;
         }
         return nullptr;
     }
 };
 
-// Definitions Registration
 template<class T> using GenericDef = ActionDefinition<T>;
 template<class T> using SandstormDef = ActionDefinition<T, When<State::Combat>, In<Zone::Desert>, Auth<Security::Server>>;
 
 using ActionDomain = BehaviorMatrix<Models, GenericDef, SandstormDef>;
 
-// ======================================================
-// API
-// ======================================================
+// GLOBAL IMMUTABLE INSTANTIATION
+inline static const ActionDomain g_domain{};
+
+// MANUAL SUPPLEMENTARY MODULE (Shows it seamlessly blends with the matrix)
+namespace { 
+    struct DesertSandstorm : IExecuteAction {
+        bool Match(TypeID id, State e, Zone b, Security r) const override {
+            return id == TypeIDOf<HeavyLifter>::Get() && e == State::Combat && b == Zone::Desert && r == Security::Server;
+        }
+        void Execute(const HardwareHandle& t) const override {
+            std::cout << "[SERVER-ONLY] 🔥 " << t.Get<HeavyLifter>().name << " engages DUST SHIELD!\n";
+        }
+    };
+    inline static const DesertSandstorm auto_reg_sandstorm{}; 
+}
+
 template<class Interface, class... Subset, class... Args>
 void Call(const HardwareHandle& h, Args... args) {
     if (const Interface* iface = ActionDomain::Find<Interface, Subset...>(h, args...)) {
@@ -187,27 +167,6 @@ void Call(const HardwareHandle& h, Args... args) {
     }
 }
 
-// ======================================================
-// MODULES
-// ======================================================
-namespace { 
-    struct DesertSandstorm : IExecuteAction, LinkedNode<DesertSandstorm, IExecuteAction> {
-        bool Match(TypeID id, State e, Zone b, Security r) const override {
-            return id == TypeIDOf<HeavyLifter>::Get() && 
-                   e == State::Combat && 
-                   b == Zone::Desert && 
-                   r == Security::Server;
-        }
-        void Execute(const HardwareHandle& t) const override {
-            std::cout << "[SERVER-ONLY] 🔥 " << t.Get<HeavyLifter>().name << " engages DUST SHIELD!\n";
-        }
-    };
-    static DesertSandstorm auto_reg_sandstorm; 
-}
-
-// ======================================================
-// MAIN
-// ======================================================
 int main() {
     HardwareHandle lifter; lifter.Set(HeavyLifter{"Loader-X"});
     HardwareHandle drone;  drone.Set(Drone{"Scout-1"});

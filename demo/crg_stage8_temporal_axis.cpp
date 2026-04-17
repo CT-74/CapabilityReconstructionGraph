@@ -33,26 +33,15 @@
 #include <string>
 #include <cstddef>
 
-// ======================================================
-// TEMPORAL AXIS
-// ======================================================
 enum class SystemState { Any, Nominal, Emergency };
-
-// Semantic Wrapper
 template<auto V> using When = std::integral_constant<decltype(V), V>;
 
-// ======================================================
-// TYPE SYSTEM
-// ======================================================
 using TypeID = std::size_t;
 template<class T> struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
 
 struct Drone       { std::string name; };
 struct HeavyLifter { std::string name; };
 
-// ======================================================
-// SBO TRANSPORT
-// ======================================================
 class HardwareHandle {
     static constexpr std::size_t SBO_SIZE = 48;
 public:
@@ -63,7 +52,6 @@ public:
     };
     HardwareHandle() = default; ~HardwareHandle() { Reset(); }
     template<class T> void Set(T v) {
-        static_assert(sizeof(Model<T>) <= SBO_SIZE, "SBO Overload!");
         Reset(); new (&m_buffer) Model<T>(std::move(v)); m_set = true;
     }
     TypeID GetTypeID() const { return reinterpret_cast<const Concept*>(&m_buffer)->GetTypeID(); }
@@ -74,23 +62,23 @@ private:
 };
 
 // ======================================================
-// NODE & INTERFACE
+// NODE & INTERFACE (Intrusive Base for loop traversal)
 // ======================================================
-template<class Derived, class Interface>
+template<class Interface>
 class LinkedNode {
 public:
-    LinkedNode() { m_next = s_head; s_head = static_cast<Interface*>(static_cast<Derived*>(this)); }
-    Interface* GetNext() const { return m_next; }
-    static Interface* GetHead() { return s_head; }
+    LinkedNode() { m_next = s_head; s_head = static_cast<const Interface*>(this); }
+    const Interface* GetNext() const { return m_next; }
+    static const Interface* GetHead() { return s_head; }
 private:
-    inline static Interface* s_head = nullptr;
-    Interface* m_next = nullptr;
+    inline static const Interface* s_head = nullptr;
+    const Interface* m_next = nullptr;
 };
 
-struct IExecuteAction {
+// Interface directly inherits the node to enable `Interface::GetHead()`
+struct IExecuteAction : LinkedNode<IExecuteAction> {
     virtual ~IExecuteAction() = default;
     virtual void Execute(const HardwareHandle&) const = 0;
-    // 3D Match: Identity + State
     virtual bool Match(TypeID id, SystemState s) const = 0;
 };
 
@@ -98,10 +86,9 @@ struct IExecuteAction {
 // DEFINITIONS
 // ======================================================
 template<class T, class T_State = When<SystemState::Any>>
-struct ActionDefinition : IExecuteAction, LinkedNode<ActionDefinition<T, T_State>, IExecuteAction> {
+struct ActionDefinition : IExecuteAction {
     bool Match(TypeID id, SystemState s) const override {
-        return id == TypeIDOf<T>::Get() && 
-               (T_State::value == SystemState::Any || T_State::value == s);
+        return id == TypeIDOf<T>::Get() && (T_State::value == SystemState::Any || T_State::value == s);
     }
     void Execute(const HardwareHandle& t) const override {
         std::cout << "[GENERIC] " << t.Get<T>().name << " acts.\n";
@@ -109,8 +96,7 @@ struct ActionDefinition : IExecuteAction, LinkedNode<ActionDefinition<T, T_State
 };
 
 template<>
-struct ActionDefinition<Drone, When<SystemState::Emergency>> 
-    : IExecuteAction, LinkedNode<ActionDefinition<Drone, When<SystemState::Emergency>>, IExecuteAction> {
+struct ActionDefinition<Drone, When<SystemState::Emergency>> : IExecuteAction {
     bool Match(TypeID id, SystemState s) const override {
         return id == TypeIDOf<Drone>::Get() && s == SystemState::Emergency;
     }
@@ -146,7 +132,7 @@ struct BehaviorMatrix<TypeList<Models...>, Defs...> : public BehaviorMatrixSingl
 private:
     template<class Interface>
     static const Interface* Resolve(TypeID id, SystemState s) {
-        for (Interface* n = Interface::GetHead(); n != nullptr; n = n->GetNext()) {
+        for (const Interface* n = Interface::GetHead(); n != nullptr; n = n->GetNext()) {
             if (n->Match(id, s)) return n;
         }
         return nullptr;
@@ -158,9 +144,11 @@ template<class T> using EmergDef = ActionDefinition<T, When<SystemState::Emergen
 
 using ActionDomain = BehaviorMatrix<Models, BaseDef, EmergDef>;
 
+// GLOBAL IMMUTABLE INSTANTIATION
+inline static const ActionDomain g_domain{};
+
 int main() {
     HardwareHandle drone; drone.Set(Drone{"Scout-1"});
-    
     std::cout << "--- STAGE 8: TEMPORAL AXIS (3D) ---\n\n";
 
     std::cout << "Drone (State: Nominal):\n  -> ";

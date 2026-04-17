@@ -34,72 +34,50 @@
 using TypeID = std::size_t;
 
 template<class T>
-struct TypeIDOf
-{
-    static TypeID Get() { return typeid(T).hash_code(); }
-};
+struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
 
 // SBO Handle
-class HardwareHandle
-{
+class HardwareHandle {
     static constexpr std::size_t SBO_SIZE = 48;
 public:
-    struct Concept { 
-        virtual ~Concept() = default; 
-        virtual TypeID GetTypeID() const = 0; 
-    };
+    struct Concept { virtual ~Concept() = default; virtual TypeID GetTypeID() const = 0; };
     template<class T> struct Model : Concept {
-        T value;
-        Model(T v) : value(std::move(v)) {}
+        T value; Model(T v) : value(std::move(v)) {}
         TypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
     };
-
-    HardwareHandle() = default;
-    ~HardwareHandle() { Reset(); }
-
+    HardwareHandle() = default; ~HardwareHandle() { Reset(); }
     template<class T> void Set(T v) {
         static_assert(sizeof(Model<T>) <= SBO_SIZE, "SBO Capacity Exceeded!");
-        Reset();
-        new (&m_buffer) Model<T>(std::move(v));
-        m_set = true;
+        Reset(); new (&m_buffer) Model<T>(std::move(v)); m_set = true;
     }
-
     TypeID GetTypeID() const { return reinterpret_cast<const Concept*>(&m_buffer)->GetTypeID(); }
     template<class T> const T& Get() const { return static_cast<const Model<T>*>(reinterpret_cast<const Concept*>(&m_buffer))->value; }
-
 private:
     void Reset() { if(m_set) { reinterpret_cast<Concept*>(&m_buffer)->~Concept(); m_set = false; } }
-    alignas(std::max_align_t) std::byte m_buffer[SBO_SIZE];
-    bool m_set = false;
+    alignas(std::max_align_t) std::byte m_buffer[SBO_SIZE]; bool m_set = false;
 };
 
+// Node (1 list per Definition for O(1) jump)
 template<class Derived, class Interface>
-class LinkedNode
-{
+class LinkedNode {
 public:
-    LinkedNode()
-    {
+    LinkedNode() {
         m_next = s_head;
-        s_head = static_cast<Interface*>(static_cast<Derived*>(this));
+        s_head = static_cast<const Interface*>(static_cast<const Derived*>(this));
     }
-
-    Interface* GetNext() const { return m_next; }
-    static Interface* GetHead() { return s_head; }
-
+    const Interface* GetNext() const { return m_next; }
+    static const Interface* GetHead() { return s_head; }
 private:
-    inline static Interface* s_head = nullptr;
-    Interface* m_next = nullptr;
+    inline static const Interface* s_head = nullptr;
+    const Interface* m_next = nullptr;
 };
 
 // Interfaces
-struct IDiagnostic
-{
+struct IDiagnostic {
     virtual ~IDiagnostic() = default;
     virtual void Execute(const HardwareHandle&) const = 0;
 };
-
-struct ITelemetry
-{
+struct ITelemetry {
     virtual ~ITelemetry() = default;
     virtual void Execute(const HardwareHandle&) const = 0;
 };
@@ -110,89 +88,74 @@ struct HeavyLifter { std::string id{"HeavyLifter"}; };
 
 // Definitions
 template<class T>
-struct DiagDef : IDiagnostic, LinkedNode<DiagDef<T>, IDiagnostic>
-{
-    void Execute(const HardwareHandle& h) const override {
-        std::cout << "Generic Diag: " << h.Get<T>().id << "\n";
-    }
+struct DiagDef : IDiagnostic, LinkedNode<DiagDef<T>, IDiagnostic> {
+    void Execute(const HardwareHandle& h) const override { std::cout << "Generic Diag: " << h.Get<T>().id << "\n"; }
 };
 
 template<>
-struct DiagDef<HeavyLifter> : IDiagnostic, LinkedNode<DiagDef<HeavyLifter>, IDiagnostic>
-{
-    void Execute(const HardwareHandle& h) const override {
-        std::cout << "🔥 HEAVY DIAG: " << h.Get<HeavyLifter>().id << "\n";
-    }
+struct DiagDef<HeavyLifter> : IDiagnostic, LinkedNode<DiagDef<HeavyLifter>, IDiagnostic> {
+    void Execute(const HardwareHandle& h) const override { std::cout << "🔥 HEAVY DIAG: " << h.Get<HeavyLifter>().id << "\n"; }
 };
 
 template<class T>
-struct TelemetryDef : ITelemetry, LinkedNode<TelemetryDef<T>, ITelemetry>
-{
-    void Execute(const HardwareHandle& h) const override {
-        std::cout << "Telemetry for TypeID=" << h.GetTypeID() << "\n";
-    }
+struct TelemetryDef : ITelemetry, LinkedNode<TelemetryDef<T>, ITelemetry> {
+    void Execute(const HardwareHandle& h) const override { std::cout << "Telemetry for TypeID=" << h.GetTypeID() << "\n"; }
 };
 
 // ======================================================
-// THE MATRIX
+// THE MATRIX (Variadic Inheritance)
 // ======================================================
 template<class...> struct TypeList;
-
 using Models = TypeList<Drone, HeavyLifter>;
+
+// Inheritance triggers constructors, avoiding std::tuple
+template<class ModelT, template<class> class... Defs>
+struct BehaviorMatrixSingle : public Defs<ModelT>... {};
 
 template<class ModelList, template<class> class... Defs>
 struct BehaviorMatrix;
 
 template<class... Models, template<class> class... Defs>
-struct BehaviorMatrix<TypeList<Models...>, Defs...>
+struct BehaviorMatrix<TypeList<Models...>, Defs...> : public BehaviorMatrixSingle<Models, Defs...>...
 {
     template<class Interface, class... Subset>
-    static const Interface* Find(const HardwareHandle& h)
-    {
+    static const Interface* Find(const HardwareHandle& h) {
         const auto id = h.GetTypeID();
         const Interface* result = nullptr;
-
-        if constexpr (sizeof...(Subset) > 0)
-        {
-            const bool allowed = ((id == TypeIDOf<Subset>::Get()) || ...);
-            if (!allowed) return nullptr;
+        if constexpr (sizeof...(Subset) > 0) {
+            if (!((id == TypeIDOf<Subset>::Get()) || ...)) return nullptr;
         }
-
-        // Fold expression resolution over the variadic pack
-        ((id == TypeIDOf<Models>::Get() &&
-            (result = Resolve<Interface>())), ...);
-
+        ((id == TypeIDOf<Models>::Get() && (result = Resolve<Interface, Models>())), ...);
         return result;
     }
 
 private:
-    template<class Interface>
-    static const Interface* Resolve()
-    {
-        // Runtime node selection
-        return Interface::GetHead();
+    template<class Interface, class Model>
+    static const Interface* Resolve() {
+        const Interface* res = nullptr;
+        ([&]() {
+            if constexpr (std::is_base_of_v<Interface, Defs<Model>>) {
+                res = Defs<Model>::GetHead(); // O(1) Deterministic jump
+            }
+        }(), ...);
+        return res;
     }
 };
 
-using Behavior = BehaviorMatrix<
-    Models,
-    DiagDef,
-    TelemetryDef
->;
+using Behavior = BehaviorMatrix<Models, DiagDef, TelemetryDef>;
+
+// GLOBAL IMMUTABLE INSTANTIATION
+inline static const Behavior g_domain{};
 
 template<class Interface, class... Subset>
-void Call(const HardwareHandle& h)
-{
-    if (const Interface* iface = Behavior::Find<Interface, Subset...>(h))
-    {
+void Call(const HardwareHandle& h) {
+    if (const Interface* iface = Behavior::Find<Interface, Subset...>(h)) {
         iface->Execute(h);
     }
 }
 
-int main()
-{
+int main() {
     HardwareHandle h;
-
     h.Set(Drone{"Scout-1"});
     Call<IDiagnostic>(h);
     Call<ITelemetry>(h);
@@ -200,6 +163,5 @@ int main()
     h.Set(HeavyLifter{"Loader-99"});
     Call<IDiagnostic>(h);
     Call<ITelemetry>(h);
-
     return 0;
 }
