@@ -4,3 +4,4 @@ build/
 *.obj
 .DS_Store
 generate_repo.py
+demo.backup.zip
