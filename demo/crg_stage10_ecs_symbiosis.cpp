@@ -21,15 +21,15 @@
 #include <string>
 #include <typeinfo>
 #include <type_traits>
-#include <cstddef>   // FIX: Requis pour std::size_t, std::byte, std::max_align_t
-#include <utility>   // FIX: Requis pour std::move
+#include <cstddef>   // Requis pour std::size_t, std::byte, std::max_align_t
+#include <utility>   // Requis pour std::move
 
 // --- CRG CORE (SBO & TYPE ID) ---
 using TypeID = std::size_t;
 template<class T> struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
 
 class HardwareHandle {
-    // FIX: Passé de 48 à 64 pour absorber la taille de std::string sur tous les OS
+    // SBO étendu à 64 pour absorber la taille de std::string sur tous les OS
     static constexpr std::size_t SBO_SIZE = 64; 
 public:
     struct Concept { virtual ~Concept() = default; virtual TypeID GetTypeID() const = 0; };
@@ -75,7 +75,6 @@ struct Drone       { std::string name; float battery; };
 struct HeavyLifter { std::string name; float cargo_load; };
 
 // --- BEHAVIOR DEFINITIONS ---
-// FIX: Normalisation des templates (1 seul paramètre T) pour être 100% C++17 compliant
 template<class T>
 struct BaseAI : IUnitAI {
     bool Match(TypeID id, WorldState ws) const override { 
@@ -99,7 +98,6 @@ struct StealthAI : IUnitAI {
 // --- THE MATRIX ---
 template<class...> struct TypeList;
 
-// FIX: Utilisation de `template<class> class` au lieu de `template<class...> class`
 template<class ModelT, template<class> class... Defs> 
 struct BehaviorMatrixSingle : public Defs<ModelT>... {};
 
@@ -122,43 +120,49 @@ using AIDomain = BehaviorMatrix<TypeList<Drone, HeavyLifter>, BaseAI, StealthAI>
 inline static const AIDomain g_behavior_matrix{};
 
 // ======================================================
-// MOCK ECS (The "Body")
+// MOCK ECS (The "Body" - Structure of Arrays approach)
 // ======================================================
-struct Entity {
-    TypeID type;
-    std::string name;
-    float special_value; // battery or cargo
-};
-
+// In a real ECS (like EnTT), storage is handled dynamically via sparse sets.
+// Here we mock the DoD approach with direct typed vectors (SoA).
 class SimpleRegistry {
 public:
-    std::vector<Entity> entities;
-    void CreateDrone(std::string n) { entities.push_back({TypeIDOf<Drone>::Get(), n, 100.0f}); }
-    void CreateLifter(std::string n) { entities.push_back({TypeIDOf<HeavyLifter>::Get(), n, 500.0f}); }
+    std::vector<Drone> drones;
+    std::vector<HeavyLifter> lifters;
+
+    void CreateDrone(std::string n) { drones.push_back(Drone{n, 100.0f}); }
+    void CreateLifter(std::string n) { lifters.push_back(HeavyLifter{n, 500.0f}); }
 };
 
 // ======================================================
 // THE SYSTEM (The Symbiosis)
 // ======================================================
-void AISystem_Update(SimpleRegistry& reg, WorldState current_time) {
-    std::cout << "\n--- System Update (Context: " 
-              << (current_time == WorldState::Day ? "Day" : "Night") << ") ---\n";
 
-    for (auto& e : reg.entities) {
-        // 1. On prépare le Handle sur la pile (Stack Allocation only, Zero Heap)
+// The System iterates over a specific typed View. 
+// ZERO if/else chains. ZERO type casting.
+template<class T>
+void ProcessAIView(const std::vector<T>& view, WorldState current_time) {
+    for (const auto& entity_data : view) {
+        
+        // 1. We prepare the Handle on the stack (Zero Heap Allocation)
         HardwareHandle handle;
         
-        // On reconstruit l'identité à partir de la data brute de l'ECS
-        if (e.type == TypeIDOf<Drone>::Get()) 
-            handle.Set(Drone{e.name, e.special_value});
-        else if (e.type == TypeIDOf<HeavyLifter>::Get()) 
-            handle.Set(HeavyLifter{e.name, e.special_value});
+        // Perfect forwarding of the exact type. No runtime type checking needed!
+        handle.Set(entity_data); 
 
-        // 2. Le CRG projette le comportement SANS muter l'ECS
-        if (auto* ai = AIDomain::Resolve<IUnitAI>(e.type, current_time)) {
+        // 2. The CRG projects the behavior WITHOUT mutating the ECS archetype
+        if (auto* ai = AIDomain::Resolve<IUnitAI>(TypeIDOf<T>::Get(), current_time)) {
             ai->Update(handle);
         }
     }
+}
+
+void AISystem_UpdateAll(const SimpleRegistry& reg, WorldState current_time) {
+    std::cout << "\n--- System Update (Context: " 
+              << (current_time == WorldState::Day ? "Day" : "Night") << ") ---\n";
+    
+    // In a real ECS: auto view = registry.view<Drone>();
+    ProcessAIView(reg.drones, current_time);
+    ProcessAIView(reg.lifters, current_time);
 }
 
 int main() {
@@ -166,9 +170,9 @@ int main() {
     world.CreateDrone("Scout-Alpha");
     world.CreateLifter("Atlas-Omega");
 
-    // Simulation du cycle jour/nuit
-    AISystem_Update(world, WorldState::Day);
-    AISystem_Update(world, WorldState::Night);
+    // Simulation of the Day/Night cycle
+    AISystem_UpdateAll(world, WorldState::Day);
+    AISystem_UpdateAll(world, WorldState::Night);
 
     return 0;
 }
