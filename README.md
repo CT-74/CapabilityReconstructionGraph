@@ -11,34 +11,52 @@ The "Capability Reconstruction Graph" (CRG) architectural pattern and its underl
 
 The CRG is a structural model for composing external behavior in C++ systems where functionality is not embedded in objects, but is reconstructed from the interaction of independent runtime-defined spaces.
 
-Instead of relying on classical inheritance hierarchies, ECS architectures, or centralized registries (the "God Controller" anti-pattern), a capability system emerges from:
-1. **A Structural Graph:** Defined purely by traversal (no centralized containers).
-2. **An Identity Space:** Stable runtime identity independent of structure and behavior.
-3. **A Behavior Space:** Fully decoupled external behavior definitions.
-4. **Contextual Coordinates:** N-Dimensional axes (e.g., Time, Environment, Authority).
+Instead of relying on classical inheritance hierarchies, ECS architectures, or centralized registries, a capability system emerges from an **N-Dimensional Hypergraph**.
 
-**The Core Insight:** No explicit capability graph is ever constructed, stored, or mutated. Instead, what appears as a graph is *reconstructed* upon observation at the intersection of these independent dimensions.
+### The Core Paradigm: From Mutation to Observation
+
+Traditional architectures manage state changes through **Mutation** (modifying data in memory). The CRG shifts this to **Contextual Observation**. Identity is no longer a container of data, but a set of coordinates in a phase space defined by **Variadic Axes**.
 
 ---
 
-## The 10-Stage Evolution
+## The 10 Stages of Evolution
 
-This repository contains the pedagogical demonstration code that progressively builds the CRG model through 10 evolutionary stages:
+This repository contains pedagogical demonstration code that progressively builds the CRG model through 10 evolutionary stages:
 
-* **Stages 0 to 3:** Escaping the centralized "God Controller" by building zero-allocation transports (Small Buffer Optimization) and establishing emergent structures through intrusive linking.
-* **Stages 4 to 6:** Decoupling behavior and identity to reconstruct a capability matrix without any centralized maps or registries.
-* **Stage 7:** The Non-Global Lifecycle Trap (aka The RAII Trap) — Exploring why embedding behavior lifecycles within objects (or dynamically mutating the graph to manage local state) is a fundamental thread-safety fallacy. 
-* **Stages 8 to 9 (The Hypergraph):** Moving from a 2D matrix to an N-dimensional phase space. We introduce variadic resolution across orthogonal axes (e.g., Epoch, Biome, Security). We demonstrate how "Context Observation" gracefully replaces "State Mutation".
+* **Stages 0 to 3: The Foundations**
+  Building zero-allocation transports (SBO) and establishing emergent structures through intrusive linking to escape the "God Controller" anti-pattern.
+* **Stages 4 to 6: Emergent Composition**
+  Decoupling behavior and identity to reconstruct a capability matrix without any centralized maps or registries.
+* **Stage 7: The Contextual Lifecycle Trap**
+  Exploring why embedding behavior lifecycles within objects (RAII) or dynamically mutating graphs for local state is a fundamental thread-safety fallacy.
+* **Stage 8: The Pivot (The Temporal Axis)**
+  Introducing the first dimension (Time). We demonstrate how changing a coordinate on a temporal axis replaces the need for state mutation.
+* **Stages 9 to 10: The N-Dimensional Hypergraph**
+  Generalizing to an open set of **Variadic Axes** (e.g., Biome, Authority, Epoch). Capabilities are reconstructed as emergent projections at the intersection of these arbitrary dimensional types.
+
+---
+
+## Key Architectural Concepts
+
+### N-Dimensional Hypergraph (Variadic Axes)
+Identity is a coordinate $(d_1, d_2, ..., d_n)$ where dimensions are defined by C++ types. 
+Example: `crg::axis<Time>`, `crg::axis<Environment>`, or any user-defined domain dimension.
+
+### Zero-Mutation State Transitions
+The graph topology remains immutable. "State changes" are merely shifts in the observation coordinates, providing native thread-safety by design.
+
+### Zero-Allocation Transports
+All capability reconstruction and resolution paths leverage **Small Buffer Optimization (SBO)** to ensure no heap allocations occur on the hot path.
 
 ---
 
 ## System Properties
 
-* **Zero-Allocation:** Transports utilize SBO to avoid heap allocations on the hot path.
-* **No Centralized Registry:** Structure emerges from object lifetime side-effects.
-* **Orthogonal Contextual Resolution:** Deterministic resolution via variadic traversal.
-* **Zero-Mutation State Transitions:** The graph remains immutable; the observation coordinates change, solving the non-global lifecycle trap.
+* **Non-Intrusive:** Can be layered over existing systems without refactoring core hierarchies.
+* **No Centralized Registry:** Structure emerges from local interactions and traversal.
+* **Deterministic Resolution:** Variadic traversal ensures a predictable capability matrix.
+* **Massively Concurrent:** By eliminating mutation, the CRG is natively optimized for multi-threaded observation.
 
 ---
 
-*This repository serves as the companion code to the CppCon presentation: "Capability Reconstruction Graph: External Behavior Composition in C++".*
+*This repository serves as the companion code to the CppCon presentation: "The Capability Reconstruction Graph: Emergent Behavior Composition via N-Dimensional Hypergraphs in C++".*

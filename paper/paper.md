@@ -14,87 +14,80 @@ These approaches typically introduce:
 - structural coupling between identity and behavior
 - centralized ownership of extension points
 - fragile cross-module extensibility
-- refactor requirements for system evolution
+- high refactor requirements for system evolution
+- **The Lifecycle Wall:** Managing state mutation in highly concurrent, context-dependent environments.
 
 ---
 
 ## 2. Design Goal
 
 Enable a system where:
-- structure, identity, and behavior are decoupled
-- behavior can be defined externally
+- structure, identity, and behavior are fully decoupled
+- behavior can be defined externally to the object’s core
 - composition emerges without central orchestration
-- runtime structure can be discovered, not predeclared
-
-while avoiding commitment to any specific implementation mechanism.
+- **Multidimensional Context:** Identity is a coordinate in a phase space, not a container of data.
 
 ---
 
-## 3. Core Insight
+## 3. The Core Concept: The N-Dimensional Hypergraph
 
-A capability system does not need to be explicitly stored.
+The CRG shifts the paradigm from **State Mutation** to **Contextual Observation**. 
 
-Instead, it emerges from the interaction of three independent spaces:
-- a structural space (runtime-linked graph)
-- an identity space (runtime type/model identity)
-- a behavior space (external definitions)
+In a traditional graph, edges are explicit data structures. In the CRG, the "graph" is an emergent projection. We define a phase space using **Variadic Axes** (orthogonal dimensions defined by arbitrary types). 
 
-No explicit capability graph is constructed or stored; it is **reconstructed** upon observation.
+Identity is represented as a coordinate $(d_1, d_2, ..., d_n)$ where each $d$ is a dimension such as Time, Authority, or Environment. A "Capability" is reconstructed at runtime by resolving the intersection of these coordinates with the behavior space.
 
 ---
 
-## 4. Progressive Construction (The 10-Stage Evolution)
-
-The system is introduced through a ten-stage progressive evolution, mirroring the live demonstration:
-
-### Stage 0 — The Baseline
-The "God Controller" anti-pattern: explicit branching and centralized dispatching that breaks the Open-Closed Principle.
+## 4. The 10 Stages of Evolution
 
 ### Stage 1 — Structural Primitive
-A runtime-linked graph is formed through object lifetime side effects (intrusive linking) with no identity or behavior semantics.
+A runtime-linked graph forming through intrusive self-registration of nodes.
 
 ### Stage 2 — Identity Space
-Each element is extended with a stable runtime identity, decoupled from the structural graph.
+Introducing a stable runtime identity, existing independently of structure and behavior.
 
 ### Stage 3 — Identity-Based Resolution
-A traversal-based lookup layer is introduced. Resolution is a runtime mechanism based on scanning existing structures, optimized via zero-allocation transports (SBO).
+A traversal-based lookup layer that scans existing structures instead of using a global map.
 
-### Stage 4 — Global Behavior Space
-Behavior is fully decoupled from identity and defined in a separate, globally discoverable external space.
+### Stage 4 — External Behavior Definitions
+Behavior semantics are decoupled from identity, allowing multiple "views" for the same domain.
 
-### Stage 5 — Projection (Visibility)
-Compile-time constrained visibility acts as a lens over the behavior space, filtering possibilities without altering structures.
+### Stage 5 — Composition (Emergent Matrix)
+Interaction of structure, identity, and behavior creates a runtime capability matrix.
 
-### Stage 6 — Behavioral Composition (Fusion)
-The interaction of structure, identity, and behavior spaces allows a runtime capability matrix to emerge and be reconstructed at runtime.
+### Stage 6 — The Functional Peak
+A working decoupled system, but one that still relies on local state for contextual changes.
 
-### Stage 7 — The Contextual Lifecycle (The Non-Global Lifecycle Trap)
-Demonstrating the thread-safety pitfalls of tying behavior registration to object lifecycles (whether stack-based RAII or heap-allocated instances). Dynamically mutating the graph to manage local state is a fundamental concurrency flaw.
+### Stage 7 — The Contextual Lifecycle (The Trap)
+Demonstrating the thread-safety pitfalls of tying registration to object lifecycles (RAII). Dynamically mutating the graph to manage local state is revealed as a fundamental concurrency flaw.
 
-### Stage 8 — The Temporal Axis (3D Space)
-Introducing an immutable topology. Instead of mutating the graph, state transitions are modeled by changing coordinates on a temporal axis.
+### Stage 8 — The Pivot: From Mutation to Observation
+Introducing the **Temporal Axis**. Instead of mutating the graph (adding/removing nodes), we shift the coordinate on a temporal dimension. State transitions are modeled as observations on an immutable topology.
 
 ### Stage 9 — N-Dimensional Expansion (The Hypergraph)
-The final evolution. Orthogonal context axes (e.g., Time/Epoch, Environment/Biome, Authority/Security) are introduced. Capabilities are reconstructed at the intersection of these variadic coordinates in an N-dimensional phase space.
+Generalizing the pivot to an open set of **Variadic Axes**. Orthogonal contexts (Biome, Security, Authority, etc.) are introduced as arbitrary types. Capabilities are reconstructed via zero-cost transports (SBO).
+
+### Stage 10 — Emergent Projections
+Final synthesis: The graph is not a data structure, but a "slice" of an N-dimensional hypergraph—a runtime projection.
 
 ---
 
 ## 5. System Properties
 
 The resulting model exhibits:
-- no centralized registry
-- no explicit capability graph structure
-- strict separation of structure, identity, and behavior
-- **Orthogonal contextual resolution**
-- deterministic resolution via variadic traversal
-- emergent many-to-many binding across independent spaces
-- **Zero-mutation state transitions**
+- **No centralized registry**
+- **No explicit stored graph structure**
+- **Orthogonal contextual resolution** via Variadic Axes
+- **Deterministic resolution** through multidimensional traversal
+- **Zero-mutation state transitions** (Thread-safety by design)
+- **Extensible Dimension Types**: Support for any user-defined domain axes.
 
 ---
 
 ## 6. Interpretation
 
-What appears as a "capability graph" is not stored. It emerges from the interaction of structural traversal, identity evaluation, behavior resolution, and **contextual coordinates**. The graph is an observed runtime projection—a "slice" of an N-dimensional hypergraph.
+What appears to the developer as a "capability graph" is an observed runtime projection. By using coordinates in a multidimensional hypergraph, we achieve a system that is non-intrusive, strictly decoupled, and natively ready for massive concurrency.
 
 ---
 
