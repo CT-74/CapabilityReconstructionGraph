@@ -1,16 +1,18 @@
-# Title:
+Title:
 The Capability Reconstruction Graph (CRG): Emergent Behavior Composition via N-Dimensional Hypergraphs in C++
 
-# Author & Architect: 
+Author & Architect: 
 Cyril Tissier
 
-## Architectural & Legal Firewall:
+Architectural & Legal Firewall:
 A rigorous distinction is maintained between the Architectural Model (the conceptual model, which remains the independent intellectual property of the Author) and any corporate property. The illustrative C++ examples shown in this presentation are functional, clean-room implementations created specifically for CppCon. While they successfully compile and demonstrate the core architectural mechanics, they are intentionally simplified and unoptimized for pedagogical purposes. They are entirely independent of, and do not leak, the highly optimized, proprietary production code or assets developed by the Author in a professional corporate capacity.
 
-## Abstract:
+Abstract:
 This talk presents a structural model for composing behavior in C++ systems where functionality is not embedded in objects, but emerges from the interaction of independent, multidimensional runtime spaces. 
 
-Instead of relying on inheritance hierarchies, ECS architectures, or centralized registries, we explore the Capability Reconstruction Graph (CRG). In this model, no explicit graph is ever stored; capabilities are reconstructed as emergent projections from an N-Dimensional Hypergraph. By shifting from state mutation to Contextual Observation across an arbitrary and extensible set of orthogonal axes (Time, Authority, Environment, ...), the CRG natively bypasses common thread-safety pitfalls.
+While classical approaches rely heavily on inheritance hierarchies or centralized registries, the Capability Reconstruction Graph (CRG) acts as a symbiotic, context-oriented layer that perfectly complements Data-Oriented Design (like ECS). In this model, no explicit graph is ever stored; capabilities are reconstructed as emergent projections from an N-Dimensional Hypergraph. 
+
+By shifting from state mutation to Contextual Observation across an arbitrary and extensible set of orthogonal axes (Time, Authority, Environment, ...), the CRG natively bypasses common thread-safety pitfalls and archetype fragmentation.
 
 The talk progressively builds this model through a 10-stage live code evolution, navigating through a critical architectural "False Peak":
 
@@ -19,14 +21,14 @@ The talk progressively builds this model through a 10-stage live code evolution,
 3. Identity-Based Resolution: A traversal-based lookup layer (avoiding registries).
 4. External Behavior Definitions: Decoupling behavior semantics from identity.
 5. Composition: Creating a runtime capability matrix through interaction.
-6. The "Functional" Peak: Achieving a working system with decoupled behavior and structure.
-7. The Trap (False Peak): Dealing with the "Contextual Lifecycle" — Why RAII and local mutations fail to scale in complex graph-based behaviors.
+6. Deterministic Reconstruction (Fusion): Achieving a working system with decoupled behavior and structure via an O(1) resolution matrix.
+7. The Trap (False Peak): Dealing with the "Contextual Lifecycle" — Why RAII and local mutations fail to scale and trigger concurrency hazards in graph-based behaviors.
 8. The Pivot: From Mutation to Observation — Introducing the Temporal Axis as a first dimension to replace state changes with contextual resolution.
 9. N-Dimensional Expansion: Implementing the Hypergraph via Variadic Axes and Zero-Cost Transports (SBO).
-10. Emergent Projections: Final synthesis of architecture as a multidimensional projection.
+10. The Symbiosis (Emergent Projections): Final synthesis showing how the CRG integrates flawlessly inside an ECS loop—separating pure Data Localisation from N-Dimensional Contextual Projection.
 
-## Audience:
+Audience:
 Intermediate to Advanced C++ Developers, Software Architects, and Systems Engineers interested in high-performance design patterns, multidimensional modeling, and thread-safety.
 
-## Level: 
-Intermediate / Advanced
+Level: 
+Intermediate / Advanced.

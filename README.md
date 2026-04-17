@@ -11,7 +11,7 @@ The "Capability Reconstruction Graph" (CRG) architectural pattern and its underl
 
 The CRG is a structural model for composing external behavior in C++ systems where functionality is not embedded in objects, but is **auto-discovered** and reconstructed from the interaction of independent runtime-defined spaces.
 
-Instead of relying on classical inheritance hierarchies, ECS architectures, or centralized registries, a capability system emerges as an **N-Dimensional Hypergraph**.
+While classical approaches rely heavily on inheritance hierarchies or centralized registries, the Capability Reconstruction Graph acts as a symbiotic, context-oriented layer that perfectly complements Data-Oriented Design (like ECS). A capability system emerges as an **N-Dimensional Hypergraph**.
 
 ### The Core Paradigm: From Mutation to Observation
 
@@ -21,42 +21,42 @@ Identity is no longer a container of data, but a set of coordinates in a phase s
 
 ---
 
-## The 10 Stages of Evolution (0 to 9)
+## The 10 Stages of Evolution
 
-This repository contains pedagogical demonstration code that progressively builds the CRG model:
+This repository contains pedagogical demonstration code that progressively builds the CRG model, navigating through a critical architectural "False Peak":
 
-* **Stages 0 to 3: The Foundations (1D - Structural Axis)**
-  Escaping the centralized "God Controller" by building zero-allocation transports (SBO) and establishing emergent structures through intrusive linking.
-* **Stages 4 to 6: Emergent Composition (2D - The Matrix)**
-  Decoupling behavior and identity to reconstruct a capability matrix without any centralized maps or registries. Auto-discovery of behaviors.
-* **Stage 7: The Contextual Lifecycle Trap (The Wall)**
-  Exploring why embedding behavior lifecycles within objects (RAII) or dynamically mutating the 2D matrix to manage local state is a fundamental thread-safety fallacy. 
-* **Stage 8: The Pivot (3D - The Temporal Axis)**
-  Introducing the 3rd Dimension (Time). We demonstrate how changing a coordinate on a temporal axis replaces the need for state mutation. State transitions become observations.
-* **Stage 9: The N-Dimensional Hypergraph (N-D - Variadic Axes)**
-  Generalizing the model to an open set of **Variadic Axes**. Capabilities are reconstructed as emergent projections at the intersection of arbitrary dimensional types (Biome, Security, etc.).
+* **Stage 1 — Structural Primitive:** A runtime-linked graph forming through intrusive self-registration.
+* **Stage 2 — Identity Space:** Adding stable runtime identity, independent of structure.
+* **Stage 3 — Identity-Based Resolution:** A traversal-based lookup layer (avoiding registries).
+* **Stage 4 — External Behavior Definitions:** Decoupling behavior semantics from identity.
+* **Stage 5 — Composition:** Creating a runtime capability matrix through interaction.
+* **Stage 6 — Deterministic Reconstruction (Fusion):** Achieving a working system with decoupled behavior and structure via an `O(1)` resolution matrix.
+* **Stage 7 — The Trap (False Peak):** Dealing with the "Contextual Lifecycle" — Why RAII and local mutations fail to scale and trigger concurrency hazards in graph-based behaviors.
+* **Stage 8 — The Pivot:** From Mutation to Observation — Introducing the Temporal Axis as a first dimension to replace state changes with contextual resolution.
+* **Stage 9 — N-Dimensional Expansion:** Implementing the Hypergraph via Variadic Axes and Zero-Cost Transports (SBO).
+* **Stage 10 — The Symbiosis (Emergent Projections):** Final synthesis showing how the CRG integrates flawlessly inside an ECS loop—separating pure Data Localisation from N-Dimensional Contextual Projection.
 
 ---
 
-## Key Architectural Concepts
+## FAQ: How does this fit with ECS (Entity Component System)?
 
-### Emergent Auto-Discovery
-Structure and behavior "find each other" at runtime through traversal-based resolution. The system remains non-intrusive: you can layer CRG over existing codebases without refactoring core hierarchies.
+**They are perfectly complementary.** The CRG does not replace an ECS; it solves the **Archetype Fragmentation** problem inherent to pure ECS architectures.
 
-### N-Dimensional Hypergraph (Variadic Axes)
-Identity is a coordinate $(d_1, d_2, ..., d_n)$ where dimensions are defined by C++ types. 
-Example: `crg::axis<Time>`, `crg::axis<Environment>`, or any custom domain dimension.
+* **The ECS (The Body):** Excels at Data-Oriented Design. It iterates through contiguous memory at blinding speed.
+* **The CRG (The Mind):** Excels at Context-Oriented Design. It projects N-Dimensional behavior onto that data.
 
-### Zero-Mutation State Transitions
-The graph topology remains immuable. "State changes" are merely shifts in the observation coordinates, providing native thread-safety by design.
+In a pure ECS, changing an entity's behavior (e.g., from "Day Mode" to "Night Stealth Mode") often requires adding or removing *Tag Components*. This forces the ECS to move the entity to a new archetype array in memory, causing cache misses and requiring structural locks in multithreading. 
+
+With the CRG, the ECS iterates purely on the data. Inside the loop, the CRG resolves the behavior based on contextual axes (like Time or Environment) via a zero-allocation SBO handle, **without ever mutating the entity's structure or archetype in the ECS.**
 
 ---
 
 ## System Properties
 
 * **Zero-Allocation:** All resolution paths leverage **SBO** to avoid heap allocations on the hot path.
-* **No Centralized Registry:** No maps, no registries, no global locks.
+* **No Centralized Registry:** No maps, no global registries, no locks.
 * **Massively Concurrent:** Optimized for multi-threaded observation through immutable topologies.
+* **ECS Symbiosis:** Natively designed to plug into existing DOD loops without competing for data layout.
 
 ---
 

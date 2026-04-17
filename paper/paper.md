@@ -8,24 +8,25 @@
 
 ## 1. Problem Statement
 
-Modern C++ systems struggle with extensibility when behavior is tightly coupled to type hierarchies, ECS layouts, or centralized registries.
+Modern C++ systems struggle with extensibility when behavior is tightly coupled to type hierarchies or centralized registries. 
 
-These approaches typically introduce:
-- structural coupling between identity and behavior
-- centralized ownership of extension points
-- fragile cross-module extensibility
-- high refactor requirements for system evolution
-- **The Lifecycle Wall:** Managing state mutation in highly concurrent, context-dependent environments.
+Furthermore, while Data-Oriented Design and Entity Component Systems (ECS) excel at data locality and fast iteration, they face challenges with complex behavior branching. Dynamically altering an entity's behavior often requires adding or removing "Tag Components", leading to **Archetype Fragmentation**, cache misses, and the need for structural locks in multithreaded environments.
+
+These classical approaches typically introduce:
+- Structural coupling between identity and behavior.
+- Centralized ownership of extension points.
+- Fragile cross-module extensibility.
+- **The Lifecycle Wall:** Managing state mutation and graph updates in highly concurrent, context-dependent environments.
 
 ---
 
 ## 2. Design Goal
 
-Enable a system where:
-- structure, identity, and behavior are fully decoupled
-- behavior can be defined externally to the object’s core
-- composition emerges without central orchestration
-- **Multidimensional Context:** Identity is a coordinate in a phase space, not a container of data.
+Enable a symbiotic architecture where:
+- Data locality and iteration are left to specialized systems (like an ECS).
+- Structure, identity, and behavior are fully decoupled.
+- Behavior can be defined externally to the object’s core.
+- **Multidimensional Context:** Identity is a coordinate in a phase space, not a container of data, allowing behavior to emerge without mutating the underlying data structures.
 
 ---
 
@@ -33,9 +34,9 @@ Enable a system where:
 
 The CRG shifts the paradigm from **State Mutation** to **Contextual Observation**. 
 
-In a traditional graph, edges are explicit data structures. In the CRG, the "graph" is an emergent projection. We define a phase space using **Variadic Axes** (orthogonal dimensions defined by arbitrary types). 
+In a traditional graph, edges are explicit data structures. In the CRG, the "graph" is an emergent projection. We define a phase space using **Variadic Axes** (orthogonal dimensions defined by arbitrary types, such as Time, Authority, or Environment). 
 
-Identity is represented as a coordinate $(d_1, d_2, ..., d_n)$ where each $d$ is a dimension such as Time, Authority, or Environment. A "Capability" is reconstructed at runtime by resolving the intersection of these coordinates with the behavior space.
+Identity is represented as a coordinate $(d_1, d_2, ..., d_n)$. A "Capability" is reconstructed at runtime by resolving the intersection of these coordinates with the global behavior space. The system acts like a transparent overlay on top of existing data.
 
 ---
 
@@ -56,18 +57,20 @@ Behavior semantics are decoupled from identity, allowing multiple "views" for th
 ### Stage 5 — Composition (Emergent Matrix)
 Interaction of structure, identity, and behavior creates a runtime capability matrix.
 
-### Stage 6 — The Functional Peak
-A working decoupled system, but one that still relies on local state for contextual changes.
+### Stage 6 — Deterministic Reconstruction (Fusion)
+Achieving a working system with decoupled behavior and structure. By formalizing the matrix using Variadic Inheritance, we achieve an `O(1)` deterministic capability reconstruction without searching.
 
-### Stage 7 — The Contextual Lifecycle (The Trap)
-Demonstrating the thread-safety pitfalls of tying registration to object lifecycles (RAII). Dynamically mutating the 2D matrix to manage local state is revealed as a fundamental concurrency flaw—the "Lifecycle Wall."
+### Stage 7 — The Trap (False Peak)
+Dealing with the "Contextual Lifecycle." Demonstrating why tying behavior registration to an individual object's life and death (RAII/local mutations) forces runtime graph mutation. This triggers severe concurrency hazards and reveals the "Lifecycle Wall."
 
-### Stage 8 — The Pivot: From Mutation to Observation (3rd Dimension)
-Introducing the **Temporal Axis**. We move from a 2D matrix to a 3D volume. Instead of mutating the graph (adding/removing nodes), we shift the coordinate on a temporal dimension. State transitions are modeled as observations on an immutable topology.
+### Stage 8 — The Pivot: From Mutation to Observation (3D Space)
+Introducing the **Temporal Axis**. We move from a 2D matrix to a 3D volume. Instead of mutating the graph (adding/removing nodes), we shift the coordinate on a temporal dimension. State transitions are modeled as pure observations on an immutable topology.
 
-### Stage 9 — Emergent Projections (N-Dimensional Hypergraph)
-Final synthesis: Generalizing the pivot to an open set of **Variadic Axes** (Biome, Authority, etc.). The graph is no longer a data structure, but a "slice" of an N-dimensional hypergraph—a runtime projection reconstructed via zero-cost transports (SBO).
+### Stage 9 — N-Dimensional Expansion (Hypergraph)
+Implementing the Hypergraph via Variadic Axes and Zero-Cost Transports (SBO). The graph is no longer a data structure, but a "slice" of an N-dimensional space—a runtime projection reconstructed on the fly.
 
+### Stage 10 — The Symbiosis (Emergent Projections)
+Final synthesis showing how the CRG integrates flawlessly inside a Data-Oriented loop (ECS). The ECS provides blindingly fast iteration over contiguous memory (The Body), while the CRG projects N-Dimensional contextual behavior onto that data (The Mind) without ever causing archetype fragmentation.
 
 ---
 
@@ -77,15 +80,15 @@ The resulting model exhibits:
 - **No centralized registry**
 - **No explicit stored graph structure**
 - **Orthogonal contextual resolution** via Variadic Axes
-- **Deterministic resolution** through multidimensional traversal
-- **Zero-mutation state transitions** (Thread-safety by design)
-- **Extensible Dimension Types**: Support for any user-defined domain axes.
+- **Zero-allocation transport** via Small Buffer Optimization (SBO)
+- **Zero-mutation state transitions** (Thread-safe by design)
+- **ECS Symbiosis**: Enhances DOD systems without competing for data layout.
 
 ---
 
 ## 6. Interpretation
 
-What appears to the developer as a "capability graph" is an observed runtime projection. By using coordinates in a multidimensional hypergraph, we achieve a system that is non-intrusive, strictly decoupled, and natively ready for massive concurrency.
+What appears to the developer as a "capability graph" is an observed runtime projection. By using coordinates in a multidimensional hypergraph, we achieve a system that is non-intrusive, strictly decoupled, natively ready for massive concurrency, and perfectly suited to complement modern Data-Oriented engines.
 
 ---
 
