@@ -5,17 +5,17 @@ High-performance C++ systems (HFT, robotics, game engines) often struggle to rec
 
 This session introduces the Capability Reconstruction Graph (CRG), a pure C++ architectural pattern that achieves O(1) contextual polymorphism through Stateless Behavior Projection. Instead of mutating data structures to attach behaviors, the CRG projects transient interfaces onto immutable, contiguous data arrays. 
 
-Validated through industry-standard benchmarking on Apple M-Series, this approach demonstrates a 3.63x performance increase at cache-scale (reaching 111 Gi/s). Even when scaled to a massive 256 MB dataset (1M entities), the CRG sustains 35.7 Gi/s, effectively saturating the physical RAM bandwidth while maintaining a 56% lead over traditional mutation-based models. By entirely eliminating the "Memory Wall" associated with archetype shifts, the CRG allows software to finally reach hardware-limit speeds.
+Validated through rigorous read-bias-corrected benchmarking on Apple M-Series, this approach demonstrates a 2x performance increase at cache-scale (reaching 70 Gi/s). Even when scaled to a massive 256 MB dataset (1M entities), the CRG sustains 30 Gi/s, effectively saturating the physical RAM bandwidth while maintaining a 60% lead over traditional mutation-based models. Attendees will learn how to eliminate the "Memory Wall" associated with archetype shifts to reach hardware-limit speeds.
 
 Attendees will learn:
-* The Mechanics of Projection: Building a static resolution matrix using C++ variadic templates and bitwise intersection.
+* The Mechanics of Projection: Building a static resolution matrix using C++ variadic templates.
 * Decoupling Logic from Memory: How to maintain 100% data residency while allowing behaviors to shift dynamically.
 * Registry-Free Extensibility: Injecting capabilities via DLLs without central registry locks.
 * Performance Realities: A data-backed analysis of how stateless resolution transitions from L2 cache speeds to physical RAM saturation.
 
 Outline:
-* The Bottleneck (5 mins): Friction between DOD and dynamic behavior. The hidden cost of Archetype Fragmentation and cache invalidation.
+* The Bottleneck (5 mins): Friction between DOD and dynamic behavior. The hidden cost of Archetype Fragmentation.
 * Architectural Shift (10 mins): Introduction to Stateless Projection. Decoupling logic as a transient view rather than owned state.
-* The Variadic Matrix (15 mins): Implementing the capability sequence. Defining N-dimensional context axes via boolean filtering for O(1) resolution.
-* Scale & Integration (15 mins): Practical implementation within massive data arrays. Proving that zero structural mutation leads to near-native memory bandwidth on datasets up to 1M entities.
+* The Variadic Matrix (15 mins): Implementing the capability sequence. Defining N-dimensional context axes for O(1) resolution.
+* Scale & Integration (15 mins): Proving saturation of memory bandwidth on datasets up to 1M entities with zero structural mutation.
 * Q&A (5 mins)

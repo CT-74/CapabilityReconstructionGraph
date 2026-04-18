@@ -17,18 +17,18 @@ The CRG solves this by decoupling logic from the data layout. It uses C++ variad
 ## Performance Benchmarks
 > Benchmarks executed on Apple M-Series (Clang 16, -O3) via Google Benchmark.
 > **Dataset:** 256 bytes per entity | **Environment:** MacBook Air (Unified Memory).
-> Full reproducible benchmark source code available in `/benchmarks/crg_benchmark.cpp`.
+> **Verification:** Read-bias corrected (forcing full 256-byte cache line load).
 
 | Dataset Size | Pattern | Execution Time | Throughput | Latency vs CRG |
 | :--- | :--- | :--- | :--- | :--- |
-| **65,536 (Cache-bound)** | ECS Mutation | 1,024,633 ns | 30.50 Gi/s | **3.63x Slower** |
-| | **CRG Projection** | **281,761 ns** | **110.91 Gi/s** | **Baseline** |
-| **1,048,576 (Memory-bound)** | ECS Mutation | 21,896,037 ns | 22.84 Gi/s | **1.56x Slower** |
-| | **CRG Projection** | **14,008,326 ns** | **35.69 Gi/s** | **Baseline** |
+| **65,536 (Cache-bound)** | ECS Mutation | 887,026 ns | 35.23 Gi/s | **1.99x Slower** |
+| | **CRG Projection** | **444,965 ns** | **70.23 Gi/s** | **Baseline** |
+| **1,048,576 (Memory-bound)** | ECS Mutation | 25,956,111 ns | 19.26 Gi/s | **1.60x Slower** |
+| | **CRG Projection** | **16,220,465 ns** | **30.83 Gi/s** | **Baseline** |
 
 **Critical Observation:**
-1. **Cache Dominance:** On a 16 MB dataset (64k entities), the CRG saturates the L2 cache with a throughput of **111 Gi/s**, outperforming traditional ECS by a factor of **3.63x**.
-2. **RAM Saturation:** On a massive 256 MB dataset (1M entities), the CRG reaches the physical limits of the RAM (35.7 Gi/s). It maintains a **56% advantage** over ECS, proving that eliminating structural mutation is the only way to exploit 100% of the hardware bandwidth.
+1. **Cache Regimes:** On a 16 MB dataset (64k entities), CRG effectively doubles performance (70.23 Gi/s) by avoiding the hidden overhead of archetype migration logic, even when forced to load full cache lines.
+2. **Memory Wall:** On a 256 MB dataset (1M entities), CRG sustains 30.83 Gi/s, saturating the physical RAM bandwidth. It maintains a 60% lead over ECS, proving that structural mutation is the primary bottleneck for hardware-limit performance.
 
 ---
 
@@ -51,6 +51,6 @@ The CRG solves this by decoupling logic from the data layout. It uses C++ variad
 ## License & Legal Notice
 
 **Author & Architect:** Cyril Tissier  
-This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the **Apache License 2.0**.
 
 *Legal & IP Disclaimer:* The CRG architectural pattern and its conceptual model are independent intellectual property. The C++ code provided in this repository consists strictly of clean-room implementations designed for educational and demonstrative purposes. They are entirely independent of, and do not contain, leak, or reference any proprietary production code, systems, or assets from the author's current or past professional capacities.

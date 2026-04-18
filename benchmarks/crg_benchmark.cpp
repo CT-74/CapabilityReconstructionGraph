@@ -27,8 +27,24 @@ struct alignas(32) EntityData {
 
 // Mock CRG Capability Interface and Matrix
 struct ICapability { virtual void Execute(EntityData& data) = 0; };
-struct CapA : ICapability { void Execute(EntityData& data) override { benchmark::DoNotOptimize(data.id += 1); } };
-struct CapB : ICapability { void Execute(EntityData& data) override { benchmark::DoNotOptimize(data.id += 2); } };
+
+struct CapA : ICapability { 
+    void Execute(EntityData& data) override { 
+        // On modifie la première et la toute dernière donnée pour forcer le 
+        // CPU à charger l'intégralité des 256 octets en cache L1/L2.
+        benchmark::DoNotOptimize(data.id += 1); 
+        benchmark::DoNotOptimize(data.padding[3] += 1);
+        benchmark::ClobberMemory(); // Empêche le compilateur d'ignorer l'opération
+    } 
+};
+
+struct CapB : ICapability { 
+    void Execute(EntityData& data) override { 
+        benchmark::DoNotOptimize(data.id += 2); 
+        benchmark::DoNotOptimize(data.padding[3] += 2);
+        benchmark::ClobberMemory();
+    } 
+};
 
 CapA g_capA;
 CapB g_capB;
