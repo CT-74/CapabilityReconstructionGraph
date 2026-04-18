@@ -1,125 +1,106 @@
-# Capability Reconstruction Graph: External Behavior Composition in C++
+# Capability Reconstruction Graph (CRG)
 
 **Author & Architect:** Cyril Tissier
 
-**Notice of Independent Authorship & Clean-Room Implementation:** The "Capability Reconstruction Graph" (CRG) architectural pattern, its specific nomenclature, and the underlying structural philosophy described in this document are the independent intellectual property of the Author. The C++ code examples provided are functional, clean-room implementations created specifically for this presentation. While they compile and accurately demonstrate the architectural concepts, they are intentionally simplified and unoptimized for pedagogical clarity. They do not represent, contain, or leak the highly optimized, proprietary source code, algorithms, or assets developed by the Author for their employer or any commercial entity. This work is an independent architectural research project.
+**Legal Notice:**
+The CRG architectural pattern and its conceptual model are my independent intellectual property. The C++ code provided here consists of clean-room implementations designed for educational purposes. They are independent of, and do not contain or leak, any proprietary production code or assets from my professional capacity.
 
 ---
 
-## 1. Problem Statement
+## Overview
 
-Modern C++ systems struggle with extensibility when behavior is tightly coupled to type hierarchies or centralized registries. 
+The CRG is a structural model for behavior composition in C++ systems. Instead of embedding functionality in objects, behavior is reconstructed through an **N-Dimensional Hypergraph** resolution.
 
-Furthermore, while Data-Oriented Design and Entity Component Systems (ECS) excel at data locality and fast iteration, they face challenges with complex behavior branching. Dynamically altering an entity's behavior often requires adding or removing "Tag Components", leading to **Archetype Fragmentation**, cache misses, and the need for structural locks in multithreaded environments.
+It addresses a fundamental limitation in high-performance architectures (like Entity Component Systems): the trade-off between **Data Locality** and **Logical Branching**.
 
-These classical approaches typically introduce:
-- Structural coupling between identity and behavior.
-- Centralized ownership of extension points.
-- Fragile cross-module extensibility.
-- **The Lifecycle Wall:** Managing state mutation and graph updates in highly concurrent, context-dependent environments.
+### The Core Concept: Stateless MVC
 
----
+Traditional MVC/MVP patterns hit a "Coupling Wall" in massive-scale, data-oriented architectures. The CRG evolves the pattern by deconstructing the "Controller" into a **Stateless Projection**:
 
-## 2. Design Goal
-
-Enable a symbiotic architecture where:
-- Data locality and iteration are left to specialized systems (like an ECS).
-- Structure, identity, and behavior are fully decoupled.
-- Behavior can be defined externally to the object’s core.
-- **Multidimensional Context:** Identity is a coordinate in a phase space, not a container of data, allowing behavior to emerge without mutating the underlying data structures.
-
----
-
-## 3. Design Philosophy: The Stateless MVC Evolution
-
-The CRG can be viewed as the logical evolution of the **Model-View-Controller (MVC)** or **Model-View-Presenter (MVP)** patterns for high-performance systems. 
-
-Traditional patterns were designed for isolated objects and local states, but they hit a "Coupling Wall" in massive-scale, data-oriented architectures.
-
-### The CRG as a Stateless MVC
-
-In a CRG-based architecture, the core components of MVC are deconstructed and decoupled via N-dimensional projection:
-
-* **The Model (Data):** In Stage 10, the Model is raw, inert ECS data. It has no knowledge of the logic that will operate on it.
-* **The View (Capability):** The "View" is not graphical, but functional. It is a **Capability** (a behavioral interface like `IUnitAI`) projected onto the data at the moment of observation.
-* **The Controller (Resolution):** Unlike a traditional Controller/Presenter, which is a persistent instance linking Model and View, the CRG Controller is **Emergent**. It exists only during the resolution phase as a result of the intersection between an Entity and its Contextual Axes.
+* **Model (Data):** Inert ECS components (POD). The data is unaware of the logic operating on it.
+* **View (Capability):** A functional interface projected onto the data at the moment of observation.
+* **Controller (Resolution):** Transient and emergent. It only exists during the $O(1)$ resolution phase through coordinate intersection.
 
 ### Comparison Matrix
 
-| Aspect | Classic MVC/MVP | CRG (Architectural) |
+| Aspect | Classic MVC/MVP | CRG (Stateless Projection) |
 | :--- | :--- | :--- |
 | **Binding** | Explicit (Controller points to Model) | Implicit (Coordinate intersection) |
-| **Lifecycle** | Instance-based (Stateful) | Transient (Stateless Projection) |
+| **Lifecycle** | Instance-based (Stateful) | Transient (Reconstructed on the stack) |
 | **Memory Cost** | 1 instance per object | 1 Matrix for N entities ($O(1)$) |
-| **State Change** | Mutation (Controller modifies Model) | Observation (Context shifts, Capability is reconstructed) |
-
-### The "Stateless Projection" Advantage
-
-By moving from persistent Controllers to **Stateless Projections**, the CRG eliminates the overhead of managing millions of controller lifecycles. 
-
-It solves the **Archetype Fragmentation** problem by ensuring that behavior is never "injected" into the data structure, but "observed" from a stable, immutable memory layout. This allows for features like hot-swapping behavior (via DLLs) or context-dependent logic (e.g., Night Mode) without a single byte of memory being shuffled or mutated.
+| **State Change** | Mutation (Controller modifies Model) | Observation (Context shifts, Capability changes) |
 
 ---
 
-## 4. The Core Concept: The N-Dimensional Hypergraph
+## Why CRG?
 
-The CRG shifts the paradigm from **State Mutation** to **Contextual Observation**. 
+Traditional ECS architectures suffer from **Archetype Fragmentation**. Changing an entity's behavior usually requires adding or removing tags, forcing the ECS to move data to a different memory chunk (memcpy) and wrecking cache locality.
 
-In a traditional graph, edges are explicit data structures. In the CRG, the "graph" is an emergent projection. We define a phase space using **Variadic Axes** (orthogonal dimensions defined by arbitrary types, such as Time, Authority, or Environment). 
+The CRG solves this by shifting from **Mutation** (changing memory) to **Contextual Observation** (shifting coordinates). Behavior is reconstructed on the fly, keeping the underlying memory contiguous and untouched.
 
-Identity is represented as a coordinate $(d_1, d_2, ..., d_n)$. A "Capability" is reconstructed at runtime by resolving the intersection of these coordinates with the global behavior space. The system acts like a transparent overlay on top of existing data.
+### Universal Applications
 
----
+While built for high-performance engines, this zero-mutation approach fits any domain requiring deterministic, zero-latency logic shifts:
 
-## 5. The 10 Stages of Evolution
-
-### Stage 1 — Structural Primitive
-A runtime-linked graph forming through intrusive self-registration of nodes.
-
-### Stage 2 — Identity Space
-Introducing a stable runtime identity, existing independently of structure and behavior.
-
-### Stage 3 — Identity-Based Resolution
-A traversal-based lookup layer that scans existing structures instead of using a global map.
-
-### Stage 4 — External Behavior Definitions
-Behavior semantics are decoupled from identity, allowing multiple "views" for the same domain.
-
-### Stage 5 — Composition (Emergent Matrix)
-Interaction of structure, identity, and behavior creates a runtime capability matrix.
-
-### Stage 6 — Deterministic Reconstruction (Fusion)
-Achieving a working system with decoupled behavior and structure. By formalizing the matrix using Variadic Inheritance, we achieve an `O(1)` deterministic capability reconstruction without searching.
-
-### Stage 7 — The Trap (False Peak)
-Dealing with the "Contextual Lifecycle." Demonstrating why tying behavior registration to an individual object's life and death (RAII/local mutations) forces runtime graph mutation. This triggers severe concurrency hazards and reveals the "Lifecycle Wall."
-
-### Stage 8 — The Pivot: From Mutation to Observation (3D Space)
-Introducing the **Temporal Axis**. We move from a 2D matrix to a 3D volume. Instead of mutating the graph (adding/removing nodes), we shift the coordinate on a temporal dimension. State transitions are modeled as pure observations on an immutable topology.
-
-### Stage 9 — N-Dimensional Expansion (Hypergraph)
-Implementing the Hypergraph via Variadic Axes and Zero-Cost Transports (SBO). The graph is no longer a data structure, but a "slice" of an N-dimensional space—a runtime projection reconstructed on the fly.
-
-### Stage 10 — The Symbiosis (Emergent Projections)
-Final synthesis showing how the CRG integrates flawlessly inside a Data-Oriented loop (ECS). The ECS provides blindingly fast iteration over contiguous memory (The Body), while the CRG projects N-Dimensional contextual behavior onto that data (The Mind) without ever causing archetype fragmentation.
+- **Agentic AI:** Real-time logical morphing for autonomous agents. Switch between reasoning modes in O(1) without structural reconfiguration or prompt-tax.
+- **High-Frequency Trading (HFT):** Hot-swapping execution strategies based on market context (volatility/liquidity axes) with zero latency.
+- **Digital Twins & Robotics:** Context-aware logic for massive-scale sensor fusion without state synchronization overhead.
 
 ---
 
-## 6. System Properties
+## Performance & Benchmarks
 
-The resulting model exhibits:
-- **No centralized registry**
-- **No explicit stored graph structure**
-- **Orthogonal contextual resolution** via Variadic Axes
-- **Zero-allocation transport** via Small Buffer Optimization (SBO)
-- **Zero-mutation state transitions** (Thread-safe by design)
-- **ECS Symbiosis**: Enhances DOD systems without competing for data layout.
+To quantify the "Management Tax" and the impact of Archetype Fragmentation, the CRG architecture must be evaluated against traditional ECS component mutation.
+
+While this repository contains educational implementations, the underlying architecture is designed to be benchmarked on the following metrics:
+
+1. **Resolution Latency ($O(1)$):** Time taken to resolve a capability via N-Dimensional coordinate intersection vs. searching through a standard VTable or ECS registry.
+2. **Cache-Miss Rate:** Comparing the L1/L2 cache misses when shifting behavior via ECS tag insertion (which triggers data relocation) versus CRG contextual observation (where data remains strictly contiguous).
+3. **Concurrency Scaling:** Measuring lock contention when multiple threads shift entity contexts simultaneously across a large dataset (100k+ entities).
+
+*(Note: Specific micro-benchmarks utilizing Google Benchmark are being integrated into the repository to formally verify these performance characteristics.)*
 
 ---
 
-## 7. Beyond Gaming: Universal Applications
+## The 10-Stage Evolution
 
-The stateless nature of the CRG makes it a prime candidate for any industry requiring deterministic, high-performance contextual logic:
+This repository follows a step-by-step progression:
 
-### 7.1 Agentic AI & Reasoning
-The CRG acts as the "Architectural Nervous System" for autonomous agents. It allows AI agents to "morph" their logical
+1. **Structural Primitive:** Intrusive self-registration.
+2. **Identity Space:** Stable runtime identity without central registries.
+3. **Identity-Based Resolution:** Traversal-based lookups.
+4. **External Semantics:** Separating behavior from memory layout.
+5. **Composition:** Building a deterministic capability matrix.
+6. **Deterministic Fusion:** Achieving constant-time $O(1)$ resolution.
+7. **The False Peak:** Why RAII and local mutations fail to scale in graph-behaviors.
+8. **The Pivot:** Introducing the Temporal Axis. Replacing state mutation with contextual observation.
+9. **N-Dimensional Expansion:** Implementing Variadic Axes and Zero-Cost Transports (SBO).
+10. **The Symbiosis:** Final integration. Projecting N-Dimensional logic onto inert, contiguous ECS data.
+
+---
+
+## Technical Q&A
+
+### Q: How does this claim O(1) resolution if there is a loop in Resolve?
+**A:** The O(1) refers to structural complexity. Resolution is local to the type's own matrix. The loop only iterates over the number of behaviors defined for that specific type (usually < 5). Since this is a small constant independent of the total system scale, the resolution is effectively O(1).
+
+### Q: Why not just use a standard ECS?
+**A:** The CRG is a symbiotic layer, not an ECS replacement. It solves the Archetype Fragmentation problem. The ECS handles fast iteration over contiguous data; the CRG projects context-aware logic onto that data without triggering structural reallocations.
+
+### Q: Isn't the Match() function just a hidden if-else chain?
+**A:** Yes, the CPU still branches. However, the CRG replaces structural mutation (expensive memory shuffling) with simple comparisons (cheap enum/ID checks). The branch is moved out of the hot-path business logic into the contextual resolution phase.
+
+### Q: How does this handle multi-threading?
+**A:** The CRG topology is immutable at runtime. "State changes" are simply different coordinates provided to the Resolve function. Since no shared state is mutated during observation, the system is natively thread-safe for concurrent reads.
+
+### Q: Why use a SBO (Small Buffer Optimization) Handle?
+**A:** To ensure zero-allocation. By keeping the capability instance on the stack during the update tick, we avoid heap allocations on the hot path while maintaining strict decoupling.
+
+---
+
+## License
+
+This project is licensed under the **Apache License 2.0**. 
+See the [LICENSE](LICENSE) file for details.
+
+*Copyright (c) 2026 Cyril Tissier*

@@ -9,34 +9,45 @@ Author & Architect:
 Cyril Tissier
 
 Architectural & Legal Firewall:
-A rigorous distinction is maintained between the Architectural Model (the conceptual model, which remains the independent intellectual property of the Author) and any corporate property. The illustrative C++ examples shown in this presentation are functional, clean-room implementations created specifically for CppCon. While they successfully compile and demonstrate the core architectural mechanics, they are intentionally simplified and unoptimized for pedagogical purposes. They are entirely independent of, and do not leak, the highly optimized, proprietary production code or assets developed by the Author in a professional corporate capacity.
+A rigorous distinction is maintained between the Architectural Model (the conceptual model, which remains the independent intellectual property of the Author) and any corporate property. The illustrative C++ examples shown in this presentation are functional, clean-room implementations created specifically for CppCon. While they successfully compile and demonstrate the core architectural mechanics, they are intentionally simplified for pedagogical purposes. They are entirely independent of, and do not leak, any proprietary production code or assets developed by the Author in a professional corporate capacity.
 
 Abstract:
-For architects and developers building high-performance C++ systems, Data-Oriented Design (DOD) and Entity Component Systems (ECS) have revolutionized performance but introduced a severe "Management Tax": Archetype Fragmentation. How do we implement complex, context-dependent behaviors without triggering massive memory reallocations or polluting our data structures with logic-specific tags?
+Data-Oriented Design (DOD) and Entity Component Systems (ECS) maximize memory locality but introduce a strict conflict with logical extensibility. Dynamically altering an entity's behavior traditionally requires structural changes to the data layout—such as adding or removing "Tag Components." This causes "Archetype Fragmentation," triggering memory reallocations, cache line invalidation, and synchronization overhead in multithreaded environments.
 
-This talk presents a structural model for composing behavior where functionality is not embedded in objects, but emerges from the interaction of independent, multidimensional runtime spaces. It introduces the Capability Reconstruction Graph (CRG), an architectural pattern that evolves traditional MVC/MVP models into a "Stateless Projection" system. 
+This session introduces the Capability Reconstruction Graph (CRG), an architectural pattern that completely decouples behavior from data layout. By projecting functional capabilities onto inert ECS data via an N-Dimensional Hypergraph based on contextual axes (Time, Authority, Environment), the CRG resolves context-dependent behaviors in constant time (O(1)) without mutating the underlying memory.
 
-While classical approaches rely heavily on inheritance hierarchies or centralized registries, the CRG acts as a symbiotic, context-oriented layer. In this model, no explicit graph is ever stored; capabilities are reconstructed as emergent projections from an N-Dimensional Hypergraph. 
+To substantiate this architectural model, the presentation will include empirical benchmarks comparing traditional ECS component mutation against CRG resolution. Data will focus on L1/L2 cache preservation, resolution latency, and concurrency scaling (lock contention) across large data sets. 
 
-By deconstructing the Controller into a transient projection, we shift from State Mutation to Contextual Observation. We achieve the flexibility of high-level patterns with the performance of raw contiguous memory (O(1) resolution). Furthermore, while designed for high-performance engines, the "Stateless MVC" paradigm extends to any domain requiring deterministic, high-speed contextual logic, including Agentic AI, High-Frequency Trading, and Robotics.
+While designed to eliminate archetype fragmentation in high-performance engines, this allocation-free, zero-mutation approach is applicable to any domain requiring deterministic, high-throughput contextual logic shifts, including Agentic AI and High-Frequency Trading.
 
 Detailed Outline (60-Minute Session):
-This session leads this model through a 10-stage live code evolution, navigating through a critical architectural "False Peak":
 
-1. Structural Primitive: A runtime-linked graph forming through intrusive self-registration.
-2. Identity Space: Adding stable runtime identity, independent of structure.
-3. Identity-Based Resolution: A traversal-based lookup layer (avoiding registries).
-4. External Behavior Definitions: Decoupling behavior semantics from identity.
-5. Composition: Creating a runtime capability matrix through interaction.
-6. Deterministic Reconstruction (Fusion): Achieving a working system with decoupled behavior and structure via an O(1) resolution matrix.
-7. The Trap (False Peak): Dealing with the "Contextual Lifecycle" — Why RAII and local mutations fail to scale and trigger the "Management Tax" in graph-based behaviors.
-8. The Pivot: From Mutation to Observation — The birth of the "Stateless MVC". Introducing the Temporal Axis as a first dimension to replace state changes with contextual resolution.
-9. N-Dimensional Expansion: Implementing the Hypergraph via Variadic Axes and Zero-Cost Transports (SBO).
-10. The Symbiosis (Emergent Projections): Final synthesis showing how the CRG integrates flawlessly inside an ECS loop—separating pure Data Localisation from N-Dimensional Contextual Projection.
-11. Universal Applications: Exploring how the CRG provides a zero-latency backbone for Agentic AI reasoning and massive-scale industrial simulation.
+1. Problem Context & The Fragmentation Wall (10 min)
+- The conflict between contiguous memory (ECS/DOD) and dynamic behavioral branching.
+- Analyzing the cost of Archetype Fragmentation: cache invalidation and multithreading bottlenecks.
+
+2. The Architectural Shift: Stateless Projection (10 min)
+- Deconstructing the traditional MVC Controller.
+- Transitioning from State Mutation (memory writes) to Contextual Observation (coordinate intersection).
+
+3. Implementation Progression (20 min)
+- Establishing stable runtime identity and external semantics without central registries.
+- Building the deterministic O(1) capability matrix using variadic templates.
+- The "Concurrency Wall": Demonstrating why RAII and local mutations fail for graph-based behaviors.
+- N-Dimensional Expansion: Implementing variadic contextual axes and Zero-Cost Transports via Small Buffer Optimization (SBO).
+
+4. ECS Integration & Performance Evaluation (15 min)
+- Integrating the CRG over a standard Data-Oriented loop.
+- Presentation of benchmark data: CRG resolution vs. traditional VTable dispatch and ECS registry lookups.
+- Analyzing cache miss reduction and throughput metrics.
+
+5. Universal Applications & Q&A (5 min)
+- Extending the model to Agentic AI reasoning paths and HFT strategy hot-swapping.
+- Audience Q&A.
 
 Audience:
-Intermediate to Advanced C++ Developers, Software Architects, and Systems Engineers interested in high-performance design patterns, multidimensional modeling, and thread-safety.
+Intermediate to Advanced C++ Developers, Software Architects, and Systems Engineers focused on high-performance design patterns, ECS limitations, and multithreading.
 
 Level: 
 Intermediate / Advanced.
+================================================================================
