@@ -1,53 +1,20 @@
-================================================================================
-CPPCON PITCH SUBMISSION 
-================================================================================
-
 Title:
-Beyond the Controller: Emergent Behavior Composition via Stateless MVC and N-Dimensional Hypergraphs in C++
-
-Author & Architect: 
-Cyril Tissier
-
-Architectural & Legal Firewall:
-A rigorous distinction is maintained between the Architectural Model (the conceptual model, which remains the independent intellectual property of the Author) and any corporate property. The illustrative C++ examples shown in this presentation are functional, clean-room implementations created specifically for CppCon. While they successfully compile and demonstrate the core architectural mechanics, they are intentionally simplified for pedagogical purposes. They are entirely independent of, and do not leak, any proprietary production code or assets developed by the Author in a professional corporate capacity.
+Stateless Behavior Projection: O(1) Contextual Polymorphism for High-Performance C++
 
 Abstract:
-Data-Oriented Design (DOD) and Entity Component Systems (ECS) maximize memory locality but introduce a strict conflict with logical extensibility. Dynamically altering an entity's behavior traditionally requires structural changes to the data layout—such as adding or removing "Tag Components." This causes "Archetype Fragmentation," triggering memory reallocations, cache line invalidation, and synchronization overhead in multithreaded environments.
+High-performance C++ applications (HFT, robotics, game engines) often struggle to reconcile Data-Oriented Design (contiguous memory) with dynamic polymorphic behavior. Traditional approaches use stateful controllers, virtual dispatches, or central registries, which inherently couple logic to data. When entity behavior changes contextually, these architectures force state mutations. In Entity Component Systems (ECS), this manifests as "Archetype Fragmentation"—where adding a behavioral tag forces a structural reallocation, breaking cache locality and creating synchronization bottlenecks (a well-documented constraint in strict archetype-based ECS like Unity DOTS or Flecs).
 
-This session introduces the Capability Reconstruction Graph (CRG), an architectural pattern that completely decouples behavior from data layout. By projecting functional capabilities onto inert ECS data via an N-Dimensional Hypergraph based on contextual axes (Time, Authority, Environment), the CRG resolves context-dependent behaviors in constant time (O(1)) without mutating the underlying memory.
+This session introduces the Capability Reconstruction Graph (CRG), a pure C++ architectural pattern that resolves this via Stateless Behavior Projection. Instead of mutating data structures to attach behaviors, the underlying data arrays remain contiguous and immutable. Behavior is projected as a transient interface, resolved at runtime in O(1) using a bitwise intersection against a compile-time variadic type matrix.
 
-To substantiate this architectural model, the presentation will include empirical benchmarks comparing traditional ECS component mutation against CRG resolution. Data will focus on L1/L2 cache preservation, resolution latency, and concurrency scaling (lock contention) across large data sets. 
+Attendees will learn how to implement this decoupled architecture. We will walk through building the static variadic type sequence to define N-dimensional context axes (state, environment, authority). We will also demonstrate how type-based resolution allows dynamically loading new behaviors via DLLs without central registry locks, keeping data memory strictly linear while behavior remains fully dynamic.
 
-While designed to eliminate archetype fragmentation in high-performance engines, this allocation-free, zero-mutation approach is applicable to any domain requiring deterministic, high-throughput contextual logic shifts, including Agentic AI and High-Frequency Trading.
-
-Detailed Outline (60-Minute Session):
-
-1. Problem Context & The Fragmentation Wall (10 min)
-- The conflict between contiguous memory (ECS/DOD) and dynamic behavioral branching.
-- Analyzing the cost of Archetype Fragmentation: cache invalidation and multithreading bottlenecks.
-
-2. The Architectural Shift: Stateless Projection (10 min)
-- Deconstructing the traditional MVC Controller.
-- Transitioning from State Mutation (memory writes) to Contextual Observation (coordinate intersection).
-
-3. Implementation Progression (20 min)
-- Establishing stable runtime identity and external semantics without central registries.
-- Building the deterministic O(1) capability matrix using variadic templates.
-- The "Concurrency Wall": Demonstrating why RAII and local mutations fail for graph-based behaviors.
-- N-Dimensional Expansion: Implementing variadic contextual axes and Zero-Cost Transports via Small Buffer Optimization (SBO).
-
-4. ECS Integration & Performance Evaluation (15 min)
-- Integrating the CRG over a standard Data-Oriented loop.
-- Presentation of benchmark data: CRG resolution vs. traditional VTable dispatch and ECS registry lookups.
-- Analyzing cache miss reduction and throughput metrics.
-
-5. Universal Applications & Q&A (5 min)
-- Extending the model to Agentic AI reasoning paths and HFT strategy hot-swapping.
-- Audience Q&A.
-
-Audience:
-Intermediate to Advanced C++ Developers, Software Architects, and Systems Engineers focused on high-performance design patterns, ECS limitations, and multithreading.
-
-Level: 
-Intermediate / Advanced.
-================================================================================
+Outline:
+* The Problem (5 mins): The friction between data-oriented memory layouts and dynamic behavior. The runtime costs of stateful logic, registries, and structural mutations (e.g., dynamic dispatch overhead, ECS archetype fragmentation).
+* Architectural Shift (10 mins): Introduction to Stateless Behavior Projection. Decoupling logic as a transient interface rather than an owned state.
+* Building the Resolution Matrix (15 mins): 
+    - Constructing the capability sequence using C++ variadic templates.
+    - Defining context axes via boolean filtering.
+    - Achieving O(1) behavior resolution without hash maps or v-tables.
+* Registry-Free Extensibility (10 mins): Injecting capabilities via dynamically loaded libraries (DLLs) without central registry locks or initialization bottlenecks.
+* Contiguous Data Integration (15 mins): Applying the pattern to massive data arrays. Proving that data can remain perfectly immutable while its behaviors dynamically shift across millions of instances.
+* Q&A (5 mins)
