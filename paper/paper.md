@@ -30,7 +30,38 @@ Enable a symbiotic architecture where:
 
 ---
 
-## 3. The Core Concept: The N-Dimensional Hypergraph
+## 3. Design Philosophy: The Stateless MVC Evolution
+
+The CRG can be viewed as the logical evolution of the **Model-View-Controller (MVC)** or **Model-View-Presenter (MVP)** patterns for high-performance systems. 
+
+Traditional patterns were designed for isolated objects and local states, but they hit a "Coupling Wall" in massive-scale, data-oriented architectures.
+
+### The CRG as a Stateless MVC
+
+In a CRG-based architecture, the core components of MVC are deconstructed and decoupled via N-dimensional projection:
+
+* **The Model (Data):** In Stage 10, the Model is raw, inert ECS data. It has no knowledge of the logic that will operate on it.
+* **The View (Capability):** The "View" is not graphical, but functional. It is a **Capability** (a behavioral interface like `IUnitAI`) projected onto the data at the moment of observation.
+* **The Controller (Resolution):** Unlike a traditional Controller/Presenter, which is a persistent instance linking Model and View, the CRG Controller is **Emergent**. It exists only during the resolution phase as a result of the intersection between an Entity and its Contextual Axes.
+
+### Comparison Matrix
+
+| Aspect | Classic MVC/MVP | CRG (Architectural) |
+| :--- | :--- | :--- |
+| **Binding** | Explicit (Controller points to Model) | Implicit (Coordinate intersection) |
+| **Lifecycle** | Instance-based (Stateful) | Transient (Stateless Projection) |
+| **Memory Cost** | 1 instance per object | 1 Matrix for N entities ($O(1)$) |
+| **State Change** | Mutation (Controller modifies Model) | Observation (Context shifts, Capability is reconstructed) |
+
+### The "Stateless Projection" Advantage
+
+By moving from persistent Controllers to **Stateless Projections**, the CRG eliminates the overhead of managing millions of controller lifecycles. 
+
+It solves the **Archetype Fragmentation** problem by ensuring that behavior is never "injected" into the data structure, but "observed" from a stable, immutable memory layout. This allows for features like hot-swapping behavior (via DLLs) or context-dependent logic (e.g., Night Mode) without a single byte of memory being shuffled or mutated.
+
+---
+
+## 4. The Core Concept: The N-Dimensional Hypergraph
 
 The CRG shifts the paradigm from **State Mutation** to **Contextual Observation**. 
 
@@ -40,7 +71,7 @@ Identity is represented as a coordinate $(d_1, d_2, ..., d_n)$. A "Capability" i
 
 ---
 
-## 4. The 10 Stages of Evolution
+## 5. The 10 Stages of Evolution
 
 ### Stage 1 — Structural Primitive
 A runtime-linked graph forming through intrusive self-registration of nodes.
@@ -74,7 +105,7 @@ Final synthesis showing how the CRG integrates flawlessly inside a Data-Oriented
 
 ---
 
-## 5. System Properties
+## 6. System Properties
 
 The resulting model exhibits:
 - **No centralized registry**
@@ -86,10 +117,9 @@ The resulting model exhibits:
 
 ---
 
-## 6. Interpretation
+## 7. Beyond Gaming: Universal Applications
 
-What appears to the developer as a "capability graph" is an observed runtime projection. By using coordinates in a multidimensional hypergraph, we achieve a system that is non-intrusive, strictly decoupled, natively ready for massive concurrency, and perfectly suited to complement modern Data-Oriented engines.
+The stateless nature of the CRG makes it a prime candidate for any industry requiring deterministic, high-performance contextual logic:
 
----
-
-## END
+### 7.1 Agentic AI & Reasoning
+The CRG acts as the "Architectural Nervous System" for autonomous agents. It allows AI agents to "morph" their logical

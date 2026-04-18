@@ -1,5 +1,9 @@
+================================================================================
+CPPCON PITCH SUBMISSION 
+================================================================================
+
 Title:
-The Capability Reconstruction Graph (CRG): Emergent Behavior Composition via N-Dimensional Hypergraphs in C++
+Beyond the Controller: Emergent Behavior Composition via Stateless MVC and N-Dimensional Hypergraphs in C++
 
 Author & Architect: 
 Cyril Tissier
@@ -8,13 +12,16 @@ Architectural & Legal Firewall:
 A rigorous distinction is maintained between the Architectural Model (the conceptual model, which remains the independent intellectual property of the Author) and any corporate property. The illustrative C++ examples shown in this presentation are functional, clean-room implementations created specifically for CppCon. While they successfully compile and demonstrate the core architectural mechanics, they are intentionally simplified and unoptimized for pedagogical purposes. They are entirely independent of, and do not leak, the highly optimized, proprietary production code or assets developed by the Author in a professional corporate capacity.
 
 Abstract:
-This talk presents a structural model for composing behavior in C++ systems where functionality is not embedded in objects, but emerges from the interaction of independent, multidimensional runtime spaces. 
+For architects and developers building high-performance C++ systems, Data-Oriented Design (DOD) and Entity Component Systems (ECS) have revolutionized performance but introduced a severe "Management Tax": Archetype Fragmentation. How do we implement complex, context-dependent behaviors without triggering massive memory reallocations or polluting our data structures with logic-specific tags?
 
-While classical approaches rely heavily on inheritance hierarchies or centralized registries, the Capability Reconstruction Graph (CRG) acts as a symbiotic, context-oriented layer that perfectly complements Data-Oriented Design (like ECS). In this model, no explicit graph is ever stored; capabilities are reconstructed as emergent projections from an N-Dimensional Hypergraph. 
+This talk presents a structural model for composing behavior where functionality is not embedded in objects, but emerges from the interaction of independent, multidimensional runtime spaces. It introduces the Capability Reconstruction Graph (CRG), an architectural pattern that evolves traditional MVC/MVP models into a "Stateless Projection" system. 
 
-By shifting from state mutation to Contextual Observation across an arbitrary and extensible set of orthogonal axes (Time, Authority, Environment, ...), the CRG natively bypasses common thread-safety pitfalls and archetype fragmentation.
+While classical approaches rely heavily on inheritance hierarchies or centralized registries, the CRG acts as a symbiotic, context-oriented layer. In this model, no explicit graph is ever stored; capabilities are reconstructed as emergent projections from an N-Dimensional Hypergraph. 
 
-The talk progressively builds this model through a 10-stage live code evolution, navigating through a critical architectural "False Peak":
+By deconstructing the Controller into a transient projection, we shift from State Mutation to Contextual Observation. We achieve the flexibility of high-level patterns with the performance of raw contiguous memory (O(1) resolution). Furthermore, while designed for high-performance engines, the "Stateless MVC" paradigm extends to any domain requiring deterministic, high-speed contextual logic, including Agentic AI, High-Frequency Trading, and Robotics.
+
+Detailed Outline (60-Minute Session):
+This session leads this model through a 10-stage live code evolution, navigating through a critical architectural "False Peak":
 
 1. Structural Primitive: A runtime-linked graph forming through intrusive self-registration.
 2. Identity Space: Adding stable runtime identity, independent of structure.
@@ -22,10 +29,11 @@ The talk progressively builds this model through a 10-stage live code evolution,
 4. External Behavior Definitions: Decoupling behavior semantics from identity.
 5. Composition: Creating a runtime capability matrix through interaction.
 6. Deterministic Reconstruction (Fusion): Achieving a working system with decoupled behavior and structure via an O(1) resolution matrix.
-7. The Trap (False Peak): Dealing with the "Contextual Lifecycle" — Why RAII and local mutations fail to scale and trigger concurrency hazards in graph-based behaviors.
-8. The Pivot: From Mutation to Observation — Introducing the Temporal Axis as a first dimension to replace state changes with contextual resolution.
+7. The Trap (False Peak): Dealing with the "Contextual Lifecycle" — Why RAII and local mutations fail to scale and trigger the "Management Tax" in graph-based behaviors.
+8. The Pivot: From Mutation to Observation — The birth of the "Stateless MVC". Introducing the Temporal Axis as a first dimension to replace state changes with contextual resolution.
 9. N-Dimensional Expansion: Implementing the Hypergraph via Variadic Axes and Zero-Cost Transports (SBO).
 10. The Symbiosis (Emergent Projections): Final synthesis showing how the CRG integrates flawlessly inside an ECS loop—separating pure Data Localisation from N-Dimensional Contextual Projection.
+11. Universal Applications: Exploring how the CRG provides a zero-latency backbone for Agentic AI reasoning and massive-scale industrial simulation.
 
 Audience:
 Intermediate to Advanced C++ Developers, Software Architects, and Systems Engineers interested in high-performance design patterns, multidimensional modeling, and thread-safety.

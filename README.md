@@ -21,6 +21,49 @@ Identity is defined as a set of coordinates in a phase space governed by **Varia
 
 ---
 
+## Architectural Evolution: Beyond MVC/MVP
+
+The CRG can be viewed as the logical evolution of the **Model-View-Controller (MVC)** or **Model-View-Presenter (MVP)** patterns for high-performance systems. 
+
+Traditional patterns were designed for isolated objects and local states, but they hit a "Coupling Wall" in massive-scale, data-oriented architectures.
+
+### The CRG as a Stateless MVC
+
+In a CRG-based architecture, the core components of MVC are deconstructed and decoupled via N-dimensional projection:
+
+* **The Model (Data):** In Stage 10, the Model is raw, inert ECS data. It has no knowledge of the logic that will operate on it.
+* **The View (Capability):** The "View" is not graphical, but functional. It is a **Capability** (a behavioral interface like `IUnitAI`) projected onto the data at the moment of observation.
+* **The Controller (Resolution):** Unlike a traditional Controller/Presenter, which is a persistent instance linking Model and View, the CRG Controller is **Emergent**. It exists only during the resolution phase as a result of the intersection between an Entity and its Contextual Axes.
+
+> **Analogy:** Just as a Shader projects color onto a vertex without modifying the geometry, the CRG projects Behavior onto Data without modifying the Memory Layout. It is a "Shader for Logic".
+
+### Comparison Matrix
+
+| Aspect | Classic MVC/MVP | CRG (Architectural) |
+| :--- | :--- | :--- |
+| **Binding** | Explicit (Controller points to Model) | Implicit (Coordinate intersection) |
+| **Lifecycle** | Instance-based (Stateful) | Transient (Stateless Projection) |
+| **Memory Cost** | 1 instance per object | 1 Matrix for N entities ($O(1)$) |
+| **State Change** | Mutation (Controller modifies Model) | Observation (Context shifts, Capability is reconstructed) |
+
+### The "Stateless Projection" Advantage
+
+By moving from persistent Controllers to **Stateless Projections**, the CRG eliminates the overhead of managing millions of controller lifecycles. 
+
+It solves the **Archetype Fragmentation** problem by ensuring that behavior is never "injected" into the data structure, but "observed" from a stable, immutable memory layout. This allows for features like hot-swapping behavior (via DLLs) or context-dependent logic (e.g., Night Mode) without a single byte of memory being shuffled or mutated.
+
+---
+
+## Universal Applications: From HFT to Agentic AI
+
+While designed for high-performance engines, the CRG paradigm is a revolution for any domain requiring deterministic, high-speed contextual logic:
+
+- **Agentic AI:** Enabling AI agents to switch between millions of logical capabilities in O(1) without structural reconfiguration or prompt-tax. The CRG acts as the "Architectural Nervous System" for autonomous agents.
+- **High-Frequency Trading:** Swapping execution strategies based on market context (Volatility/Liquidity axes) with zero latency.
+- **Robotics & Aerospace:** Managing massive-scale sensor fusion and target classification through N-Dimensional context shifts.
+
+---
+
 ## The 10-Stage Evolution
 
 This repository provides a step-by-step progression of the CRG implementation:
@@ -56,3 +99,12 @@ This repository provides a step-by-step progression of the CRG implementation:
 ---
 
 *This repository serves as the companion code to the CppCon presentation: "The Capability Reconstruction Graph: Emergent Behavior Composition via N-Dimensional Hypergraphs in C++".*
+
+---
+
+## License
+
+This project is licensed under the **Apache License 2.0**. 
+See the [LICENSE](LICENSE) file for details.
+
+*Copyright (c) 2026 Cyril Tissier*

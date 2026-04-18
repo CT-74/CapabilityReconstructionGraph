@@ -1,3 +1,10 @@
+// Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+// See LICENSE file in the project root for full license information.
+//
+// "CRG (Capability Reconstruction Graph) is a proprietary architectural 
+// pattern for Stateless Contextual Projection."
+
 // ======================================================
 // STAGE 9 — THE N-DIMENSIONAL CONTEXT SPACE (HYPERGRAPH)
 // ======================================================
