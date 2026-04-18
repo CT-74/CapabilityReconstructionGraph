@@ -9,6 +9,9 @@
 #include <cstring>
 #include <cstdint>
 
+//#define ENTITY_COUNT 65536
+#define ENTITY_COUNT 1048576
+
 // -----------------------------------------------------------------------------
 // 1. DATA SETUP
 // -----------------------------------------------------------------------------
@@ -61,7 +64,7 @@ static void BM_EcsArchetypeMutation(benchmark::State& state) {
     // Bytes processed = Entity size * Number of entities * 2 moves per iteration
     state.SetBytesProcessed(int64_t(state.iterations()) * int64_t(entityCount) * sizeof(EntityData) * 2);
 }
-BENCHMARK(BM_EcsArchetypeMutation)->RangeMultiplier(4)->Range(1024, 65536);
+BENCHMARK(BM_EcsArchetypeMutation)->RangeMultiplier(4)->Range(1024, ENTITY_COUNT);
 
 // -----------------------------------------------------------------------------
 // 3. CRG STATELESS MVC MOCK (Contextual Observation)
@@ -99,6 +102,6 @@ static void BM_CrgContextualObservation(benchmark::State& state) {
     // Bytes processed is zero for memory copies, but we count the data touched.
     state.SetBytesProcessed(int64_t(state.iterations()) * int64_t(entityCount) * sizeof(EntityData) * 2);
 }
-BENCHMARK(BM_CrgContextualObservation)->RangeMultiplier(4)->Range(1024, 65536);
+BENCHMARK(BM_CrgContextualObservation)->RangeMultiplier(4)->Range(1024, ENTITY_COUNT);
 
 BENCHMARK_MAIN();

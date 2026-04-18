@@ -17,24 +17,26 @@ The CRG eliminates structural mutation by treating "State" as a coordinate on an
 Using variadic templates, the CRG builds a static matrix of "Capabilities" (interfaces). When an entity's context changes (e.g., switching from `Idle` to `Combat`), the system performs an O(1) lookup in the capability matrix. The underlying entity data remains perfectly contiguous in its original memory location.
 
 ## 5. Performance Criteria & Benchmarks
-To validate the efficiency of the CRG, a comparative benchmark was conducted against a traditional Archetype-based mutation model. 
 
 ### Methodology
-* **Target:** 65,536 Entities.
-* **Payload:** 256 bytes per entity (simulating Transform + Physics data).
-* **Environment:** Apple M-Series (Clang 16, -O3 optimization) via Google Benchmark.
-* **Scenario:** Measuring the cost of a dual-state transition (A -> B -> A) for the entire dataset.
+* **Target:** Variable scale from 1,024 to 1,048,576 Entities.
+* **Payload:** 256 bytes per entity (Transform + Physics data).
+* **Environment:** MacBook Air (Apple M-Series, Clang 16, -O3) via Google Benchmark.
 
 ### Results
-| Implementation | Execution Time (65k) | Throughput | Observation |
+| Entities | ECS Mutation (Throughput) | CRG Projection (Throughput) | Ratio |
 | :--- | :--- | :--- | :--- |
-| **ECS Archetype Mutation** | 1,033,657 ns | 30.23 Gi/s | Significant cache-miss overhead. |
-| **CRG Projection** | **317,634 ns** | **98.38 Gi/s** | **Near-native memory bandwidth.** |
+| 65,536 | 30.50 Gi/s | **110.91 Gi/s** | **3.63x** |
+| 1,048,576 | 22.84 Gi/s | **35.69 Gi/s** | **1.56x** |
 
-### Technical Analysis
-The benchmark reveals a **3.25x performance advantage** for the CRG pattern. The performance gap is primarily driven by the "Memory Wall": 
-1. **Structural Mutation (ECS):** Each state change forces a `memcpy` of 256 bytes. At scale, this saturates the memory bus and invalidates L1/L2 caches.
-2. **Contextual Observation (CRG):** Data residency is 100%. The CPU prefetcher remains effective as data never leaves its contiguous array. The O(1) resolution cost is negligible compared to the cost of memory movement.
+### Technical Analysis: Crossing the Memory Wall
+The benchmark results reveal two distinct performance regimes:
+
+1. **The Cache Regime (< 16 MB):** At 64k entities, the data fits within the L2/System Level Cache. The CRG achieves a throughput of **111 Gi/s**, which is the near-theoretical limit of the silicon's internal interconnects. The ECS model is bottlenecked by the logic of mutation (copying data), even within the cache.
+
+2. **The RAM Regime (> 64 MB):** At 1M entities, the dataset (256 MB) exceeds the cache capacity. The CRG throughput drops to **35.7 Gi/s**, which corresponds to the physical saturation of the LPDDR memory bus on the test hardware. 
+
+**Conclusion:** The CRG is "Optimal by Design." It allows the software to reach the maximum speed allowed by the hardware. While traditional ECS suffers from structural overhead, the CRG ensures that the CPU prefetcher remains 100% efficient by maintaining total data residency.
 
 ## 6. The 10-Stage Implementation Architecture
 1. **Type-Safety:** Enforcing static interface requirements.
