@@ -1,7 +1,7 @@
 # Capability Reconstruction Graph (CRG)
 
 > A stateless architectural pattern for resolving contextual behavior in Data-Oriented Design without structural memory mutation.
-> 📄 **[Read the full White Paper here](paper.md)**
+> 📄 **[Read the full White Paper here](paper/paper.md)**
 
 ## Abstract
 High-performance C++ applications often struggle to reconcile Data-Oriented Design (contiguous memory) with dynamic polymorphic behavior. In strict Archetype-based Entity Component Systems (ECS), adding or removing behavioral tags forces entities to migrate between memory chunks—a bottleneck known as Archetype Fragmentation.
@@ -16,6 +16,7 @@ The CRG solves this by decoupling logic from the data layout. It uses C++ variad
 
 ## Performance Benchmarks
 > Benchmarks executed on Apple M-Series (Clang 16, -O3) via Google Benchmark.
+> **Dataset:** 65,536 Entities | **Payload:** 256 bytes per entity.
 > Full reproducible benchmark source code available in `/benchmarks/crg_benchmark.cpp`.
 
 | Pattern | Execution Time (65k Entities) | Throughput | Latency vs CRG |

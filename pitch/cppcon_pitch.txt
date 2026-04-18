@@ -5,7 +5,7 @@ High-performance C++ systems (HFT, robotics, game engines) often struggle to rec
 
 This session introduces the Capability Reconstruction Graph (CRG), a pure C++ architectural pattern that achieves O(1) contextual polymorphism through Stateless Behavior Projection. Instead of mutating data structures to attach behaviors, the CRG projects transient interfaces onto immutable, contiguous data arrays. 
 
-Validated through industry-standard benchmarking, this approach demonstrates a 3.25x performance increase (reaching 98 Gi/s on Apple M-Series) compared to traditional structural mutation by eliminating the "Memory Wall" associated with archetype shifts.
+Validated through industry-standard benchmarking, this approach demonstrates a 3.25x performance increase (reaching 98 Gi/s on Apple M-Series) compared to traditional structural mutation. This throughput was sustained across a dataset of 65,536 entities (256-byte payload) by entirely eliminating the "Memory Wall" associated with archetype shifts.
 
 Attendees will learn:
 * The Mechanics of Projection: Building a static resolution matrix using C++ variadic templates and bitwise intersection.
