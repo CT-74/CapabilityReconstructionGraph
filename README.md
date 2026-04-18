@@ -1,5 +1,3 @@
-CRG : README
-
 # Capability Reconstruction Graph (CRG)
 
 **Author & Architect:** Cyril Tissier
