@@ -1,20 +1,21 @@
-Title:
-Stateless Behavior Projection: O(1) Contextual Polymorphism for High-Performance C++
+Title: Stateless Behavior Projection: O(1) Contextual Polymorphism for High-Performance C++
 
 Abstract:
-High-performance C++ applications (HFT, robotics, game engines) often struggle to reconcile Data-Oriented Design (contiguous memory) with dynamic polymorphic behavior. Traditional approaches use stateful controllers, virtual dispatches, or central registries, which inherently couple logic to data. When entity behavior changes contextually, these architectures force state mutations. In Entity Component Systems (ECS), this manifests as "Archetype Fragmentation"—where adding a behavioral tag forces a structural reallocation, breaking cache locality and creating synchronization bottlenecks (a well-documented constraint in strict archetype-based ECS like Unity DOTS or Flecs).
+High-performance C++ systems (HFT, robotics, game engines) often struggle to reconcile Data-Oriented Design (DOD) with dynamic polymorphic behavior. Traditional approaches, such as archetype-based Entity Component Systems (ECS), solve for cache locality but falter when behavior changes dynamically. This "Archetype Fragmentation" forces structural reallocations and memory copies (memcpy), breaking cache residency and creating synchronization bottlenecks.
 
-This session introduces the Capability Reconstruction Graph (CRG), a pure C++ architectural pattern that resolves this via Stateless Behavior Projection. Instead of mutating data structures to attach behaviors, the underlying data arrays remain contiguous and immutable. Behavior is projected as a transient interface, resolved at runtime in O(1) using a bitwise intersection against a compile-time variadic type matrix.
+This session introduces the Capability Reconstruction Graph (CRG), a pure C++ architectural pattern that achieves O(1) contextual polymorphism through Stateless Behavior Projection. Instead of mutating data structures to attach behaviors, the CRG projects transient interfaces onto immutable, contiguous data arrays. 
 
-Attendees will learn how to implement this decoupled architecture. We will walk through building the static variadic type sequence to define N-dimensional context axes (state, environment, authority). We will also demonstrate how type-based resolution allows dynamically loading new behaviors via DLLs without central registry locks, keeping data memory strictly linear while behavior remains fully dynamic.
+Validated through industry-standard benchmarking, this approach demonstrates a 3.25x performance increase (reaching 98 Gi/s on Apple M-Series) compared to traditional structural mutation by eliminating the "Memory Wall" associated with archetype shifts.
+
+Attendees will learn:
+* The Mechanics of Projection: Building a static resolution matrix using C++ variadic templates and bitwise intersection.
+* Decoupling Logic from Memory: How to maintain 100% data residency while allowing behaviors to shift dynamically.
+* Registry-Free Extensibility: Injecting capabilities via DLLs without central registry locks.
+* Performance Realities: A data-backed analysis of how stateless resolution bypasses structural memory shuffling latency.
 
 Outline:
-* The Problem (5 mins): The friction between data-oriented memory layouts and dynamic behavior. The runtime costs of stateful logic, registries, and structural mutations (e.g., dynamic dispatch overhead, ECS archetype fragmentation).
-* Architectural Shift (10 mins): Introduction to Stateless Behavior Projection. Decoupling logic as a transient interface rather than an owned state.
-* Building the Resolution Matrix (15 mins): 
-    - Constructing the capability sequence using C++ variadic templates.
-    - Defining context axes via boolean filtering.
-    - Achieving O(1) behavior resolution without hash maps or v-tables.
-* Registry-Free Extensibility (10 mins): Injecting capabilities via dynamically loaded libraries (DLLs) without central registry locks or initialization bottlenecks.
-* Contiguous Data Integration (15 mins): Applying the pattern to massive data arrays. Proving that data can remain perfectly immutable while its behaviors dynamically shift across millions of instances.
+* The Bottleneck (5 mins): Friction between DOD and dynamic behavior. The hidden cost of Archetype Fragmentation and cache invalidation.
+* Architectural Shift (10 mins): Introduction to Stateless Projection. Decoupling logic as a transient view rather than owned state.
+* The Variadic Matrix (15 mins): Implementing the capability sequence. Defining N-dimensional context axes via boolean filtering for O(1) resolution.
+* Scale & Integration (15 mins): Practical implementation within massive data arrays. Proving that zero structural mutation leads to near-native memory bandwidth.
 * Q&A (5 mins)

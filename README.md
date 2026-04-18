@@ -14,17 +14,26 @@ The CRG solves this by decoupling logic from the data layout. It uses C++ variad
 * **Registry-Free Extensibility:** Behaviors can be dynamically injected via loaded libraries (DLLs) without central registry locks.
 * **Thread-Safe by Design:** The resolution topology is immutable at runtime, allowing lock-free concurrent observation across massive datasets.
 
-## Documentation & Appendix
-* [The 10-Stage Implementation Architecture](paper.md#6-the-10-stage-implementation-architecture)
-* [Technical FAQ & Design Decisions](#technical-qa)
-* [License & Legal Notice](#license--legal-notice)
+## Performance Benchmarks
+> Benchmarks executed on Apple M-Series (Clang 16, -O3) via Google Benchmark.
+> Full reproducible benchmark source code available in `/benchmarks/crg_benchmark.cpp`.
+
+| Pattern | Execution Time (65k Entities) | Throughput | Latency vs CRG |
+| :--- | :--- | :--- | :--- |
+| **ECS Archetype Mutation** | 1,033,657 ns | 30.23 Gi/s | **3.25x Slower** |
+| **CRG Contextual Observation** | **317,634 ns** | **98.38 Gi/s** | **Baseline** |
+
+**Critical Observation:** The CRG resolution pattern achieves a **225% performance increase** over traditional Archetype-based state changes. By eliminating structural mutation, we bypass the memory wall that typically bottlenecks large-scale ECS simulations and maintain optimal L1/L2 cache residency.
 
 ---
 
 ## Technical Q&A
 
-### Q: How does this claim O(1) resolution if there is a loop in Resolve?
-**A:** The O(1) refers to structural complexity. Resolution is local to the type's own matrix. The loop only iterates over the compile-time defined behaviors for that specific type (usually < 5). Since this is a small constant independent of the total system scale, the resolution is effectively O(1).
+### Q: Is this just another State Machine?
+**A:** No. A traditional FSM is often internal to an object or managed by a controller. The CRG is an externalized, stateless projection. It reconstructs the necessary "capability" for an entity on-the-fly based on its current context coordinates, without the entity ever knowing its own state.
+
+### Q: What is the "O(1)" cost exactly?
+**A:** The "O(1)" refers to structural complexity. Resolution is local to the type's own matrix. The loop only iterates over the compile-time defined behaviors for that specific type (usually < 5). Since this is a small constant independent of the total system scale, the resolution is effectively O(1).
 
 ### Q: Why not just use a standard ECS?
 **A:** The CRG is a symbiotic layer, not an ECS replacement. The ECS handles fast iteration over contiguous data; the CRG projects context-aware logic onto that data without triggering structural reallocations (Archetype Fragmentation).

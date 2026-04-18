@@ -11,29 +11,34 @@ Traditional Entity Component Systems (ECS) maximize cache locality by grouping e
 In strict Archetype-based ECS implementations (such as Unity DOTS [1] or Flecs [2]), adding or removing a component triggers a structural change: the system must allocate memory in a new archetype chunk, copy the entity's data, and free the old memory. This process, known as Archetype Fragmentation, causes implicit `memcpy` operations and introduces synchronization barriers (mutexes) that halt multithreaded pipelines [3].
 
 ## 3. The Solution: Stateless Behavior Projection
-The CRG resolves this by decoupling logic from the data layout, utilizing a "Stateless Projection" model:
+The CRG eliminates structural mutation by treating "State" as a coordinate on an N-Dimensional axis rather than a component modification. Instead of moving data to match a behavior, the CRG reconstructs the behavior to match the data.
 
-* **Model (Data):** Inert ECS components (POD). The data layout remains strictly contiguous.
-* **View (Capability):** A functional interface projected onto the data at the moment of observation.
-* **Controller (Resolution):** Transient and emergent. Reconstructed on the stack during the $O(1)$ resolution phase.
+## 4. Implementation Strategy
+Using variadic templates, the CRG builds a static matrix of "Capabilities" (interfaces). When an entity's context changes (e.g., switching from `Idle` to `Combat`), the system performs an O(1) lookup in the capability matrix. The underlying entity data remains perfectly contiguous in its original memory location.
 
-Instead of mutating data structures, the CRG uses a static type resolution matrix (built via C++ variadic templates) to resolve the correct behavioral interface at runtime based on context axes (e.g., Time, Environment, Authority).
+## 5. Performance Criteria & Benchmarks
+To validate the efficiency of the CRG, a comparative benchmark was conducted against a traditional Archetype-based mutation model. 
 
-## 4. Universal Applications
-This registry-free approach applies to any domain requiring deterministic, zero-latency logic shifts:
-- **High-Frequency Trading (HFT):** Hot-swapping execution strategies based on market context with zero memory reallocation.
-- **Agentic AI:** Real-time logical morphing for autonomous agents, switching reasoning capabilities in $O(1)$.
-- **Robotics & Digital Twins:** Context-aware logic for massive-scale sensor processing without state synchronization overhead.
+### Methodology
+* **Target:** 65,536 Entities.
+* **Payload:** 256 bytes per entity (simulating Transform + Physics data).
+* **Environment:** Apple M-Series (Clang 16, -O3 optimization) via Google Benchmark.
+* **Scenario:** Measuring the cost of a dual-state transition (A -> B -> A) for the entire dataset.
 
-## 5. Performance Criteria
-1. **Resolution Latency:** $O(1)$ coordinate intersection via bitwise operations vs. VTable dispatch.
-2. **Cache Locality:** Maintenance of L1/L2 cache integrity by avoiding archetype shifts.
-3. **Concurrency Scaling:** Lock-free concurrent behavior resolution due to runtime topology immutability.
+### Results
+| Implementation | Execution Time (65k) | Throughput | Observation |
+| :--- | :--- | :--- | :--- |
+| **ECS Archetype Mutation** | 1,033,657 ns | 30.23 Gi/s | Significant cache-miss overhead. |
+| **CRG Projection** | **317,634 ns** | **98.38 Gi/s** | **Near-native memory bandwidth.** |
+
+### Technical Analysis
+The benchmark reveals a **3.25x performance advantage** for the CRG pattern. The performance gap is primarily driven by the "Memory Wall": 
+1. **Structural Mutation (ECS):** Each state change forces a `memcpy` of 256 bytes. At scale, this saturates the memory bus and invalidates L1/L2 caches.
+2. **Contextual Observation (CRG):** Data residency is 100%. The CPU prefetcher remains effective as data never leaves its contiguous array. The O(1) resolution cost is negligible compared to the cost of memory movement.
 
 ## 6. The 10-Stage Implementation Architecture
-The implementation follows a technical progression to demonstrate the architecture:
-1. **Structural Primitive:** Intrusive self-registration.
-2. **Identity Space:** Stable runtime identity without central registries.
+1. **Type-Safety:** Enforcing static interface requirements.
+2. **Entity Space:** Stable runtime identity without central registries.
 3. **Identity-Based Resolution:** Traversal-based lookups.
 4. **External Semantics:** Separating logic from memory layout.
 5. **Composition:** Building a deterministic capability matrix.
@@ -47,6 +52,7 @@ The implementation follows a technical progression to demonstrate the architectu
 [1] Unity Technologies. "Structural Changes." Unity Data-Oriented Technology Stack (DOTS) Documentation.
 [2] Mertens, S. "Building an ECS #2: Archetypes and Vectorization." Flecs Architecture Documentation.
 [3] Caini, M. "Sparse Sets vs Archetypes." EnTT Architecture Notes.
+[4] Source Code: Reproducible benchmarks available in `/benchmarks/crg_benchmark.cpp`.
 
 ---
 
