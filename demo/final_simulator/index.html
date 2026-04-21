@@ -19,7 +19,7 @@
         .ecs-color { color: #ff4d4d; }
         .crg-color { color: #4dff4d; }
         canvas { background: #1e1e1e; border-radius: 8px; padding: 10px; }
-        .explanation { text-align: center; margin-top: 15px; font-style: italic; color: #aaa; font-size: 0.9em; }
+        .explanation { text-align: center; margin-top: 15px; font-style: italic; color: #aaa; font-size: 0.9em; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -34,7 +34,7 @@
                 <span id="entityValue" style="font-weight: bold; color: #4da6ff;">50,000</span>
             </div>
             <input type="range" id="entitySlider" min="10000" max="150000" step="10000" value="50000">
-            <small style="color: #aaa; margin-top: 5px;">Base iteration cost (MMO Standard = 50k)</small>
+            <small style="color: #aaa; margin-top: 5px;">Scales base iteration cost (ns / entity)</small>
         </div>
 
         <div class="control-panel">
@@ -43,30 +43,30 @@
                 <span id="mutationValue" style="font-weight: bold; color: #ffb34d;">0 / frame</span>
             </div>
             <input type="range" id="mutationSlider" min="0" max="50000" step="1000" value="0">
-            <small style="color: #aaa; margin-top: 5px;">Triggers structural changes (Archetype moves)</small>
+            <small style="color: #aaa; margin-top: 5px;">Triggers structural changes (memcpy overhead)</small>
         </div>
     </div>
 
     <div class="metrics">
         <div class="metric-card">
-            <h3>Classic ECS <br><small style="font-weight: normal; color: #aaa;">(Subject to Mutation Tax)</small></h3>
-            <div class="metric-value ecs-color" id="ecsStatus">2.0 ms</div>
+            <h3>Classic ECS <br><small style="font-weight: normal; color: #aaa;">(Fast iteration, heavy mutation tax)</small></h3>
+            <div class="metric-value ecs-color" id="ecsStatus">1.6 ms</div>
         </div>
         <div class="metric-card">
-            <h3>CRG Architecture <br><small style="font-weight: normal; color: #aaa;">(Structural Immunity)</small></h3>
-            <div class="metric-value crg-color" id="crgStatus">1.3 ms</div>
+            <h3>CRG Architecture <br><small style="font-weight: normal; color: #aaa;">(Fixed routing tax, full immunity)</small></h3>
+            <div class="metric-value crg-color" id="crgStatus">1.8 ms</div>
         </div>
     </div>
 
     <canvas id="performanceChart" height="100"></canvas>
     
     <div class="explanation">
-        <strong>The "Archetype Poisoning" effect:</strong> While standard ECS scales linearly with entity count, introducing state changes (mutations) causes memory fragmentation and heavy data moving overhead. CRG maintains O(1) state resolution regardless of chaos.
+        <strong>The "Archetype Poisoning" effect:</strong> At zero mutations, pure ECS iteration is slightly faster due to raw array traversal. 
+        CRG pays a fixed routing tax of a few nanoseconds per entity. However, introducing state changes (mutations) causes heavy <code>memcpy</code> overhead and cache misses in ECS. CRG absorbs mutations as simple O(1) state assignments.
     </div>
 </div>
 
 <script>
-    // Initial configuration
     const entitySlider = document.getElementById('entitySlider');
     const mutationSlider = document.getElementById('mutationSlider');
     const entityDisplay = document.getElementById('entityValue');
@@ -74,7 +74,6 @@
     const ecsStatus = document.getElementById('ecsStatus');
     const crgStatus = document.getElementById('crgStatus');
 
-    // Chart.js setup
     const ctx = document.getElementById('performanceChart').getContext('2d');
     const maxDataPoints = 50;
     
@@ -88,18 +87,20 @@
                     borderColor: '#ff4d4d',
                     backgroundColor: 'rgba(255, 77, 77, 0.1)',
                     borderWidth: 2,
-                    data: Array(maxDataPoints).fill(2.0),
+                    data: Array(maxDataPoints).fill(1.6),
                     fill: true,
-                    tension: 0.1
+                    tension: 0.1,
+                    pointRadius: 0
                 },
                 {
                     label: 'CRG Frame Time (ms)',
                     borderColor: '#4dff4d',
                     backgroundColor: 'rgba(77, 255, 77, 0.1)',
                     borderWidth: 3,
-                    data: Array(maxDataPoints).fill(1.3),
+                    data: Array(maxDataPoints).fill(1.8),
                     fill: true,
-                    tension: 0.1
+                    tension: 0.1,
+                    pointRadius: 0
                 }
             ]
         },
@@ -115,16 +116,17 @@
                 },
                 x: { display: false }
             },
-            plugins: {
-                legend: { labels: { color: '#fff' } }
-            }
+            plugins: { legend: { labels: { color: '#fff' } } }
         },
         plugins: [{
             id: 'horizontalLine',
             beforeDraw: function(chart) {
-                const ctx = chart.canvas.getContext('2d');
                 const yAxis = chart.scales.y;
+                if (!yAxis) return; 
+                
+                const ctx = chart.ctx;
                 const y16 = yAxis.getPixelForValue(16.6);
+                
                 ctx.save();
                 ctx.beginPath();
                 ctx.moveTo(chart.chartArea.left, y16);
@@ -140,15 +142,29 @@
         }]
     });
 
-    // Enforce mutation slider logic (mutations cannot exceed entity count)
     entitySlider.addEventListener('input', () => {
         if(parseInt(mutationSlider.value) > parseInt(entitySlider.value)) {
             mutationSlider.value = entitySlider.value;
         }
     });
 
-    // Simulation Loop (runs every 100ms)
+    // --- HARDWARE PHYSICS MODEL ---
+    // Costs in milliseconds (1 ms = 1,000,000 ns)
+    const BASE_SYSTEM_OVERHEAD_MS = 0.5; // OS, framework loop...
+    
+    const GAME_LOGIC_NS = 20; // Simulated work per entity
+    const ECS_ITERATION_NS = 3; // Raw array step
+    const CRG_ROUTING_NS = 8; // Array step + static VTable / if constexpr
+
+    const ECS_COST_PER_ENTITY_MS = (GAME_LOGIC_NS + ECS_ITERATION_NS) / 1000000;
+    const CRG_COST_PER_ENTITY_MS = (GAME_LOGIC_NS + CRG_ROUTING_NS) / 1000000;
+
+    const ECS_ARCHETYPE_MOVE_MS = 0.0012; // ~1200ns per mutation (memcpy + structural change)
+    const CRG_STATE_ASSIGN_MS = 0.000005; // ~5ns per mutation (simple integer reassignment)
+
     setInterval(() => {
+        if (!chart || !chart.data) return;
+
         const entities = parseInt(entitySlider.value);
         const mutations = parseInt(mutationSlider.value);
         
@@ -157,35 +173,33 @@
 
         // --- Simulator Logic ---
         
-        // 1. ECS Calculation
-        // Base iteration cost (L1 Cache friendly, relatively low)
-        let ecsBaseTime = 1.0 + (entities / 50000); 
-        // Structural Change Tax (Archetype moving overhead, very heavy)
-        let ecsTax = (mutations / 600); 
-        // Cache Miss Chaos (Simulates unpredictable memory fragmentation when mutations happen)
-        let ecsChaos = mutations > 1000 ? (Math.random() * (mutations / 2000)) : (Math.random() * 0.2); 
+        // 1. ECS: Pays entity volume + Heavy mutation tax + Cache miss chaos
+        let ecsBaseTime = BASE_SYSTEM_OVERHEAD_MS + (entities * ECS_COST_PER_ENTITY_MS); 
+        let ecsTax = mutations * ECS_ARCHETYPE_MOVE_MS; 
+        let ecsChaos = mutations > 500 ? (Math.random() * (mutations * 0.0004)) : 0; 
         
         let ecsTotalTime = ecsBaseTime + ecsTax + ecsChaos;
-        
-        // Visual ceiling for the graph
         if(ecsTotalTime > 50) ecsTotalTime = 45 + Math.random() * 5; 
 
-        // 2. CRG Calculation (O(1) routing, practically zero mutation cost)
-        let crgBaseTime = 0.8 + (entities / 100000); // More efficient base loop
-        let crgTax = (mutations / 50000); // Negligible cost for state updates
+        // 2. CRG: Pays higher entity volume (routing tax), but ignores mutation chaos
+        let crgBaseTime = BASE_SYSTEM_OVERHEAD_MS + (entities * CRG_COST_PER_ENTITY_MS);
+        let crgTax = mutations * CRG_STATE_ASSIGN_MS; 
         let crgTotalTime = crgBaseTime + crgTax;
 
         // UI Text Update
         if (ecsTotalTime > 16.6) {
-            ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ff4d4d; font-size: 0.6em;">Frame Drop (Stalls)</small>`;
+            ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ff4d4d; font-size: 0.6em;">Archetype Poisoning</small>`;
             ecsStatus.style.color = '#ff4d4d';
         } else {
-            ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ffb34d; font-size: 0.6em;">Stable</small>`;
+            ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ffb34d; font-size: 0.6em;">Stable Array</small>`;
             ecsStatus.style.color = '#ffb34d';
         }
-        crgStatus.innerHTML = `${crgTotalTime.toFixed(1)} ms <br><small style="color: #4dff4d; font-size: 0.6em;">Prefetcher Active</small>`;
+        crgStatus.innerHTML = `${crgTotalTime.toFixed(1)} ms <br><small style="color: #4dff4d; font-size: 0.6em;">Constant Time</small>`;
 
-        // Chart Update (scrolling effect)
+        // Synchronize arrays
+        chart.data.labels.shift();
+        chart.data.labels.push('');
+
         chart.data.datasets[0].data.shift();
         chart.data.datasets[0].data.push(ecsTotalTime);
         
@@ -194,7 +208,7 @@
         
         chart.update();
 
-    }, 100); // 10 FPS for visual refresh
+    }, 100); 
 </script>
 
 </body>
