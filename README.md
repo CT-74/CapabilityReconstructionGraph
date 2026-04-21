@@ -2,7 +2,7 @@
 
 > A stateless architectural pattern for resolving contextual behavior in Data-Oriented Design without structural memory mutation.
 > 📄 **[Read the full White Paper here](paper/paper.md)**
-> 🎮 **[Try the Interactive Simulator (ECS vs CRG)](https://htmlpreview.github.io/?https://github.com/CT-74/CapabilityReconstructionGraph/blob/main/demo/final_simulator/index.html)**
+> 🎮 **[Try the Interactive Simulator (ECS vs CRG)](https://ct-74.github.io/CapabilityReconstructionGraph/demo/final_simulator/index.html)**
 
 ## Abstract
 High-performance C++ applications often struggle to reconcile Data-Oriented Design (contiguous memory) with dynamic polymorphic behavior. In strict Archetype-based Entity Component Systems (ECS), adding or removing behavioral tags forces entities to migrate between memory chunks—a bottleneck known as Archetype Fragmentation.
@@ -18,7 +18,7 @@ The CRG solves this by decoupling logic from the data layout. It uses C++ variad
 ## 🎮 Interactive Simulator
 Experience the architectural difference visually! We have included a real-time HTML simulator that demonstrates the impact of Archetype Fragmentation (Classic ECS) versus Structural Immunity (CRG) under heavy mutation loads.
 
-👉 **[Launch the Simulator : ECS vs CRG](https://htmlpreview.github.io/?https://github.com/CT-74/CapabilityReconstructionGraph/blob/main/demo/final_simulator/index.html)** *(Open the file in your browser to run the simulation).*
+👉 **[Launch the Simulator : ECS vs CRG](https://ct-74.github.io/CapabilityReconstructionGraph/demo/final_simulator/index.html)** *(Open the file in your browser to run the simulation).*
 
 ## Performance Benchmarks
 > Benchmarks executed on Apple M-Series (Clang 16, -O3) via Google Benchmark.
