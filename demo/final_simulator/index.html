@@ -18,7 +18,10 @@
         .metric-value { font-size: 24px; font-weight: bold; margin-top: 10px; }
         .ecs-color { color: #ff4d4d; }
         .crg-color { color: #4dff4d; }
-        canvas { background: #1e1e1e; border-radius: 8px; padding: 10px; }
+        
+        /* THE FIX: A rigid container for the Canvas */
+        .chart-container { position: relative; height: 350px; width: 100%; background: #1e1e1e; border-radius: 8px; padding: 10px; box-sizing: border-box; }
+        
         .explanation { text-align: center; margin-top: 15px; font-style: italic; color: #aaa; font-size: 0.9em; line-height: 1.4; }
     </style>
 </head>
@@ -58,7 +61,9 @@
         </div>
     </div>
 
-    <canvas id="performanceChart" height="100"></canvas>
+    <div class="chart-container">
+        <canvas id="performanceChart"></canvas>
+    </div>
     
     <div class="explanation">
         <strong>The "Archetype Poisoning" effect:</strong> At zero mutations, pure ECS iteration is slightly faster due to raw array traversal. 
@@ -107,6 +112,7 @@
         options: {
             animation: false,
             responsive: true,
+            maintainAspectRatio: false, // THE FIX: Let CSS control the height
             scales: {
                 y: {
                     beginAtZero: true,
@@ -149,21 +155,27 @@
     });
 
     // --- HARDWARE PHYSICS MODEL ---
-    // Costs in milliseconds (1 ms = 1,000,000 ns)
-    const BASE_SYSTEM_OVERHEAD_MS = 0.5; // OS, framework loop...
-    
-    const GAME_LOGIC_NS = 20; // Simulated work per entity
-    const ECS_ITERATION_NS = 3; // Raw array step
-    const CRG_ROUTING_NS = 8; // Array step + static VTable / if constexpr
+    const BASE_SYSTEM_OVERHEAD_MS = 0.5; 
+    const GAME_LOGIC_NS = 20; 
+    const ECS_ITERATION_NS = 3; 
+    const CRG_ROUTING_NS = 8; 
 
     const ECS_COST_PER_ENTITY_MS = (GAME_LOGIC_NS + ECS_ITERATION_NS) / 1000000;
     const CRG_COST_PER_ENTITY_MS = (GAME_LOGIC_NS + CRG_ROUTING_NS) / 1000000;
 
-    const ECS_ARCHETYPE_MOVE_MS = 0.0012; // ~1200ns per mutation (memcpy + structural change)
-    const CRG_STATE_ASSIGN_MS = 0.000005; // ~5ns per mutation (simple integer reassignment)
+    const ECS_ARCHETYPE_MOVE_MS = 0.0012; 
+    const CRG_STATE_ASSIGN_MS = 0.000005; 
+
+    let firstTick = true;
 
     setInterval(() => {
         if (!chart || !chart.data) return;
+
+        // THE FIX: Force resize on first tick to ensure proper rendering from external links
+        if (firstTick) {
+            chart.resize();
+            firstTick = false;
+        }
 
         const entities = parseInt(entitySlider.value);
         const mutations = parseInt(mutationSlider.value);
@@ -171,9 +183,6 @@
         entityDisplay.innerText = entities.toLocaleString();
         mutationDisplay.innerText = mutations.toLocaleString() + " / frame";
 
-        // --- Simulator Logic ---
-        
-        // 1. ECS: Pays entity volume + Heavy mutation tax + Cache miss chaos
         let ecsBaseTime = BASE_SYSTEM_OVERHEAD_MS + (entities * ECS_COST_PER_ENTITY_MS); 
         let ecsTax = mutations * ECS_ARCHETYPE_MOVE_MS; 
         let ecsChaos = mutations > 500 ? (Math.random() * (mutations * 0.0004)) : 0; 
@@ -181,12 +190,10 @@
         let ecsTotalTime = ecsBaseTime + ecsTax + ecsChaos;
         if(ecsTotalTime > 50) ecsTotalTime = 45 + Math.random() * 5; 
 
-        // 2. CRG: Pays higher entity volume (routing tax), but ignores mutation chaos
         let crgBaseTime = BASE_SYSTEM_OVERHEAD_MS + (entities * CRG_COST_PER_ENTITY_MS);
         let crgTax = mutations * CRG_STATE_ASSIGN_MS; 
         let crgTotalTime = crgBaseTime + crgTax;
 
-        // UI Text Update
         if (ecsTotalTime > 16.6) {
             ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ff4d4d; font-size: 0.6em;">Archetype Poisoning</small>`;
             ecsStatus.style.color = '#ff4d4d';
@@ -196,7 +203,6 @@
         }
         crgStatus.innerHTML = `${crgTotalTime.toFixed(1)} ms <br><small style="color: #4dff4d; font-size: 0.6em;">Constant Time</small>`;
 
-        // Synchronize arrays
         chart.data.labels.shift();
         chart.data.labels.push('');
 
