@@ -4,24 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simulator: ECS vs CRG (Structural Immunity)</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; background: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .container { max-width: 1100px; margin: 0 auto; background: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         h1 { text-align: center; color: #4da6ff; font-weight: 300; }
-        .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        
+        #errorLog { color: #ff4d4d; font-family: monospace; text-align: center; font-weight: bold; margin-bottom: 10px; }
+
+        .controls-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        @media (max-width: 800px) { .controls-grid { grid-template-columns: 1fr; } }
+        
         .control-panel { background: #3d3d3d; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; }
-        .slider-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9em; }
         input[type=range] { width: 100%; cursor: pointer; }
+        
         .metrics { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 20px; }
-        .metric-card { background: #3d3d3d; padding: 15px; border-radius: 8px; flex: 1; text-align: center; }
-        .metric-value { font-size: 24px; font-weight: bold; margin-top: 10px; }
+        .metric-card { background: #3d3d3d; padding: 15px; border-radius: 8px; flex: 1; text-align: center; position: relative; }
+        .metric-value { font-size: 24px; font-weight: bold; margin-top: 10px; margin-bottom: 10px; }
         .ecs-color { color: #ff4d4d; }
         .crg-color { color: #4dff4d; }
         
-        /* THE FIX: A rigid container for the Canvas */
+        /* Memory Wall Visualization */
+        .memory-wall-label { font-size: 0.8em; color: #aaa; margin-bottom: 5px; display: flex; justify-content: space-between; }
+        .stall-warning { color: #ff4d4d; font-weight: bold; }
+        .stall-safe { color: #4da6ff; font-weight: bold; }
+        .memory-bar-bg { width: 100%; height: 8px; background: #1e1e1e; border-radius: 4px; overflow: hidden; }
+        .memory-bar-fill { height: 100%; transition: width 0.1s ease-out, background-color 0.1s ease-out; }
+
         .chart-container { position: relative; height: 350px; width: 100%; background: #1e1e1e; border-radius: 8px; padding: 10px; box-sizing: border-box; }
-        
         .explanation { text-align: center; margin-top: 15px; font-style: italic; color: #aaa; font-size: 0.9em; line-height: 1.4; }
     </style>
 </head>
@@ -30,34 +41,62 @@
 <div class="container">
     <h1>Stability Benchmark: Classic ECS vs CRG</h1>
     
+    <div id="errorLog"></div>
+
     <div class="controls-grid">
         <div class="control-panel">
             <div class="slider-header">
-                <label for="entitySlider"><strong>Total Entities (Volume):</strong></label>
+                <label for="entitySlider"><strong>Total Entities:</strong></label>
                 <span id="entityValue" style="font-weight: bold; color: #4da6ff;">50,000</span>
             </div>
             <input type="range" id="entitySlider" min="10000" max="150000" step="10000" value="50000">
-            <small style="color: #aaa; margin-top: 5px;">Scales base iteration cost (ns / entity)</small>
+            <small style="color: #aaa; margin-top: 5px;">Server / World density</small>
         </div>
 
         <div class="control-panel">
             <div class="slider-header">
-                <label for="mutationSlider"><strong>State Mutations (Chaos):</strong></label>
-                <span id="mutationValue" style="font-weight: bold; color: #ffb34d;">0 / frame</span>
+                <label for="logicSlider"><strong>Game Logic (Payload):</strong></label>
+                <span id="logicValue" style="font-weight: bold; color: #c44dff;">20 ns</span>
             </div>
-            <input type="range" id="mutationSlider" min="0" max="50000" step="1000" value="0">
-            <small style="color: #aaa; margin-top: 5px;">Triggers structural changes (memcpy overhead)</small>
+            <input type="range" id="logicSlider" min="5" max="200" step="5" value="20">
+            <small style="color: #aaa; margin-top: 5px;">Avg work per entity (AI, Math...)</small>
+        </div>
+
+        <div class="control-panel">
+            <div class="slider-header">
+                <label for="mutationSlider"><strong>State Mutations:</strong></label>
+                <span id="mutationValue" style="font-weight: bold; color: #ffb34d;">0%</span>
+            </div>
+            <input type="range" id="mutationSlider" min="0" max="50" step="1" value="0">
+            <small style="color: #aaa; margin-top: 5px;">% of entities changing state/frame</small>
         </div>
     </div>
 
     <div class="metrics">
         <div class="metric-card">
-            <h3>Classic ECS <br><small style="font-weight: normal; color: #aaa;">(Fast iteration, heavy mutation tax)</small></h3>
-            <div class="metric-value ecs-color" id="ecsStatus">1.6 ms</div>
+            <h3>Classic ECS <br><small style="font-weight: normal; color: #aaa;">(Fast array, heavy struct tax)</small></h3>
+            <div class="metric-value ecs-color" id="ecsStatus">0.0 ms</div>
+            
+            <div class="memory-wall-label">
+                <span>CPU Memory Wall:</span>
+                <span id="ecsStallText">5% Stalled</span>
+            </div>
+            <div class="memory-bar-bg">
+                <div class="memory-bar-fill" id="ecsStallBar" style="width: 5%; background-color: #4da6ff;"></div>
+            </div>
         </div>
+
         <div class="metric-card">
-            <h3>CRG Architecture <br><small style="font-weight: normal; color: #aaa;">(Fixed routing tax, full immunity)</small></h3>
-            <div class="metric-value crg-color" id="crgStatus">1.8 ms</div>
+            <h3>CRG Architecture <br><small style="font-weight: normal; color: #aaa;">(Fixed routing, structural immunity)</small></h3>
+            <div class="metric-value crg-color" id="crgStatus">0.0 ms</div>
+            
+            <div class="memory-wall-label">
+                <span>CPU Memory Wall:</span>
+                <span id="crgStallText">8% Stalled</span>
+            </div>
+            <div class="memory-bar-bg">
+                <div class="memory-bar-fill" id="crgStallBar" style="width: 8%; background-color: #4da6ff;"></div>
+            </div>
         </div>
     </div>
 
@@ -66,155 +105,191 @@
     </div>
     
     <div class="explanation">
-        <strong>The "Archetype Poisoning" effect:</strong> At zero mutations, pure ECS iteration is slightly faster due to raw array traversal. 
-        CRG pays a fixed routing tax of a few nanoseconds per entity. However, introducing state changes (mutations) causes heavy <code>memcpy</code> overhead and cache misses in ECS. CRG absorbs mutations as simple O(1) state assignments.
+        <strong>The "Memory Wall" & Archetype Poisoning:</strong> As mutations occur, classic ECS forces the CPU to wait for RAM during heavy <code>memcpy</code> operations and Cache Misses (high stall rate). The CRG architecture keeps data contiguous and uses O(1) assignments, allowing the Hardware Prefetcher to feed the CPU without delay (low stall rate).
     </div>
 </div>
 
 <script>
-    const entitySlider = document.getElementById('entitySlider');
-    const mutationSlider = document.getElementById('mutationSlider');
-    const entityDisplay = document.getElementById('entityValue');
-    const mutationDisplay = document.getElementById('mutationValue');
-    const ecsStatus = document.getElementById('ecsStatus');
-    const crgStatus = document.getElementById('crgStatus');
+    window.onerror = function(message, source, lineno, colno, error) {
+        document.getElementById('errorLog').innerText = "SYSTEM ERROR: " + message;
+        return false;
+    };
 
-    const ctx = document.getElementById('performanceChart').getContext('2d');
-    const maxDataPoints = 50;
-    
-    const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: Array(maxDataPoints).fill(''),
-            datasets: [
-                {
-                    label: 'ECS Frame Time (ms)',
-                    borderColor: '#ff4d4d',
-                    backgroundColor: 'rgba(255, 77, 77, 0.1)',
-                    borderWidth: 2,
-                    data: Array(maxDataPoints).fill(1.6),
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0
-                },
-                {
-                    label: 'CRG Frame Time (ms)',
-                    borderColor: '#4dff4d',
-                    backgroundColor: 'rgba(77, 255, 77, 0.1)',
-                    borderWidth: 3,
-                    data: Array(maxDataPoints).fill(1.8),
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0
-                }
-            ]
-        },
-        options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false, // THE FIX: Let CSS control the height
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 40,
-                    title: { display: true, text: 'Milliseconds (ms)', color: '#fff' },
-                    ticks: { color: '#aaa' }
-                },
-                x: { display: false }
+    try {
+        const entitySlider = document.getElementById('entitySlider');
+        const logicSlider = document.getElementById('logicSlider');
+        const mutationSlider = document.getElementById('mutationSlider');
+        
+        const entityDisplay = document.getElementById('entityValue');
+        const logicDisplay = document.getElementById('logicValue');
+        const mutationDisplay = document.getElementById('mutationValue');
+        
+        const ecsStatus = document.getElementById('ecsStatus');
+        const crgStatus = document.getElementById('crgStatus');
+        
+        const ecsStallText = document.getElementById('ecsStallText');
+        const ecsStallBar = document.getElementById('ecsStallBar');
+        const crgStallText = document.getElementById('crgStallText');
+        const crgStallBar = document.getElementById('crgStallBar');
+
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        const maxDataPoints = 50;
+        
+        Chart.defaults.color = '#aaaaaa';
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(maxDataPoints).fill(''),
+                datasets: [
+                    {
+                        label: 'ECS Frame Time (ms)',
+                        borderColor: '#ff4d4d',
+                        backgroundColor: 'rgba(255, 77, 77, 0.1)',
+                        borderWidth: 2,
+                        data: Array(maxDataPoints).fill(1.15),
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'CRG Frame Time (ms)',
+                        borderColor: '#4dff4d',
+                        backgroundColor: 'rgba(77, 255, 77, 0.1)',
+                        borderWidth: 3,
+                        data: Array(maxDataPoints).fill(1.4),
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0
+                    }
+                ]
             },
-            plugins: { legend: { labels: { color: '#fff' } } }
-        },
-        plugins: [{
-            id: 'horizontalLine',
-            beforeDraw: function(chart) {
-                const yAxis = chart.scales.y;
-                if (!yAxis) return; 
-                
-                const ctx = chart.ctx;
-                const y16 = yAxis.getPixelForValue(16.6);
-                
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(chart.chartArea.left, y16);
-                ctx.lineTo(chart.chartArea.right, y16);
-                ctx.lineWidth = 1;
-                ctx.strokeStyle = 'rgba(255, 77, 77, 0.8)';
-                ctx.setLineDash([5, 5]);
-                ctx.stroke();
-                ctx.fillStyle = 'rgba(255, 77, 77, 0.9)';
-                ctx.fillText('60 FPS Deadline (16.6ms)', chart.chartArea.left + 10, y16 - 5);
-                ctx.restore();
+            options: {
+                animation: false,
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 40,
+                        title: { display: true, text: 'Milliseconds (ms)' }
+                    },
+                    x: { display: false }
+                },
+                plugins: { legend: { labels: { color: '#fff' } } }
+            },
+            plugins: [{
+                id: 'horizontalLine',
+                beforeDraw: function(chart) {
+                    try {
+                        const yAxis = chart.scales.y;
+                        if (!yAxis) return; 
+                        
+                        const ctx = chart.ctx;
+                        const y16 = yAxis.getPixelForValue(16.6);
+                        if (isNaN(y16)) return; 
+                        
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.moveTo(chart.chartArea.left, y16);
+                        ctx.lineTo(chart.chartArea.right, y16);
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = 'rgba(255, 77, 77, 0.8)';
+                        ctx.setLineDash([5, 5]);
+                        ctx.stroke();
+                        ctx.fillStyle = 'rgba(255, 77, 77, 0.9)';
+                        ctx.fillText('60 FPS Limit (16.6ms)', chart.chartArea.left + 10, y16 - 5);
+                        ctx.restore();
+                    } catch (err) {}
+                }
+            }]
+        });
+
+        // --- HARDWARE PHYSICS CONSTANTS ---
+        const BASE_SYSTEM_OVERHEAD_MS = 0.5; 
+        const ECS_ITERATION_NS = 3;  
+        const CRG_ROUTING_NS = 8;    
+
+        const ECS_ARCHETYPE_MOVE_MS = 0.0012; 
+        const CRG_STATE_ASSIGN_MS = 0.000005; 
+
+        let firstTick = true;
+
+        setInterval(() => {
+            if (!chart || !chart.data) return;
+
+            if (firstTick) {
+                chart.resize();
+                firstTick = false;
             }
-        }]
-    });
 
-    entitySlider.addEventListener('input', () => {
-        if(parseInt(mutationSlider.value) > parseInt(entitySlider.value)) {
-            mutationSlider.value = entitySlider.value;
-        }
-    });
+            const entities = parseInt(entitySlider.value);
+            const logicNs = parseInt(logicSlider.value);
+            const mutationPct = parseInt(mutationSlider.value);
+            
+            const absoluteMutations = Math.floor(entities * (mutationPct / 100));
+            
+            entityDisplay.innerText = entities.toLocaleString();
+            logicDisplay.innerText = logicNs + " ns";
+            mutationDisplay.innerText = mutationPct + "% (" + absoluteMutations.toLocaleString() + ")";
 
-    // --- HARDWARE PHYSICS MODEL ---
-    const BASE_SYSTEM_OVERHEAD_MS = 0.5; 
-    const GAME_LOGIC_NS = 20; 
-    const ECS_ITERATION_NS = 3; 
-    const CRG_ROUTING_NS = 8; 
+            const ECS_COST_PER_ENTITY_MS = (logicNs + ECS_ITERATION_NS) / 1000000;
+            const CRG_COST_PER_ENTITY_MS = (logicNs + CRG_ROUTING_NS) / 1000000;
 
-    const ECS_COST_PER_ENTITY_MS = (GAME_LOGIC_NS + ECS_ITERATION_NS) / 1000000;
-    const CRG_COST_PER_ENTITY_MS = (GAME_LOGIC_NS + CRG_ROUTING_NS) / 1000000;
+            // Compute CPU WORK vs MEMORY STALL for ECS
+            let ecsComputeTime = BASE_SYSTEM_OVERHEAD_MS + (entities * ECS_COST_PER_ENTITY_MS);
+            let ecsStallTime = (absoluteMutations * ECS_ARCHETYPE_MOVE_MS) + (mutationPct > 1 ? (Math.random() * (absoluteMutations * 0.0004)) : 0);
+            let ecsTotalTime = ecsComputeTime + ecsStallTime;
+            
+            // Compute CPU WORK vs MEMORY STALL for CRG
+            let crgComputeTime = BASE_SYSTEM_OVERHEAD_MS + (entities * CRG_COST_PER_ENTITY_MS);
+            let crgStallTime = absoluteMutations * CRG_STATE_ASSIGN_MS; // Almost zero latency
+            let crgTotalTime = crgComputeTime + crgStallTime;
 
-    const ECS_ARCHETYPE_MOVE_MS = 0.0012; 
-    const CRG_STATE_ASSIGN_MS = 0.000005; 
+            if(ecsTotalTime > 50) ecsTotalTime = 45 + Math.random() * 5; 
 
-    let firstTick = true;
+            // Calculate Stall Percentages
+            let ecsStallPct = Math.min(95, Math.max(5, (ecsStallTime / ecsTotalTime) * 100));
+            let crgStallPct = Math.min(95, Math.max(5, (crgStallTime / crgTotalTime) * 100));
 
-    setInterval(() => {
-        if (!chart || !chart.data) return;
+            // UI Update: Main Times
+            if (ecsTotalTime > 16.6) {
+                ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ff4d4d; font-size: 0.6em;">Archetype Poisoning</small>`;
+                ecsStatus.style.color = '#ff4d4d';
+            } else {
+                ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ffb34d; font-size: 0.6em;">Stable Iteration</small>`;
+                ecsStatus.style.color = '#ffb34d';
+            }
+            crgStatus.innerHTML = `${crgTotalTime.toFixed(1)} ms <br><small style="color: #4dff4d; font-size: 0.6em;">Constant Time</small>`;
 
-        // THE FIX: Force resize on first tick to ensure proper rendering from external links
-        if (firstTick) {
-            chart.resize();
-            firstTick = false;
-        }
+            // UI Update: Memory Wall Bars
+            ecsStallText.innerText = `${ecsStallPct.toFixed(0)}% Stalled (RAM Wait)`;
+            ecsStallBar.style.width = `${ecsStallPct}%`;
+            ecsStallText.className = ecsStallPct > 30 ? 'stall-warning' : 'stall-safe';
+            ecsStallBar.style.backgroundColor = ecsStallPct > 30 ? '#ff4d4d' : '#4da6ff';
 
-        const entities = parseInt(entitySlider.value);
-        const mutations = parseInt(mutationSlider.value);
-        
-        entityDisplay.innerText = entities.toLocaleString();
-        mutationDisplay.innerText = mutations.toLocaleString() + " / frame";
+            crgStallText.innerText = `${crgStallPct.toFixed(0)}% Stalled (Cache Hits)`;
+            crgStallBar.style.width = `${crgStallPct}%`;
+            crgStallText.className = 'stall-safe';
+            crgStallBar.style.backgroundColor = '#4da6ff';
 
-        let ecsBaseTime = BASE_SYSTEM_OVERHEAD_MS + (entities * ECS_COST_PER_ENTITY_MS); 
-        let ecsTax = mutations * ECS_ARCHETYPE_MOVE_MS; 
-        let ecsChaos = mutations > 500 ? (Math.random() * (mutations * 0.0004)) : 0; 
-        
-        let ecsTotalTime = ecsBaseTime + ecsTax + ecsChaos;
-        if(ecsTotalTime > 50) ecsTotalTime = 45 + Math.random() * 5; 
+            // Chart Update
+            chart.data.labels.shift();
+            chart.data.labels.push('');
 
-        let crgBaseTime = BASE_SYSTEM_OVERHEAD_MS + (entities * CRG_COST_PER_ENTITY_MS);
-        let crgTax = mutations * CRG_STATE_ASSIGN_MS; 
-        let crgTotalTime = crgBaseTime + crgTax;
+            chart.data.datasets[0].data.shift();
+            chart.data.datasets[0].data.push(ecsTotalTime);
+            
+            chart.data.datasets[1].data.shift();
+            chart.data.datasets[1].data.push(crgTotalTime);
+            
+            chart.update();
 
-        if (ecsTotalTime > 16.6) {
-            ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ff4d4d; font-size: 0.6em;">Archetype Poisoning</small>`;
-            ecsStatus.style.color = '#ff4d4d';
-        } else {
-            ecsStatus.innerHTML = `${ecsTotalTime.toFixed(1)} ms <br><small style="color: #ffb34d; font-size: 0.6em;">Stable Array</small>`;
-            ecsStatus.style.color = '#ffb34d';
-        }
-        crgStatus.innerHTML = `${crgTotalTime.toFixed(1)} ms <br><small style="color: #4dff4d; font-size: 0.6em;">Constant Time</small>`;
+        }, 100); 
 
-        chart.data.labels.shift();
-        chart.data.labels.push('');
-
-        chart.data.datasets[0].data.shift();
-        chart.data.datasets[0].data.push(ecsTotalTime);
-        
-        chart.data.datasets[1].data.shift();
-        chart.data.datasets[1].data.push(crgTotalTime);
-        
-        chart.update();
-
-    }, 100); 
+    } catch (criticalError) {
+        document.getElementById('errorLog').innerText = "FATAL ERROR: " + criticalError.message;
+    }
 </script>
 
 </body>
