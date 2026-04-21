@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulator: ECS vs CRG (Structural Immunity)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1e1e1e; color: #fff; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: #2d2d2d; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        h1 { text-align: center; color: #4da6ff; font-weight: 300; }
+        .controls { display: flex; align-items: center; justify-content: space-between; background: #3d3d3d; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .slider-container { flex-grow: 1; margin: 0 20px; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .metrics { display: flex; justify-content: space-around; margin-bottom: 20px; }
+        .metric-card { background: #3d3d3d; padding: 15px; border-radius: 8px; width: 45%; text-align: center; }
+        .metric-value { font-size: 24px; font-weight: bold; margin-top: 10px; }
+        .ecs-color { color: #ff4d4d; }
+        .crg-color { color: #4dff4d; }
+        canvas { background: #1e1e1e; border-radius: 8px; padding: 10px; }
+        .explanation { text-align: center; margin-top: 15px; font-style: italic; color: #aaa; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Stability Benchmark: Classic ECS vs CRG Architecture</h1>
+    
+    <div class="controls">
+        <label for="mutationSlider"><strong>Mutation Volume (AI):</strong></label>
+        <div class="slider-container">
+            <input type="range" id="mutationSlider" min="0" max="50000" step="1000" value="0">
+        </div>
+        <span id="mutationValue" style="font-weight: bold; font-size: 1.2em;">0 / frame</span>
+    </div>
+
+    <div class="metrics">
+        <div class="metric-card">
+            <h3>Classic ECS (Mutation Tax)</h3>
+            <div class="metric-value ecs-color" id="ecsStatus">Stable (2.0 ms)</div>
+        </div>
+        <div class="metric-card">
+            <h3>CRG Mode (Structural Immunity)</h3>
+            <div class="metric-value crg-color" id="crgStatus">Perfect (2.0 ms)</div>
+        </div>
+    </div>
+
+    <canvas id="performanceChart" height="100"></canvas>
+    <div class="explanation">
+        The graph illustrates the rendering time per frame (Frame Time in ms). Above 16.6ms (dotted line), the engine experiences stuttering (loss of 60 FPS).
+    </div>
+</div>
+
+<script>
+    // Initial configuration
+    const slider = document.getElementById('mutationSlider');
+    const mutationDisplay = document.getElementById('mutationValue');
+    const ecsStatus = document.getElementById('ecsStatus');
+    const crgStatus = document.getElementById('crgStatus');
+
+    // Chart.js setup
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    const maxDataPoints = 50;
+    
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array(maxDataPoints).fill(''),
+            datasets: [
+                {
+                    label: 'ECS Frame Time (ms)',
+                    borderColor: '#ff4d4d',
+                    backgroundColor: 'rgba(255, 77, 77, 0.1)',
+                    borderWidth: 2,
+                    data: Array(maxDataPoints).fill(2),
+                    fill: true,
+                    tension: 0.1
+                },
+                {
+                    label: 'CRG Frame Time (ms)',
+                    borderColor: '#4dff4d',
+                    backgroundColor: 'rgba(77, 255, 77, 0.1)',
+                    borderWidth: 3,
+                    data: Array(maxDataPoints).fill(2),
+                    fill: true,
+                    tension: 0.1
+                }
+            ]
+        },
+        options: {
+            animation: false,
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 50,
+                    title: { display: true, text: 'Milliseconds (ms)', color: '#fff' },
+                    ticks: { color: '#aaa' }
+                },
+                x: { display: false }
+            },
+            plugins: {
+                legend: { labels: { color: '#fff' } }
+            }
+        },
+        plugins: [{
+            id: 'horizontalLine',
+            beforeDraw: function(chart) {
+                const ctx = chart.canvas.getContext('2d');
+                const yAxis = chart.scales.y;
+                const y16 = yAxis.getPixelForValue(16.6);
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(chart.chartArea.left, y16);
+                ctx.lineTo(chart.chartArea.right, y16);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fillText('60 FPS Limit (16.6ms)', chart.chartArea.left + 10, y16 - 5);
+                ctx.restore();
+            }
+        }]
+    });
+
+    // Simulation Loop (runs every 100ms)
+    setInterval(() => {
+        const mutations = parseInt(slider.value);
+        mutationDisplay.innerText = mutations + " / frame";
+
+        // --- Simulator Logic ---
+        
+        // 1. ECS Calculation: The more mutations, the more saturation. Adding chaos (cache misses).
+        let ecsBaseTime = 2.0;
+        let ecsPenalty = (mutations / 1500); // Linear penalty
+        let ecsChaos = (mutations > 5000) ? Math.random() * (mutations / 2000) : Math.random() * 0.5; // Unpredictable spikes
+        let ecsTotalTime = ecsBaseTime + ecsPenalty + ecsChaos;
+        
+        // Visual ceiling
+        if(ecsTotalTime > 60) ecsTotalTime = 50 + Math.random() * 10; 
+
+        // 2. CRG Calculation: O(1). Mutations cost virtually nothing.
+        let crgTotalTime = 2.0 + (mutations / 50000); // Virtually flat line
+
+        // UI Text Update
+        if (ecsTotalTime > 16.6) {
+            ecsStatus.innerHTML = `Critical (${ecsTotalTime.toFixed(1)} ms) <br><small>Memory Stalls</small>`;
+            ecsStatus.style.color = '#ff4d4d';
+        } else {
+            ecsStatus.innerHTML = `Stable (${ecsTotalTime.toFixed(1)} ms)`;
+            ecsStatus.style.color = '#ffb34d';
+        }
+        crgStatus.innerHTML = `Perfect (${crgTotalTime.toFixed(1)} ms) <br><small>O(1) Resolution</small>`;
+
+        // Chart Update (scrolling effect)
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[0].data.push(ecsTotalTime);
+        
+        chart.data.datasets[1].data.shift();
+        chart.data.datasets[1].data.push(crgTotalTime);
+        
+        chart.update();
+
+    }, 100); // 10 FPS for visual refresh
+</script>
+
+</body>
+</html>
