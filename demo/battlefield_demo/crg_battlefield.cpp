@@ -1,35 +1,48 @@
 // Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
-// STAGE 13 — THE ULTIMATE BATTLEFIELD : PURE DATA & TOTAL CONTROL
+// Licensed under the Apache License, Version 2.0.
+//
 #include "raylib.h"
-#include "raymath.h"  // Pour les opérations Vector2
+#include "raymath.h"  
 #include <entt/entt.hpp>
 #include <chrono>
 #include <vector>
-#include <unordered_map>
 
 // ======================================================
-// [ ENGINE CORE ] 1. IDENTITY & INFRASTRUCTURE
+// [ ENGINE CORE ] 1. IDENTITY & INFRASTRUCTURE (DENSE IDs)
 // ======================================================
-using TypeID = std::size_t;
-template<class T> struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
+using DenseID = std::size_t;
+
+struct TypeIDGenerator {
+    static DenseID GetNext() { static DenseID s_id = 0; return s_id++; }
+};
+
+template<class T> 
+struct DenseTypeID { 
+    static DenseID Get() { static DenseID s_id = TypeIDGenerator::GetNext(); return s_id; } 
+};
 
 enum class UnitState : std::size_t { Patrol, Combat };
 template<typename T> struct EnumTraits;
 template<> struct EnumTraits<UnitState> { static constexpr std::size_t Count = 2; };
 
-// --- BEHAVIOR ROUTER (O1 Tensors) ---
-template<class InterfaceT>
+// --- BEHAVIOR ROUTER (FLAT FUNC PTR TENSOR) ---
+// Le routeur ne prend plus d'interface, mais un type de Pointeur de Fonction pur.
+template<typename FuncPtrT>
 class BehaviorRouter {
-    static inline std::unordered_map<TypeID, const InterfaceT* const*> s_tensors;
+    static inline std::vector<const FuncPtrT*> s_tensors;
 public:
-    static void Register(TypeID id, const InterfaceT* const* t) { s_tensors[id] = t; }
-    static const InterfaceT* GetBehavior(TypeID id, UnitState state) {
-        auto it = s_tensors.find(id);
-        return (it != s_tensors.end()) ? it->second[(std::size_t)state] : nullptr;
+    static void Register(DenseID id, const FuncPtrT* t) { 
+        if (id >= s_tensors.size()) s_tensors.resize(id + 1, nullptr);
+        s_tensors[id] = t; 
     }
-    static const InterfaceT* GetSingle(TypeID id) {
-        auto it = s_tensors.find(id);
-        return (it != s_tensors.end()) ? it->second[0] : nullptr;
+    
+    // Retourne directement le pointeur de fonction
+    static FuncPtrT GetBehavior(DenseID id, UnitState state) {
+        return s_tensors[id] ? s_tensors[id][(std::size_t)state] : nullptr;
+    }
+    
+    static FuncPtrT GetSingle(DenseID id) {
+        return s_tensors[id] ? s_tensors[id][0] : nullptr;
     }
 };
 
@@ -46,13 +59,14 @@ struct IRule {
 
 template<typename SettingsT, typename... Args>
 class RuleRegistry {
-    using HeadMap = std::unordered_map<TypeID, const IRule<SettingsT, Args...>*>;
-    static HeadMap& GetMap() { static HeadMap s_instance; return s_instance; }
+    static inline std::vector<const IRule<SettingsT, Args...>*> s_tensors;
 public:
-    static void Register(TypeID modelID, const IRule<SettingsT, Args...>* node) { GetMap()[modelID] = node; }
-    static const IRule<SettingsT, Args...>* GetHead(TypeID modelID) {
-        auto& map = GetMap(); auto it = map.find(modelID);
-        return (it != map.end()) ? it->second : nullptr;
+    static void Register(DenseID id, const IRule<SettingsT, Args...>* node) { 
+        if (id >= s_tensors.size()) s_tensors.resize(id + 1, nullptr);
+        s_tensors[id] = node; 
+    }
+    static const IRule<SettingsT, Args...>* GetHead(DenseID id) {
+        return (id < s_tensors.size()) ? s_tensors[id] : nullptr;
     }
 };
 
@@ -60,9 +74,9 @@ template<typename Derived, typename SettingsT, typename... Args>
 class RuleNode : public IRule<SettingsT, Args...> {
     const IRule<SettingsT, Args...>* m_next = nullptr;
 public:
-    RuleNode(TypeID modelID) {
-        m_next = RuleRegistry<SettingsT, Args...>::GetHead(modelID);
-        RuleRegistry<SettingsT, Args...>::Register(modelID, this);
+    RuleNode(DenseID id) {
+        m_next = RuleRegistry<SettingsT, Args...>::GetHead(id);
+        RuleRegistry<SettingsT, Args...>::Register(id, this);
     }
     const IRule<SettingsT, Args...>* GetNext() const override { return m_next; }
 };
@@ -74,52 +88,63 @@ struct Body { Vector2 pos; Vector2 vel; };
 struct Weapon { float cooldown; float fire_rate; };
 struct Health { float current = 100.0f; bool is_dead = false; };
 struct Battery { float charge = 100.0f; };
-struct CRGIdentity { TypeID logic_class; UnitState current_state; };
+struct CRGIdentity { DenseID logic_class; UnitState current_state; }; 
 struct Projectile { float ttl; float damage; entt::entity owner; }; 
 struct Renderable { Color color; float size; };
 struct DefenseSettings { float armor_multiplier = 1.0f; }; 
 
-struct PatrolData { double data[512]; }; // Structural Tax (4KB)
+struct PatrolData { double data[512]; }; 
 struct CombatData { double data[512]; }; 
 
 // ======================================================
-// [ GAMEPLAY SPACE ] LOGIC (CRG)
+// [ GAMEPLAY SPACE ] LOGIC (CRG PARAMS SANDBOX & DOD)
 // ======================================================
-struct IUnitBehavior {
-    virtual void Update(entt::registry& reg, entt::entity e, Body& b, Weapon& w, const BehaviorSettings& s, float dt) const = 0;
+// 1. Les Contrats de Données stricts
+struct UnitParams {
+    entt::registry& reg;
+    entt::entity e;
+    Body& b;
+    Weapon& w;
+    const BehaviorSettings& s;
+    float dt;
 };
 
-struct IDamageBehavior {
-    virtual void Apply(Health& h, float amount, const DefenseSettings& ds) const = 0;
+struct DamageParams {
+    Health& h;
+    float amount;
+    const DefenseSettings& ds;
 };
+
+// 2. Les Signatures des Pointeurs de Fonction
+using PfnUnitBehavior = void(*)(const UnitParams&);
+using PfnDamageBehavior = void(*)(const DamageParams&);
 
 struct Drone {}; struct HeavyLifter {};
 
-// AI: Combat Behavior (Spawns Projectiles)
-template<class T> struct CombatDef : IUnitBehavior {
-    void Update(entt::registry& reg, entt::entity e, Body& b, Weapon& w, const BehaviorSettings& s, float dt) const override {
-        b.pos = Vector2Add(b.pos, Vector2Scale(b.vel, 0.3f * dt));
-        if (w.cooldown <= 0) {
-            auto bullet = reg.create();
-            reg.emplace<Projectile>(bullet, 1.5f, s.damage, e);
-            reg.emplace<Body>(bullet, b.pos, Vector2Scale(Vector2Normalize(b.vel), 600.0f));
-            reg.emplace<Renderable>(bullet, YELLOW, 2.0f);
-            w.cooldown = w.fire_rate;
+// 3. Implémentation des comportements : Des fonctions statiques pures. Zéro objet.
+struct CombatDef {
+    static void Update(const UnitParams& p) {
+        p.b.pos = Vector2Add(p.b.pos, Vector2Scale(p.b.vel, 0.3f * p.dt));
+        if (p.w.cooldown <= 0) {
+            auto bullet = p.reg.create();
+            p.reg.emplace<Projectile>(bullet, 1.5f, p.s.damage, p.e);
+            p.reg.emplace<Body>(bullet, p.b.pos, Vector2Scale(Vector2Normalize(p.b.vel), 600.0f));
+            p.reg.emplace<Renderable>(bullet, YELLOW, 2.0f);
+            p.w.cooldown = p.w.fire_rate;
         }
-        if (w.cooldown > 0) w.cooldown -= dt;
+        if (p.w.cooldown > 0) p.w.cooldown -= p.dt;
     }
 };
 
-// AI: Damage Logic (Pure Data)
-struct StandardDamage : IDamageBehavior {
-    void Apply(Health& h, float amount, const DefenseSettings& ds) const override {
-        h.current -= (amount * ds.armor_multiplier);
+struct StandardDamage {
+    static void Apply(const DamageParams& p) {
+        p.h.current -= (p.amount * p.ds.armor_multiplier);
     }
 };
 
-// Battery Rule (Stage 11 Auto-Reg)
+// Battery Rule (Stage 11 Auto-Reg - Reste objet car "Cold Path" de setup/rules)
 struct DroneNightRule : RuleNode<DroneNightRule, BehaviorSettings, Battery> {
-    DroneNightRule() : RuleNode(TypeIDOf<Drone>::Get()) {}
+    DroneNightRule() : RuleNode(DenseTypeID<Drone>::Get()) {}
     void Eval(const WorldContext& w, const BehaviorSettings& s, Battery& bat) const override {
         if (w.time_of_day >= s.night_start) bat.charge -= 0.05f;
     }
@@ -138,29 +163,31 @@ class BattlefieldEngine {
 
 public:
     void Init() {
-        static const CombatDef<Drone> dc; static const IUnitBehavior* d_t[2] = {nullptr, &dc};
-        BehaviorRouter<IUnitBehavior>::Register(TypeIDOf<Drone>::Get(), d_t);
-        static const StandardDamage std_dmg; static const IDamageBehavior* dmg_t[1] = {&std_dmg};
-        BehaviorRouter<IDamageBehavior>::Register(TypeIDOf<Drone>::Get(), dmg_t);
-        BehaviorRouter<IDamageBehavior>::Register(TypeIDOf<HeavyLifter>::Get(), dmg_t);
+        // Enregistrement des tableaux de pointeurs de fonctions purs
+        static const PfnUnitBehavior drone_ai[2] = { nullptr, &CombatDef::Update };
+        BehaviorRouter<PfnUnitBehavior>::Register(DenseTypeID<Drone>::Get(), drone_ai);
+
+        static const PfnDamageBehavior std_dmg[1] = { &StandardDamage::Apply };
+        BehaviorRouter<PfnDamageBehavior>::Register(DenseTypeID<Drone>::Get(), std_dmg);
+        BehaviorRouter<PfnDamageBehavior>::Register(DenseTypeID<HeavyLifter>::Get(), std_dmg);
 
         AddWave(1500);
     }
 
     void AddWave(int count) {
-        for(int i=0; i<count; i++) SpawnUnit(GetRandomValue(0,1) == 0 ? TypeIDOf<Drone>::Get() : TypeIDOf<HeavyLifter>::Get());
+        for(int i=0; i<count; i++) SpawnUnit(GetRandomValue(0,1) == 0 ? DenseTypeID<Drone>::Get() : DenseTypeID<HeavyLifter>::Get());
     }
 
-    void SpawnUnit(TypeID type) {
+    void SpawnUnit(DenseID type) {
         auto e = reg.create();
         reg.emplace<Body>(e, Vector2{(float)GetRandomValue(0, 1280), (float)GetRandomValue(0, 720)}, Vector2{(float)GetRandomValue(-120, 120), (float)GetRandomValue(-120, 120)});
-        reg.emplace<Weapon>(e, 0.0f, (type == TypeIDOf<Drone>::Get() ? 0.3f : 0.8f));
+        reg.emplace<Weapon>(e, 0.0f, (type == DenseTypeID<Drone>::Get() ? 0.3f : 0.8f));
         reg.emplace<CRGIdentity>(e, type, UnitState::Combat);
         reg.emplace<Health>(e, 100.0f, false);
         reg.emplace<Battery>(e, 100.0f);
-        reg.emplace<DefenseSettings>(e, (type == TypeIDOf<Drone>::Get() ? 0.6f : 1.0f)); 
+        reg.emplace<DefenseSettings>(e, (type == DenseTypeID<Drone>::Get() ? 0.6f : 1.0f)); 
         reg.emplace<BehaviorSettings>(e, 18.0f, 300.0f, 30.0f);
-        reg.emplace<Renderable>(e, (type == TypeIDOf<Drone>::Get() ? SKYBLUE : ORANGE), (type == TypeIDOf<Drone>::Get() ? 3.0f : 6.0f));
+        reg.emplace<Renderable>(e, (type == DenseTypeID<Drone>::Get() ? SKYBLUE : ORANGE), (type == DenseTypeID<Drone>::Get() ? 3.0f : 6.0f));
         reg.emplace<PatrolData>(e);
     }
 
@@ -169,7 +196,7 @@ ProfileResult Update(float dt, bool use_crg, bool immortal) {
         world.time_of_day = fmod(world.time_of_day + dt * 0.2f, 24.0f);
 
         // ==========================================
-        // 1. PHASE PHYSIQUE & COLLISIONS (ECS - O(N^2))
+        // 1. PHASE PHYSIQUE & COLLISIONS 
         // ==========================================
         auto start_physics = std::chrono::high_resolution_clock::now();
         auto target_view = reg.view<CRGIdentity, Body, Health, DefenseSettings>();
@@ -178,27 +205,32 @@ ProfileResult Update(float dt, bool use_crg, bool immortal) {
             b.pos = Vector2Add(b.pos, Vector2Scale(b.vel, dt)); p.ttl -= dt;
             for(auto [u_entity, u_id, u_b, u_h, u_ds] : target_view.each()) {
                 if (p.owner != u_entity && CheckCollisionCircles(b.pos, 2.0f, u_b.pos, 7.0f)) {
-                    if (auto* dmg = BehaviorRouter<IDamageBehavior>::GetSingle(u_id.logic_class)) {
-                        dmg->Apply(u_h, p.damage, u_ds);
+                    
+                    // Exécution O(1) DOD via FuncPtr
+                    if (PfnDamageBehavior func = BehaviorRouter<PfnDamageBehavior>::GetSingle(u_id.logic_class)) {
+                        DamageParams params{u_h, p.damage, u_ds};
+                        func(params);
                     }
                     p.ttl = 0; break;
                 }
             }
-            if (p.ttl <= 0) reg.destroy(p_entity); // Destructions physiques
+            if (p.ttl <= 0) reg.destroy(p_entity);
         });
         prof.physics_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start_physics).count();
 
         // ==========================================
-        // 2. PHASE DÉCISIONNELLE (CRG IA - O(N))
+        // 2. PHASE DÉCISIONNELLE (CRG IA - FUNC PTR)
         // ==========================================
         auto start_ai = std::chrono::high_resolution_clock::now();
         reg.view<CRGIdentity, Body, Weapon, BehaviorSettings, Health, Battery>().each([&](auto entity, auto& id, auto& b, auto& w, auto& s, auto& h, auto& bat) {
             
-            // Résolution O(1) de l'IA pure
-            if (auto* ai = BehaviorRouter<IUnitBehavior>::GetBehavior(id.logic_class, id.current_state)) {
-                ai->Update(reg, entity, b, w, s, dt);
+            // Exécution O(1) DOD via FuncPtr et Params Sandbox
+            if (PfnUnitBehavior func = BehaviorRouter<PfnUnitBehavior>::GetBehavior(id.logic_class, id.current_state)) {
+                UnitParams params{reg, entity, b, w, s, dt};
+                func(params);
             }
-            // Règles (Stage 11)
+            
+            // Cold Path Rules 
             for (auto* r = RuleRegistry<BehaviorSettings, Battery>::GetHead(id.logic_class); r; r = r->GetNext()) {
                 r->Eval(world, s, bat);
             }
@@ -208,7 +240,7 @@ ProfileResult Update(float dt, bool use_crg, bool immortal) {
         prof.ai_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start_ai).count();
 
         // ==========================================
-        // 3. PHASE STRUCTURELLE (Taxe de Mutation ECS)
+        // 3. PHASE STRUCTURELLE
         // ==========================================
         auto start_struct = std::chrono::high_resolution_clock::now();
         reg.view<CRGIdentity>().each([&](auto entity, auto& id) {
@@ -223,7 +255,7 @@ ProfileResult Update(float dt, bool use_crg, bool immortal) {
         });
 
         for(auto [e, h] : reg.view<Health>().each()) {
-            if (h.is_dead) { reg.destroy(e); SpawnUnit(GetRandomValue(0,1) == 0 ? TypeIDOf<Drone>::Get() : TypeIDOf<HeavyLifter>::Get()); }
+            if (h.is_dead) { reg.destroy(e); SpawnUnit(GetRandomValue(0,1) == 0 ? DenseTypeID<Drone>::Get() : DenseTypeID<HeavyLifter>::Get()); }
         }
         prof.struct_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start_struct).count();
         
@@ -244,35 +276,18 @@ void Render(ProfileResult p, bool crg, bool immortal) {
         size_t entity_count = reg.storage<entt::entity>().size();
         
         // --- CALCUL DE LA TAXE ---
-        // EP Tax (External Polymorphism) : L'indirection du tenseur coûte ~20 nanosecondes par entité.
-        // On la convertit en millisecondes (* 0.00002).
-        double ep_tax_ms = (double)entity_count * 0.00002; 
+        // Avec un FuncPtr brut, l'indirection est ~1ns. Zéro VTable lookup.
+        double ep_tax_ms = (double)entity_count * 0.000001; 
         
-        // La Taxe affichée dépend du mode actif
         double displayed_tax = crg ? ep_tax_ms : p.struct_ms;
         Color tax_color = crg ? LIGHTGRAY : (p.struct_ms > 1.2 ? RED : ORANGE);
 
-        // --- AFFICHAGE DU MENU (Trié par Y croissant pour correspondre à ta demande) ---
-        
-        // Y = 10
         DrawText(TextFormat("PHYSICS & COLLISION: %.2f ms", p.physics_ms), 10, 10, 20, LIGHTGRAY); 
-        
-        // Y = 40
-        DrawText(TextFormat("AI LOGIC (CRG O1):   %.2f ms", p.ai_ms), 10, 40, 20, GREEN);
-        
-        // Y = 70 (Affiche soit la toute petite EP Tax, soit l'énorme Struct Tax)
+        DrawText(TextFormat("AI LOGIC (FUNC PTR): %.2f ms", p.ai_ms), 10, 40, 20, GREEN);
         DrawText(TextFormat("TAX: %.2f ms", displayed_tax), 10, 70, 24, tax_color);     
-        
-        // Y = 110
-        DrawText(TextFormat("MODE: %s (SPACE)", crg ? "CRG (EP Tax)" : "ECS (Structural Tax)"), 10, 110, 20, RAYWHITE);
-        
-        // Y = 140
+        DrawText(TextFormat("MODE: %s (SPACE)", crg ? "CRG (FuncPtr Tax)" : "ECS (Structural Tax)"), 10, 110, 20, RAYWHITE);
         DrawText(TextFormat("MUTATION RATE: %.1f %% (UP/DOWN)", mutation_rate), 10, 140, 20, SKYBLUE);        
-        
-        // Y = 170
         DrawText(TextFormat("IMMORTAL: %s (I) | WAVE (W)", immortal ? "YES" : "NO"), 10, 170, 20, LIGHTGRAY);
-        
-        // Y = 200
         DrawText(TextFormat("ENTITIES: %zu", entity_count), 10, 200, 20, RAYWHITE); 
         
         EndDrawing();
@@ -282,13 +297,13 @@ void Render(ProfileResult p, bool crg, bool immortal) {
 };
 
 int main() {
-    InitWindow(1280, 720, "CRG STAGE 13 - THE FINAL BATTLEFIELD");
+    InitWindow(1280, 720, "CRG STAGE 13 - ZERO COST DOD (FUNCPTR)");
     SetTargetFPS(60); BattlefieldEngine engine; engine.Init();
     bool use_crg = true; bool immortal = false; float m_rate = 5.0f;
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_SPACE)) use_crg = !use_crg;
         if (IsKeyPressed(KEY_I)) immortal = !immortal;
-        if (IsKeyPressed(KEY_W)) engine.AddWave(500); // Ajoute une vague
+        if (IsKeyPressed(KEY_W)) engine.AddWave(500); 
         if (IsKeyDown(KEY_UP)) m_rate = std::min(100.0f, m_rate + 0.5f);
         if (IsKeyDown(KEY_DOWN)) m_rate = std::max(0.0f, m_rate - 0.5f);
         
