@@ -1,42 +1,35 @@
+// Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+// See LICENSE file in the project root for full license information.
+//
 // ======================================================
-// STAGE 6 — FUSION (DETERMINISTIC RECONSTRUCTION)
+// STAGE 6 — FUSION (TYPE ERASURE + EXTERNAL POLYMORPHISM)
 // ======================================================
 //
 // @intent:
-// Introduce deterministic identity-based resolution over projected behavior space.
+// Provide an ECS-ready O(1) resolution API by completely decoupling 
+// memory identity from behavior topology. Prove domain decentralization.
 //
 // @what_changed:
-// Formalization of the "One thing is selected" rule using TypeList and Matrix.
-// This is our first BIG Waouh.
-//
-// @key_insight:
-// Fusion is the reconstruction of a capability from identity, global behavior, 
-// and projection. No search, just resolution.
-//
-// @what_is_not:
-// No temporal system yet, no N-dimensional axes.
-//
-// @transition:
-// Attempt to bind this reconstruction to a lifecycle (The False Peak).
-//
-// @spoken_line:
-// “We no longer search the system — we resolve it. The capability emerges, 
-// reconstructed from pure logic.”
+// - HardwareHandle acts strictly as a Type-Erased data container.
+// - BehaviorMatrixList acts as the global External Polymorphism Router.
+// - Multiple Domain Bakers demonstrate that behaviors can be compiled 
+//   and injected completely independently for the same Models.
 // ======================================================
 
 #include <iostream>
-#include <memory>
-#include <type_traits>
 #include <typeinfo>
 #include <string>
 #include <cstddef>
+#include <new>
+#include <tuple>
 
+// --- CORE UTILITIES ---
 using TypeID = std::size_t;
+template<class T> struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
+template<typename... Ts> struct TypeList {};
 
-template<class T>
-struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
-
-// SBO Handle
+// --- TYPE ERASED SHELL (The Data Container) ---
 class HardwareHandle {
     static constexpr std::size_t SBO_SIZE = 48;
 public:
@@ -50,118 +43,143 @@ public:
         static_assert(sizeof(Model<T>) <= SBO_SIZE, "SBO Capacity Exceeded!");
         Reset(); new (&m_buffer) Model<T>(std::move(v)); m_set = true;
     }
-    TypeID GetTypeID() const { return reinterpret_cast<const Concept*>(&m_buffer)->GetTypeID(); }
+    TypeID GetTypeID() const { return m_set ? reinterpret_cast<const Concept*>(&m_buffer)->GetTypeID() : 0; }
     template<class T> const T& Get() const { return static_cast<const Model<T>*>(reinterpret_cast<const Concept*>(&m_buffer))->value; }
 private:
     void Reset() { if(m_set) { reinterpret_cast<Concept*>(&m_buffer)->~Concept(); m_set = false; } }
     alignas(std::max_align_t) std::byte m_buffer[SBO_SIZE]; bool m_set = false;
 };
 
-// Node (1 list per Definition for O(1) jump)
-template<class Derived, class Interface>
-class LinkedNode {
+// --- EXTERNAL POLYMORPHISM LAYER ---
+
+// 1. The common interface for all baked behavior nodes
+struct IModelRegistryNode {
+    virtual TypeID GetModelTypeID() const = 0;
+    virtual const void* Resolve(TypeID interfaceID) const = 0;
+};
+
+// 2. The Global Registry (The Router)
+class BehaviorMatrixList {
+    static inline const IModelRegistryNode* s_nodes[128] = {};
+    static inline std::size_t s_nodeCount = 0;
+
 public:
-    LinkedNode() {
-        m_next = s_head;
-        s_head = static_cast<const Interface*>(static_cast<const Derived*>(this));
+    static void Register(const IModelRegistryNode* node) {
+        if (s_nodeCount < 128) s_nodes[s_nodeCount++] = node;
     }
-    const Interface* GetNext() const { return m_next; }
-    static const Interface* GetHead() { return s_head; }
-private:
-    inline static const Interface* s_head = nullptr;
-    const Interface* m_next = nullptr;
-};
 
-// Interfaces
-struct IDiagnostic {
-    virtual ~IDiagnostic() = default;
-    virtual void Execute(const HardwareHandle&) const = 0;
-};
-struct ITelemetry {
-    virtual ~ITelemetry() = default;
-    virtual void Execute(const HardwareHandle&) const = 0;
-};
-
-// Domain
-struct Drone { std::string id{"Drone"}; };
-struct HeavyLifter { std::string id{"HeavyLifter"}; };
-
-// Definitions
-template<class T>
-struct DiagDef : IDiagnostic, LinkedNode<DiagDef<T>, IDiagnostic> {
-    void Execute(const HardwareHandle& h) const override { std::cout << "Generic Diag: " << h.Get<T>().id << "\n"; }
-};
-
-template<>
-struct DiagDef<HeavyLifter> : IDiagnostic, LinkedNode<DiagDef<HeavyLifter>, IDiagnostic> {
-    void Execute(const HardwareHandle& h) const override { std::cout << "🔥 HEAVY DIAG: " << h.Get<HeavyLifter>().id << "\n"; }
-};
-
-template<class T>
-struct TelemetryDef : ITelemetry, LinkedNode<TelemetryDef<T>, ITelemetry> {
-    void Execute(const HardwareHandle& h) const override { std::cout << "Telemetry for TypeID=" << h.GetTypeID() << "\n"; }
-};
-
-// ======================================================
-// THE MATRIX (Variadic Inheritance)
-// ======================================================
-template<class...> struct TypeList;
-using Models = TypeList<Drone, HeavyLifter>;
-
-// Inheritance triggers constructors, avoiding std::tuple
-template<class ModelT, template<class> class... Defs>
-struct BehaviorMatrixSingle : public Defs<ModelT>... {};
-
-template<class ModelList, template<class> class... Defs>
-struct BehaviorMatrix;
-
-template<class... Models, template<class> class... Defs>
-struct BehaviorMatrix<TypeList<Models...>, Defs...> : public BehaviorMatrixSingle<Models, Defs...>...
-{
-    template<class Interface, class... Subset>
-    static const Interface* Find(const HardwareHandle& h) {
-        const auto id = h.GetTypeID();
-        const Interface* result = nullptr;
-        if constexpr (sizeof...(Subset) > 0) {
-            if (!((id == TypeIDOf<Subset>::Get()) || ...)) return nullptr;
+    // THE CORE ECS API: Resolves an interface solely from a TypeID.
+    // Iterates over nodes of the matching ModelID (supports additive decoupled domains).
+    template<class InterfaceT>
+    static const InterfaceT* FindInterface(TypeID modelID) {
+        for (std::size_t i = 0; i < s_nodeCount; ++i) {
+            if (s_nodes[i]->GetModelTypeID() == modelID) {
+                if (const void* ptr = s_nodes[i]->Resolve(TypeIDOf<InterfaceT>::Get())) {
+                    return static_cast<const InterfaceT*>(ptr);
+                }
+            }
         }
-        ((id == TypeIDOf<Models>::Get() && (result = Resolve<Interface, Models>())), ...);
+        return nullptr;
+    }
+};
+
+// 3. The Capability Node
+template<class ModelT, template<class> class... Behaviors>
+class BakedCapabilityNode : public IModelRegistryNode, public Behaviors<ModelT>... {
+public:
+    BakedCapabilityNode() {
+        // Auto-Register this baked node into the global list at startup
+        BehaviorMatrixList::Register(this);
+    }
+
+    TypeID GetModelTypeID() const override { 
+        return TypeIDOf<ModelT>::Get(); 
+    }
+
+    const void* Resolve(TypeID interfaceID) const override {
+        const void* result = nullptr;
+        // Branchless O(1) evaluation resolved at compile time via fold expression
+        ((interfaceID == TypeIDOf<typename Behaviors<ModelT>::InterfaceType>::Get() && 
+         (result = static_cast<const typename Behaviors<ModelT>::InterfaceType*>(this))), ...);
         return result;
     }
+};
 
-private:
-    template<class Interface, class Model>
-    static const Interface* Resolve() {
-        const Interface* res = nullptr;
-        ([&]() {
-            if constexpr (std::is_base_of_v<Interface, Defs<Model>>) {
-                res = Defs<Model>::GetHead(); // O(1) Deterministic jump
-            }
-        }(), ...);
-        return res;
+
+// --- USER INTERFACES ---
+struct IDiagnostic {
+    using InterfaceType = IDiagnostic; // Metadata for the Baker
+    virtual void Execute(const HardwareHandle& h) const = 0;
+};
+
+struct ITelemetry {
+    using InterfaceType = ITelemetry;
+    virtual void Send(const HardwareHandle& h) const = 0;
+};
+
+// --- USER MODELS (Data) ---
+struct Drone { std::string name; };
+struct HeavyLifter { std::string name; };
+
+// --- BEHAVIOR DEFINITIONS ---
+template<class T>
+struct DiagnosticBehavior : IDiagnostic {
+    void Execute(const HardwareHandle& h) const override { 
+        std::cout << "[CRG] Diagnostic Executed on Model TypeID: " << TypeIDOf<T>::Get() << "\n"; 
     }
 };
 
-using Behavior = BehaviorMatrix<Models, DiagDef, TelemetryDef>;
-
-// GLOBAL IMMUTABLE INSTANTIATION
-inline static const Behavior g_domain{};
-
-template<class Interface, class... Subset>
-void Call(const HardwareHandle& h) {
-    if (const Interface* iface = Behavior::Find<Interface, Subset...>(h)) {
-        iface->Execute(h);
+template<class T>
+struct TelemetryBehavior : ITelemetry {
+    void Send(const HardwareHandle& h) const override { 
+        std::cout << "[CRG] Telemetry Sent on Model TypeID: " << TypeIDOf<T>::Get() << "\n"; 
     }
-}
+};
 
+// --- THE COMPILE-TIME BAKER (Instantiator) ---
+template<class ModelList, template<class> class... Behaviors>
+struct DomainBaker;
+
+template<class... Models, template<class> class... Behaviors>
+struct DomainBaker<TypeList<Models...>, Behaviors...> {
+    // Instantiating this tuple automatically triggers the constructors of BakedCapabilityNode
+    // which self-register into the BehaviorMatrixList.
+    std::tuple<BakedCapabilityNode<Models, Behaviors...>...> m_nodes;
+};
+
+// ======================================================
+// MODULE INSTANTIATIONS (Proving Decentralization)
+// ======================================================
+
+// Extracted explicit model list
+using SimulationModels = TypeList<Drone, HeavyLifter>;
+
+// In a real codebase, these lines would live in completely different .cpp files!
+// Module A (Diagnostic System) knows nothing about Module B (Telemetry System).
+static const DomainBaker<SimulationModels, DiagnosticBehavior> g_DiagBaker{};
+static const DomainBaker<SimulationModels, TelemetryBehavior> g_TelemetryBaker{};
+
+
+// ======================================================
+// USER CODE (ECS Hot Path Simulation)
+// ======================================================
 int main() {
-    HardwareHandle h;
+    HardwareHandle h; 
     h.Set(Drone{"Scout-1"});
-    Call<IDiagnostic>(h);
-    Call<ITelemetry>(h);
 
-    h.Set(HeavyLifter{"Loader-99"});
-    Call<IDiagnostic>(h);
-    Call<ITelemetry>(h);
+    std::cout << "--- STAGE 06: FUSION (DECENTRALIZED O(1) BAKER) ---\n";
+    
+    // 1. The System fetches the ID from the raw data
+    TypeID currentModelID = h.GetTypeID();
+
+    // 2. The Systems query the global CRG Matrix independently
+    if (const IDiagnostic* diag = BehaviorMatrixList::FindInterface<IDiagnostic>(currentModelID)) {
+        diag->Execute(h);
+    }
+
+    if (const ITelemetry* telemetry = BehaviorMatrixList::FindInterface<ITelemetry>(currentModelID)) {
+        telemetry->Send(h);
+    }
+
     return 0;
 }

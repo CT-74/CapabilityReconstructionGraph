@@ -7,6 +7,7 @@
 //
 // @what_changed:
 // Intrusive linked list (self-registering nodes) introduced.
+// Unified naming for next/head pointers.
 //
 // @key_insight:
 // Structure can emerge from object lifetime side effects instead of explicit 
@@ -16,52 +17,43 @@
 // No identity system, no behavior system, no lookup mechanism. Just raw topology.
 //
 // @transition:
-// Add an identity layer to the structural nodes.
-//
-// @spoken_line:
-// “We already have a structure — but we never built one. It’s just there, 
-// in the wake of our objects.”
+// Nodes exist, but we cannot distinguish them dynamically. We need Identity.
 // ======================================================
 
 #include <iostream>
 
-struct INode
-{
-    virtual ~INode() = default;
-    virtual void Diag() const = 0;
+struct IBehavior {
+    virtual ~IBehavior() = default;
+    virtual void Execute() const = 0;
 
-    INode* GetNext() const { return m_next; }
-    static INode* GetHead() { return s_head; }
+    const IBehavior* GetNext() const { return m_next; }
+    static const IBehavior* GetHead() { return s_head; }
 
 protected:
-    INode()
-    {
+    IBehavior() {
         m_next = s_head;
         s_head = this;
     }
 
 private:
-    inline static INode* s_head = nullptr;
-    INode* m_next = nullptr;
+    inline static const IBehavior* s_head = nullptr;
+    const IBehavior* m_next = nullptr;
 };
 
-struct DroneNode : INode { 
-    void Diag() const override { std::cout << "Drone Node Active\n"; } 
+struct DroneBehavior : IBehavior { 
+    void Execute() const override { std::cout << "Drone Behavior Active\n"; } 
 };
 
-struct HeavyLifterNode : INode { 
-    void Diag() const override { std::cout << "HeavyLifter Node Active\n"; } 
+struct HeavyLifterBehavior : IBehavior { 
+    void Execute() const override { std::cout << "HeavyLifter Behavior Active\n"; } 
 };
 
-int main()
-{
-    DroneNode a; 
-    HeavyLifterNode b; 
+int main() {
+    DroneBehavior a; 
+    HeavyLifterBehavior b; 
 
-    for (auto* n = INode::GetHead(); n; n = n->GetNext())
-    {
-        n->Diag();
+    for (const auto* n = IBehavior::GetHead(); n; n = n->GetNext()) {
+        n->Execute();
     }
-
     return 0;
 }

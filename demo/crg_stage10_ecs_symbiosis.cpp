@@ -1,223 +1,310 @@
 // Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 //
-// "CRG (Capability Reconstruction Graph) is a proprietary architectural 
-// pattern for Stateless Contextual Projection."
-
 // ======================================================
-// STAGE 10 — THE SYMBIOSIS (PURE DOD ECS + O(1) CRG MATRIX)
+// STAGE 10 — THE SYMBIOSIS (PURE DOD ECS + O(1) TENSOR)
 // ======================================================
 //
 // @intent:
 // Harmonize high-density Data-Oriented Design (ECS) with the compile-time 
-// deterministic resolution matrix of the CRG.
+// N-Dimensional tensor of the CRG.
 //
 // @what_changed:
-// - Implementation of the "IDCard" component for semantic identity.
-// - Introduction of the "Nested Selector" for contextual N-dimensional routing.
-// - Strict Cache-Friendly iteration (No 'reg.get' inside the hot loop).
-// - Restoration of the Stage 6 O(1) Deterministic Jump via dual-parameter CRTP.
+// - Object-Oriented 'HardwareHandle' is entirely removed.
+// - Introduction of ECS Components: 'LogicID', 'Battery', 'BiomeContext'.
+// - The Hot Path (System): Iterates tightly packed arrays, extracts context 
+//   from components, and executes behavior directly on the data.
+// - Zero Virtual Interface over Data: The capabilities take direct component 
+//   references (e.g., Execute(Battery&)).
 //
 // @key_insight:
-// The System owns the "Pipeline" (Data Locality). The CRG owns the "Behavior" 
-// (Logic Projection). Together, they allow zero-cost state mutations, resolved
-// at compile-time without any O(N) search.
-//
-// @spoken_line:
-// “The ECS provides the physical body in memory; the CRG grants the purpose 
-// without moving a single byte, resolved at the speed of the compiler.”
+// The ECS owns the Data Pipeline. The CRG owns the Logic Projection. 
+// Together, they allow zero-cost state mutations mapped in a hypergraph.
 // ======================================================
 
 #include <iostream>
 #include <vector>
 #include <string>
-#include <typeinfo>
-#include <type_traits>
+#include <cstddef>
+#include <tuple>
 
 // ======================================================
-// 1. PURE ECS DATA (Components)
+// [ ENGINE CORE ] 1. IDENTITY & SEMANTICS
 // ======================================================
-using TypeHash = std::size_t;
-template<class T> struct TypeIDOf { static TypeHash Get() { return typeid(T).hash_code(); } };
+using TypeID = std::size_t;
+template<class T> struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
+template<typename... Ts> struct TypeList {};
 
-struct Battery   { float charge = 100.0f; };
-struct Equipment { bool nv_toggled = true; };
-struct Biome     { uint32_t current_id; };
-struct IDCard    { TypeHash logic_class; }; 
-
-// Global State (Context Component)
-struct WorldState { bool is_night = false; };
+template<auto V> using When = std::integral_constant<decltype(V), V>;
+template<auto V> using In   = std::integral_constant<decltype(V), V>;
+template<auto V> using Auth = std::integral_constant<decltype(V), V>;
 
 // ======================================================
-// 2. CRG INFRASTRUCTURE (O(1) Deterministic Core)
+// [ ENGINE CORE ] 2. THE SELECTOR & TENSOR MATH
 // ======================================================
+template<typename T> struct EnumTraits;
 
-// The Stage 6 Magic: Dual-parameter CRTP for isolated static heads
-template<class Derived, class Interface>
-class LinkedNode {
-public:
-    LinkedNode() {
-        m_next = s_head;
-        s_head = static_cast<const Interface*>(static_cast<const Derived*>(this));
+template<typename... Enums>
+struct Selector {
+    static constexpr std::size_t Dimensions = sizeof...(Enums);
+    template<std::size_t I> using EnumAt = std::tuple_element_t<I, std::tuple<Enums...>>;
+
+    template<std::size_t I>
+    static constexpr std::size_t DimSize() {
+        using E = EnumAt<I>;
+        return EnumTraits<E>::Count - (EnumTraits<E>::HasAny ? 1 : 0);
     }
-    const Interface* GetNext() const { return m_next; }
-    static const Interface* GetHead() { return s_head; }
+
+    template<std::size_t I>
+    static constexpr std::size_t Stride() {
+        if constexpr (I + 1 >= Dimensions) return 1;
+        else return DimSize<I + 1>() * Stride<I + 1>();
+    }
+
+    static constexpr std::size_t Volume() { return (DimSize<0>() * ... * 1); }
+    static constexpr std::size_t ComputeOffset(Enums... args) { return ComputeOffsetImpl<0>(args...); }
+
 private:
-    inline static const Interface* s_head = nullptr;
-    const Interface* m_next = nullptr;
+    template<std::size_t I>
+    static constexpr std::size_t ComputeOffsetImpl(Enums... args) {
+        if constexpr (I == Dimensions) return 0;
+        else {
+            auto val_enum = std::get<I>(std::make_tuple(args...));
+            std::size_t val = static_cast<std::size_t>(val_enum);
+            using E = EnumAt<I>;
+            if constexpr (EnumTraits<E>::HasAny) val -= 1; 
+            return val * Stride<I>() + ComputeOffsetImpl<I + 1>(args...);
+        }
+    }
 };
 
-// --- THE INTERFACE (Nested Selector Pattern) ---
-struct INightVisionBehavior {
-    virtual ~INightVisionBehavior() = default;
+// ======================================================
+// [ ENGINE CORE ] 3. DEVIRTUALIZED ROUTER (Lazy SoA)
+// ======================================================
+template<class InterfaceT>
+class BehaviorRouter {
+    struct DiscoveryNode { TypeID modelID; const InterfaceT* const* tensor; };
+    static inline std::vector<DiscoveryNode> s_discovery_list;
 
-    // The Selector defines the environmental dimensions
-    struct Selector {
-        bool is_night;
-        uint32_t biome_id;
+    struct BakedRouter {
+        std::vector<TypeID> ids;
+        std::vector<const InterfaceT* const*> tensors; 
+        
+        BakedRouter() {
+            for (const auto& n : s_discovery_list) {
+                ids.push_back(n.modelID);
+                tensors.push_back(n.tensor);
+            }
+        }
     };
 
-    virtual bool Match(TypeHash logic_class, const Selector& sel) const = 0;
-    virtual void Execute(Battery& bat, Equipment& eq) const = 0;
+    static const BakedRouter& GetBaked() {
+        static const BakedRouter instance; 
+        return instance;
+    }
+
+public:
+    static void Register(TypeID modelID, const InterfaceT* const* tensor) {
+        for (const auto& n : s_discovery_list) if (n.modelID == modelID) return;
+        s_discovery_list.push_back({modelID, tensor});
+    }
+
+    template<class... Args>
+    static const InterfaceT* Find(TypeID modelID, Args... args) {
+        const BakedRouter& router = GetBaked();
+        std::size_t offset = InterfaceT::Context::ComputeOffset(args...); 
+        
+        for (std::size_t i = 0; i < router.ids.size(); ++i) {             
+            if (router.ids[i] == modelID) {
+                return router.tensors[i][offset];                         
+            }
+        }
+        return nullptr;
+    }
 };
 
 // ======================================================
-// 3. DECLARATIVE BEHAVIORS (Matrix Definitions)
+// [ ENGINE CORE ] 4. CAPABILITY BASE & BAKER
 // ======================================================
+template<class InterfaceT, class ModelT, class... Constraints>
+struct CapabilityDefinition : InterfaceT {
+    using InterfaceType = InterfaceT;
+
+    bool MatchIndex(std::size_t offset) const { return MatchIndexImpl<0>(offset); }
+
+private:
+    template<std::size_t I>
+    bool MatchIndexImpl(std::size_t offset) const {
+        if constexpr (I == sizeof...(Constraints)) return true;
+        else {
+            using Context = typename InterfaceT::Context;
+            using EnumType = typename Context::template EnumAt<I>;
+            using ConstraintWrapper = std::tuple_element_t<I, std::tuple<Constraints...>>;
+            
+            constexpr auto constraint_val = ConstraintWrapper::value;
+            constexpr bool constraint_is_any = EnumTraits<EnumType>::HasAny && (static_cast<std::size_t>(constraint_val) == 0);
+
+            std::size_t c_val = (offset / Context::template Stride<I>()) % Context::template DimSize<I>();
+            EnumType runtime_val = static_cast<EnumType>(c_val + (EnumTraits<EnumType>::HasAny ? 1 : 0));
+
+            return (constraint_is_any || (constraint_val == runtime_val)) && MatchIndexImpl<I + 1>(offset);
+        }
+    }
+};
+
+template<class ModelT, template<class> class... Behaviors>
+class BakedCapabilityNode : public Behaviors<ModelT>... {
+    
+    template<class InterfaceT>
+    struct TensorBaker {
+        std::vector<const InterfaceT*> buffer;
+        TensorBaker(const BakedCapabilityNode* node) {
+            buffer.assign(InterfaceT::Context::Volume(), nullptr);
+            ([&]() {
+                if constexpr (std::is_base_of_v<InterfaceT, Behaviors<ModelT>>) {
+                    const auto* behaviorPtr = static_cast<const InterfaceT*>(static_cast<const Behaviors<ModelT>*>(node));
+                    for (std::size_t i = 0; i < InterfaceT::Context::Volume(); ++i) {
+                        if (static_cast<const Behaviors<ModelT>*>(node)->MatchIndex(i)) buffer[i] = behaviorPtr;
+                    }
+                }
+            }(), ...);
+        }
+    };
+
+    template<class InterfaceT>
+    const InterfaceT* const* GetTensorBuffer() const {
+        static TensorBaker<InterfaceT> baker(this);
+        return baker.buffer.data();
+    }
+
+public:
+    BakedCapabilityNode() {
+        (BehaviorRouter<typename Behaviors<ModelT>::InterfaceType>::Register(
+            TypeIDOf<ModelT>::Get(), 
+            GetTensorBuffer<typename Behaviors<ModelT>::InterfaceType>()
+        ), ...);
+    }
+};
+
+template<class ModelList, template<class> class... Behaviors>
+struct DomainBaker;
+
+template<class... Models, template<class> class... Behaviors>
+struct DomainBaker<TypeList<Models...>, Behaviors...> {
+    std::tuple<BakedCapabilityNode<Models, Behaviors...>...> m_nodes;
+};
+
+
+// ======================================================
+// [ GAMEPLAY SPACE ] 1. DATA (ECS COMPONENTS & ENUMS)
+// ======================================================
+
+enum class State    { Any, Init, Combat };
+enum class Zone     { Any, Desert, Tundra };
+
+template<> struct EnumTraits<State> { static constexpr std::size_t Count = 3; static constexpr bool HasAny = true; };
+template<> struct EnumTraits<Zone>  { static constexpr std::size_t Count = 3; static constexpr bool HasAny = true; };
+
+// ECS Components
+struct LogicID  { TypeID hash; };
+struct Battery  { float charge = 100.0f; };
+struct BiomeCtx { Zone current_zone; };
+
+// Models (Semantic Types only)
 struct Scout {};
 struct HeavyLifter {};
 
-// --- BEHAVIOR: DAY (Generic Template) ---
-template<class T>
-struct DayBehavior : INightVisionBehavior, LinkedNode<DayBehavior<T>, INightVisionBehavior> {
-    
-    bool Match(TypeHash c, const Selector& sel) const override { 
-        return c == TypeIDOf<T>::Get() && !sel.is_night; 
-    }
-    void Execute(Battery& bat, Equipment& eq) const override {
-        bat.charge -= 0.1f; 
-    }
+
+// ======================================================
+// [ GAMEPLAY SPACE ] 2. LOGIC (CRG INTERFACES & DEFS)
+// ======================================================
+
+// The Interface takes ECS data directly!
+struct IEnergyDrain {
+    using InterfaceType = IEnergyDrain;
+    using Context = Selector<State, Zone>; 
+    virtual void ExecuteDrain(Battery& bat) const = 0;
 };
 
-// --- BEHAVIOR: NIGHT (Templated with Specialization) ---
-template<class T>
-struct NightBehavior : INightVisionBehavior, LinkedNode<NightBehavior<T>, INightVisionBehavior> {
-    
-    bool Match(TypeHash c, const Selector& sel) const override { 
-        return c == TypeIDOf<T>::Get() && sel.is_night; 
-    }
-    void Execute(Battery& bat, Equipment& eq) const override;
+template<class T, class T_E = When<State::Any>, class T_B = In<Zone::Any>>
+using EnergyDefBase = CapabilityDefinition<IEnergyDrain, T, T_E, T_B>;
+
+// Behaviors
+template<class T> 
+struct GenericDrainDef : EnergyDefBase<T> { 
+    void ExecuteDrain(Battery& bat) const override { bat.charge -= 0.5f; }
 };
 
-// Specific Logic for Scout at Night
-template<> 
-void NightBehavior<Scout>::Execute(Battery& bat, Equipment& eq) const {
-    if (eq.nv_toggled) bat.charge -= 0.5f; 
-    else               bat.charge -= 0.05f;
-}
-
-// Specific Logic for HeavyLifter at Night
-template<> 
-void NightBehavior<HeavyLifter>::Execute(Battery& bat, Equipment& eq) const {
-    if (eq.nv_toggled) bat.charge -= 2.5f; 
-    else               bat.charge -= 0.2f;
-}
-
-// ======================================================
-// 4. THE BEHAVIOR MATRIX (O(1) Resolution Engine)
-// ======================================================
-template<class...> struct TypeList;
-template<class ModelT, template<class> class... Defs> struct BehaviorMatrixSingle : public Defs<ModelT>... {};
-template<class ModelList, template<class> class... Defs> struct BehaviorMatrix;
-
-template<class... Models, template<class> class... Defs>
-struct BehaviorMatrix<TypeList<Models...>, Defs...> : public BehaviorMatrixSingle<Models, Defs...>... {
-    
-    template<class Interface>
-    static const Interface* Resolve(TypeHash logic_class, const typename Interface::Selector& sel) {
-        const Interface* result = nullptr;
-        
-        // C++17 Fold Expressions: The compiler resolves the jump at compile-time.
-        // ZERO loops. ZERO search. Pure O(1) determinism.
-        ([&]() {
-            if (logic_class == TypeIDOf<Models>::Get()) {
-                ([&]() {
-                    if constexpr (std::is_base_of_v<Interface, Defs<Models>>) {
-                        const Interface* candidate = Defs<Models>::GetHead();
-                        if (candidate && candidate->Match(logic_class, sel)) {
-                            result = candidate;
-                        }
-                    }
-                }(), ...);
-            }
-        }(), ...);
-        
-        return result;
-    }
+template<class T> 
+struct SandstormDrainDef : EnergyDefBase<T, When<State::Combat>, In<Zone::Desert>> {
+    void ExecuteDrain(Battery& bat) const override { bat.charge -= 15.0f; /* Sand clogs the filters! */ }
 };
 
-// Matrix Instantiation
-using AIDomain = BehaviorMatrix<TypeList<Scout, HeavyLifter>, DayBehavior, NightBehavior>;
-inline static const AIDomain g_behavior_matrix{};
+// Instantiations
+using SimModels = TypeList<Scout, HeavyLifter>;
+static const DomainBaker<SimModels, GenericDrainDef> g_GenericDrainModule{};
+static const DomainBaker<TypeList<HeavyLifter>, SandstormDrainDef> g_SandstormModule{};
+
 
 // ======================================================
-// 5. THE SYSTEM (The ECS/CRG Symbiosis)
+// [ THE SYSTEM ] ECS HOT PATH SIMULATION
 // ======================================================
-
-// Mock Registry to mimic EnTT view.each()
 struct MockRegistry {
-    WorldState world;
-    std::vector<Battery> batteries;
-    std::vector<Equipment> equipments;
-    std::vector<IDCard> id_cards;
-    std::vector<Biome> biomes;
+    // Global State
+    State global_state = State::Init;
 
-    void Update() {
-        for (size_t i = 0; i < id_cards.size(); ++i) {
+    // SoA Components Layout
+    std::vector<LogicID>  logic_ids;
+    std::vector<Battery>  batteries;
+    std::vector<BiomeCtx> biomes;
+
+    // The ECS Update Loop
+    void System_UpdateEnergy() {
+        for (std::size_t i = 0; i < logic_ids.size(); ++i) {
             
-            // 1. Prepare the nested Selector (Context building)
-            INightVisionBehavior::Selector selector {
-                world.is_night,
-                biomes[i].biome_id
-            };
+            // 1. Context Extraction (Gathering coords from ECS payload)
+            State current_state = global_state;
+            Zone  current_zone  = biomes[i].current_zone;
 
-            // 2. Resolve Logic via CRG Matrix (O(1) Compile-time routing)
-            if (const auto* behavior = AIDomain::Resolve<INightVisionBehavior>(id_cards[i].logic_class, selector)) {
+            // 2. CRG Resolution (O(1) Jump)
+            if (auto* action = BehaviorRouter<IEnergyDrain>::Find(logic_ids[i].hash, current_state, current_zone)) {
                 
-                // 3. Execute with Zero-Cost references (Strict DOD)
-                behavior->Execute(batteries[i], equipments[i]);
+                // 3. Execution directly on the Component (Strict DOD)
+                action->ExecuteDrain(batteries[i]);
             }
         }
     }
 };
 
 // ======================================================
-// ENTRY POINT
-// ======================================================
 int main() {
     MockRegistry reg;
+
+    // Entity 0: Scout in Desert
+    reg.logic_ids.push_back({TypeIDOf<Scout>::Get()});
+    reg.batteries.push_back({100.0f});
+    reg.biomes.push_back({Zone::Desert});
+
+    // Entity 1: HeavyLifter in Desert
+    reg.logic_ids.push_back({TypeIDOf<HeavyLifter>::Get()});
+    reg.batteries.push_back({100.0f});
+    reg.biomes.push_back({Zone::Desert});
+
+    std::cout << "--- STAGE 10: THE SYMBIOSIS (ECS + O(1) CRG TENSOR) ---\n\n";
+
+    std::cout << "FRAME 1: Initialization (Init)\n";
+    reg.global_state = State::Init;
+    reg.System_UpdateEnergy();
+    std::cout << "  Scout Battery:       " << reg.batteries[0].charge << "%\n";
+    std::cout << "  HeavyLifter Battery: " << reg.batteries[1].charge << "%\n\n";
+
+    std::cout << "FRAME 2: Combat starts in the Desert! (Zero-cost logic swap)\n";
+    reg.global_state = State::Combat;
+    reg.System_UpdateEnergy();
     
-    // Create entities
-    reg.id_cards.push_back({ TypeIDOf<Scout>::Get() });
-    reg.batteries.push_back({ 100.0f });
-    reg.equipments.push_back({ true });
-    reg.biomes.push_back({ 0 }); // City
-
-    reg.id_cards.push_back({ TypeIDOf<HeavyLifter>::Get() });
-    reg.batteries.push_back({ 100.0f });
-    reg.equipments.push_back({ true });
-    reg.biomes.push_back({ 1 }); // Desert
-
-    std::cout << "--- FRAME 1: Day Time ---\n";
-    reg.world.is_night = false;
-    reg.Update();
-    std::cout << "Scout Battery: " << reg.batteries[0].charge << "%\n";
-
-    std::cout << "\n--- FRAME 2: Night falls! (Zero-Cost Mutation) ---\n";
-    reg.world.is_night = true;
-    reg.Update();
-    std::cout << "Scout Battery: " << reg.batteries[0].charge << "%\n";
-    std::cout << "HeavyLifter Battery: " << reg.batteries[1].charge << "%\n";
+    // Scout uses Generic (-0.5f), HeavyLifter takes the Sandstorm penalty (-15.0f)
+    std::cout << "  Scout Battery:       " << reg.batteries[0].charge << "% (Generic)\n";
+    std::cout << "  HeavyLifter Battery: " << reg.batteries[1].charge << "% (Sandstorm Penalty)\n";
 
     return 0;
 }
