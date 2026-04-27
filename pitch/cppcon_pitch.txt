@@ -1,21 +1,22 @@
-Title: Stateless Behavior Projection: O(1) Contextual Polymorphism at Hardware Limits
+Title: Beyond Archetypes: Decoupling State and Logic with Linker-Level Auto-Discovery
 
 Abstract:
-High-performance C++ systems often struggle to reconcile Data-Oriented Design (DOD) with dynamic polymorphic behavior. Traditional approaches, such as archetype-based Entity Component Systems (ECS), solve for cache locality but falter when behavior changes dynamically. This "Archetype Fragmentation" forces structural reallocations and memory copies (memcpy), breaking cache residency and creating synchronization bottlenecks. 
+Large-scale C++ engines often suffer from the "Virtual-Template Deadlock": the friction between rigid inheritance hierarchies and the need for modular, high-performance logic. This leads to "Include Hell," massive recompilation times, and costly "Archetype Fragmentation" in ECS-based systems.
 
-This session introduces the Capability Routing Gateway (CRG), a pure C++ architectural pattern that achieves O(1) contextual polymorphism through Stateless Behavior Projection. Instead of mutating data structures to attach behaviors, the CRG projects transient interfaces onto immutable, contiguous data arrays. This allows gameplay domains to exist as completely isolated projects that remain invisible to each other until link-time.
+This session introduces the Capability Routing Gateway (CRG), an architectural framework that achieves total decoupling of state and logic through Stateless Behavior Projection. 
+
+We move away from centralized registries and hardcoded dependencies. Instead, CRG leverages Static Anchor Points and C++17 auto-registration to allow gameplay plugins to "wire themselves" into the engine core across vcproj and DLL boundaries with zero manual registration. By treating logic as a transient view projected onto immutable data, we reach a level of modularity where adding or removing entire gameplay domains is a linker-level operation.
 
 Attendees will learn how to:
-* Bypass the C++ Virtual-Template Deadlock using the stack-allocated Stateless Shell (TES) to transport strictly-typed data through generic virtual interfaces.
-* Eliminate "Include Hell" and dependency rot using C++17 static inline auto-discovery and linker-level registration.
-* Flatten the VTable by mapping behaviors to a Static N-Dimensional Tensor, transforming dynamic resolution into a branch-predictor-friendly O(1) array access.
-* Saturate physical RAM bandwidth, reaching a throughput of 30.83 Gi/s on Apple M-Series hardware while maintaining 100% data residency.
-
-The presentation will conclude with a data-backed analysis of how this architecture natively supports safe hot-reloading of gameplay code while remaining purely Memory Bandwidth Bound.
+* Eradicate Dependency Rot: Use static anchor points to create a plugin system where gameplay domains (Combat, AI, UI) remain completely invisible to each other and the engine core.
+* Solve the Cross-DLL Frontier: Use the Stateless Shell (TES) as an "Ambassador" to transport data through generic interfaces across module boundaries without header pollution.
+* Deep-Dive into the "Memory Wall": Analyze detailed benchmark data proving how decoupling leads to "Structural Immunity," saturating RAM bandwidth (30.8 Gi/s) on Apple M-Series hardware.
+* Flatten Polymorphism: Map behaviors into an N-Dimensional Tensor, transforming complex contextual logic into a branch-predictor-friendly O(1) array access.
 
 Outline:
-* The Bottleneck (5 mins): Friction between DOD and dynamic behavior; the hidden cost of Archetype Fragmentation.
-* Architectural Shift (10 mins): Introduction to Stateless Projection; decoupling logic as a transient view.
-* The Variadic Matrix (15 mins): Implementing the capability sequence and N-dimensional context axes for O(1) resolution.
-* Scale & Integration (15 mins): Proving saturation of memory bandwidth on datasets of 1M entities with zero structural mutation.
-* Q&A (5 mins)
+* 00-05: The Dependency Wall: The cost of coupling; why "Include Hell" and Archetype Fragmentation are the same architectural flaw.
+* 05-15: Anchor-Based Discovery: Implementing auto-registration via static anchor points in DLLs; making the linker do the "wiring" work across module boundaries.
+* 15-25: Selective Projection: Dual-backend strategy. The Stateless Shell (TES) for flexibility vs. the Stateless DOD sniper for throughput.
+* 25-40: The N-Dimensional Tensor & Logic Math: Transforming decisions into O(1) arithmetic; implementing "Space" evaluation via Horner’s method.
+* 40-55: Data-Driven Performance Masterclass: Analyzing the "Archetype Poisoning" penalty. 60% throughput reclamation and the 30.8 Gi/s memory wall.
+* 55-60: Q&A
