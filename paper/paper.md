@@ -1,56 +1,84 @@
-# The Capability Routing Gateway (CRG)
-### Reaching Hardware Limits through Zero-Cost Logic Mapping & Universal Decoupling
+# CRG: Linker-Driven Discovery and Hardware-Bound Logic Mapping
+### An Architecture for Modular Decoupling and High-Performance Dispatch
 
 **Cyril Tissier** | April 2026
 
 ---
 
 ## 1. Abstract
-The **Capability Routing Gateway (CRG)** is an architectural framework designed to eliminate the primary bottlenecks in modern AAA engine development: structural memory overhead and rigid architectural coupling. By decoupling identity from behavior through a dual-governance backend, the CRG enables expressive external polymorphism while maintaining 100% data residency for performance-critical simulation. The architecture eliminates the "Structural Tax" of entity migration, allowing logic execution to reach the **Memory Bandwidth (BW) Bound** limit, saturating the system bus at **30.83 Gi/s**.
+The **Capability Routing Gateway (CRG)** is an architectural framework developed to resolve two divergent constraints in AAA development: the need for total module decoupling (Team Scalability) and the requirement for hardware-level execution efficiency (Performance). By shifting module discovery to the linker level through a **Linker-Driven Discovery** pattern, CRG removes centralized dependency bottlenecks. When applied to entity logic, it enables a deterministic $O(1)$ dispatch that saturates system memory bandwidth at **30.83 Gi/s** while maintaining 100% data residency.
 
-## 2. Decoupling via Linker-Level Discovery
-The CRG achieves absolute inversion of control during static initialization, preventing the dependency rot and "Include Hell" common in large-scale C++ projects.
-* **Auto-Registration:** Leveraging C++17 `static inline` constants, features register themselves to the Gateway without centralized registries or "god-functions." 
-* **Domain Isolation:** Gameplay domains (Combat, AI, UI) exist as isolated projects, remaining invisible to the core engine and each other until link-time.
-* **Linker Optimization:** Unused behaviors are entirely removed via **Dead Code Stripping**, ensuring zero runtime overhead and minimal binary footprint for specialized builds (e.g., dedicated servers).
+---
 
-## 3. Dual-Backend Governance
-The CRG does not force a single paradigm onto the entire codebase. Instead, it bridges two distinct execution regimes through a unified routing matrix:
+## 2. Pillar I: Linker-Driven Discovery (The Core Innovation)
+The primary bottleneck in large-scale C++ projects is often the "Central Registry" pattern, which forces every module to know about every other module. CRG relocates Inversion of Control (IoC) to the linker.
 
-| Architectural Feature | The DOD Hot Path (Surgical) | The Interface Path (Expressive) |
-| :--- | :--- | :--- |
-| **Target Use Case** | Physics, Movement, Core Combat | Quest Systems, UI, Stateful Add-ons |
-| **Routed Payload** | Pure C-Style Function Pointers | Stateful Virtual Interfaces (`Interface*`) |
-| **Data Contract** | Strict **Params Sandbox** (Context Struct) | Unrestricted (Free-for-all C++ logic) |
-| **Memory Access** | Linear & Sequential (100% Cache hits) | Graph-based (Random access allowed) |
-| **Primary Goal** | Raw Throughput (Bandwidth Saturation) | Architectural Richness & API Callbacks |
+* **Zero-Include Registration:** Behavior modules (DLLs/Plugins) interface with the Gateway via a **Linker-Driven Registry**. This allows a feature to be added to the engine simply by linking its binary, with no modifications required to the core engine headers or source code.
+* **The Strict Anchor Pattern:** To prevent dead-code stripping, CRG employs a **Strict Anchor** specialization in the core. This forces the linker to resolve and "pull" behavior chains across binary boundaries, ensuring all capabilities are "baked" into the engine's routing matrix during a controlled startup sequence.
 
-## 4. The Stateless Shell (TES): The Virtual-Template Bypass
-The **Stateless Shell (TES)** is a stack-allocated transport unit that solves the fundamental C++ limitation where `virtual` functions cannot be templates. 
-* **Mechanism:** The TES acts as a type-erased carrier for data identity across domain boundaries.
-* **Execution:** A stable virtual interface accepts the TES as its primary argument; the concrete implementation retrieves type-specific data via `shell.GetAs<T>()`. This allows generic interfaces to drive highly specific, templated logic with zero heap allocation.
+---
 
-## 5. Universal Auto-Discovery & Dynamic Baking
-The CRG utilizes automated discovery to build its deterministic O(1) routing matrix:
-* **The DomainBaker:** For modeled simulation types, the Baker constructs a flat routing table during initialization.
-* **Global Logic Discovery:** For data-less behaviors, the system uses auto-registered linked lists. 
-* **Magic Static Cache:** To eliminate traversal costs, the first call to a global logic path caches pointers into a **contiguous static vector**. This transforms "cold" discovery into a "warm" cache-friendly iteration for all subsequent frames.
+## 3. Pillar II: Thematic Identity Governance (`TFamily`)
+CRG partitions identity through `TFamily` layers to maintain data density and cache efficiency.
 
-## 6. Performance Criteria & Benchmarks
+* **Domain Isolation:** Distinct domains (e.g., `RobotFamily`, `VFXFamily`) operate in isolated index spaces. This ensures that behavioral tensors remain dense, preventing the "Sparse Table" problem common in monolithic ID systems.
+* **Type-Safe Phantom IDs:** Strong typing (`DenseModelID`, `DenseInterfaceID`) prevents cross-domain ID leakage and ensures compile-time safety for domain-specific interfaces.
 
-### Methodology
-* **Target:** Variable scale from 1,024 to 1,048,576 Entities.
-* **Payload:** 256 bytes per entity (forced full cache line load).
-* **Environment:** MacBook Air (Apple M-Series, Clang 16, -O3).
+---
 
-### Results
+## 4. Pillar III: The Type-Erased Shell (TES)
+The **ModelHandle** acts as a **Type-Erased Shell (TES)** designed for high-performance data transport across decoupled systems.
+
+* **SBO & Cache-Line Alignment:** To avoid heap fragmentation, the TES utilizes **Small Buffer Optimization (SBO)** with `alignas(64)` constraints. This ensures that any data projection starts at a hardware cache-line boundary, optimizing prefetcher efficiency.
+* **Concept/Model Abstraction:** TES encapsulates concrete types while providing the Gateway with a localized **Reverse Router**, enabling $O(1)$ capability resolution without call-site knowledge of the underlying type.
+
+![TES Memory Layout](../img/tes_layout.png)
+*Figure 1: TES memory layout illustrating SBO buffer, alignment padding, and the Concept pointer bridge.*
+
+---
+
+## 5. Pillar IV: N-Dimensional Behavioral Projection
+For systems requiring high-frequency updates, CRG models behavioral resolution as a coordinate lookup within an **N-Dimensional Tensor**.
+
+* **Amortized Resolution:** Capability lookup is a deterministic calculation: `(ModelID * Volume) + Offset`. 
+* **Branch-Predictor Friendly:** Contextual logic (Environment, State, Time) is resolved into a flat $O(1)$ access using **Horner’s method**, removing the need for complex branching or state-machine logic in hot loops.
+
+![Behavior Tensor](../img/tensor_routing.png)
+*Figure 2: 3D Visualization of behavioral resolution at the intersection of Entity Model, Environment, and Time.*
+
+---
+
+## 6. Performance Analysis
+CRG is designed to reach the physical limits of the hardware by ensuring **Structural Immunity**—the principle that data should never move or be copied to change its logical behavior.
+
 | Entities | ECS Mutation (Throughput) | CRG Projection (Throughput) | Ratio |
 | :--- | :--- | :--- | :--- |
 | 65,536 | 35.23 Gi/s | **70.23 Gi/s** | **1.99x** |
 | 1,048,576 | 19.26 Gi/s | **30.83 Gi/s** | **1.60x** |
 
-### Technical Analysis: Read-Bias Correction & RAM Saturation
-The benchmark results reveal two distinct performance regimes after correcting for read-bias. The data proves that by mapping behaviors to a contiguous matrix rather than relying on standard OOP VTables, the abstraction overhead is effectively zero:
-* **Structural Immunity:** Entities never move between memory chunks (Archetypes) to change behavior. By keeping data resident and immobile, the CPU prefetcher achieves 100% efficiency.
-* **Bandwidth Saturation:** The benchmark proves that with stable data locality, the bottleneck shifts from the call-site (pointer chasing) to the physical limits of the RAM, hitting **30.83 Gi/s** at massive scale. The engine becomes purely Memory Bandwidth Bound.
+**Technical Conclusion:** By eliminating "Archetype Migrations," CRG allows the CPU to operate at peak memory bandwidth, effectively reaching the **Memory Wall** limit.
 
+---
+
+## 7. Design Trade-offs & FAQ
+
+**Q: Can I use the Discovery system without the Performance Tensors?**
+Yes. Pillar I is a standalone solution for modularity. You can use CRG solely to decouple your engine's sub-systems and reduce compile times, even if those systems use traditional OOP or standard ECS logic.
+
+**Q: Is there a hidden cost compared to a "Pure" ECS System?**
+Yes. A pure ECS remains optimal for mass-simulations with low state complexity (e.g., particles). CRG introduces a **1.5ns dispatch tax** (approx. 4-6 cycles) per entity. This trade-off is specifically designed for complex gameplay entities, where the constant-time dispatch offsets the unpredictable performance spikes of traditional Archetype Migrations.
+
+**Q: Can this be integrated into existing engines?**
+Yes. CRG supports **Hybrid Adoption**. Developers can wrap specific existing ECS modules within the CRG framework to leverage its interface governance without requiring a full engine rewrite.
+
+**Q: Does CRG provide built-in security against cheating?**
+CRG is **"Anti-Tamper Friendly"** by design. By centralizing behavior pointers into a dense, contiguous matrix, it allows for fast integrity checks (e.g., hashing) and increases the reverse-engineering cost for malicious actors compared to scattered VTables.
+
+---
+
+**Implementation Note:** *The provided source code is a **reference implementation** focused on architectural clarity and portability. To maintain a clean-room approach and ensure readability, certain low-level optimizations (such as manual SBO memory management or custom stack allocators) have been replaced by standard C++ constructs (e.g., `std::unique_ptr`). In a production AAA environment, these should be replaced by the hardware-aligned structures described in this paper.*
+
+**Author:** Cyril Tissier  
+**License:** Apache 2.0  
+
+**Legal Disclaimer:** *This repository represents independent research and a clean-room implementation of the Capability Routing Gateway architecture. All code and documentation were developed personally by the author. This project is independent of, and does not contain any proprietary or confidential information from, any past or present employer.*
