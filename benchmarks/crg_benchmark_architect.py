@@ -1,6 +1,13 @@
+"""
+PURPOSE:
+This script reads 'crg_benchmark_architect.csv' and generates a line chart (semi-log X axis).
+It visualizes the cost per entity as the dataset grows, specifically highlighting 
+where the hardware cache limits (L1 and L3 memory walls) are hit.
+"""
 import matplotlib.pyplot as plt
 import csv
 import os
+from datetime import datetime
 
 file_path = 'crg_benchmark_architect.csv'
 
@@ -23,12 +30,9 @@ plt.semilogx(n, ecs, 'o-', label='Classic ECS (Idealized Loop)', color='#34495e'
 plt.semilogx(n, crg, 'o-', label='CRG Stage 10 (Matrix Resolution)', color='#3498db', linewidth=2.5)
 
 # --- ANALYSE DU CACHING ---
-# On estime les limites de cache (basé sur un processeur standard comme le M1/M2/M3 ou Intel récent)
-# Chaque entité fait 64 octets (1 ligne de cache)
 plt.axvline(x=32000/64, color='gray', linestyle=':', alpha=0.5) 
 plt.text(32000/64, plt.ylim()[1]*0.9, ' L1 Cache', color='gray', fontsize=9)
 
-# Limite L3 (estimée à 16MB) - C'est là que le "Memory Wall" frappe
 l3_limit_entities = 16000000 / 64
 plt.axvline(x=l3_limit_entities, color='#e74c3c', linestyle='--', alpha=0.4) 
 plt.text(l3_limit_entities, plt.ylim()[1]*0.05, ' Memory Wall (L3 Limit)', color='#e74c3c', rotation=90, va='bottom')
@@ -39,5 +43,9 @@ plt.title('Performance Stability & Cache Locality Analysis (Stage 10)')
 plt.legend()
 plt.grid(True, which="both", ls="-", alpha=0.1)
 
-plt.savefig('crg_benchmark_architect.png', dpi=300, bbox_inches='tight')
-print("Graphique sauvegardé : crg_benchmark_architect.png")
+# TIMESTAMP ADDITION
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+output_filename = f'crg_benchmark_architect_{timestamp}.png'
+
+plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+print(f"Graphique sauvegardé : {output_filename}")

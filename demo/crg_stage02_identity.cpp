@@ -1,60 +1,86 @@
-// ======================================================
-// STAGE 2 — IDENTITY SPACE
-// ======================================================
-//
-// @intent:
-// Introduce runtime identity independent of behavior and structure.
-//
-// @what_changed:
-// Type-erased transport (HardwareHandle) added, carrying runtime TypeID + value.
-// Uses heap allocation (unique_ptr) for initial simplicity.
-//
-// @key_insight:
-// Identity becomes a first-class citizen. 
-//
-// @what_is_not:
-// No traversal system yet, no behavior system, no registry.
-//
-// @transition:
-// We have an Identity, and we have a Structure (Stage 1). Let's connect them.
-// ======================================================
+// =============================================================================
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 2: IDENTITY SPACE
+// =============================================================================
+// @Intent: Introduce runtime identity independent of logic or structure.
+// @Nomenclature:
+//   1. ModelHandle: The container for DATA models.
+//   2. Concept / Model: Standard Type Erasure bridge (Sean Parent style).
+//   3. ModelTypeID: Unique ID generated via hash_code().
+// @Key_Insight: 
+//   We can now transport "Anything" and know "What" it is at runtime 
+//   without a dynamic_cast ladder or a fixed base class.
+// =============================================================================
 
 #include <iostream>
 #include <memory>
 #include <typeinfo>
 #include <string>
 
-using TypeID = std::size_t;
-template<class T> struct TypeIDOf { static TypeID Get() { return typeid(T).hash_code(); } };
+// Global identity type
+using ModelTypeID = std::size_t;
 
-class HardwareHandle {
+// 1. THE TRANSPORT (Type-Erased Model Container)
+class ModelHandle {
 public:
+    // The Bridge: Internal interface to recover TypeID
     struct Concept { 
         virtual ~Concept() = default; 
-        virtual TypeID GetTypeID() const = 0; 
+        virtual ModelTypeID GetModelID() const = 0; 
     };
 
-    template<class T> struct Model : Concept {
+    // The Implementation: Concrete wrapper for type T
+    template<class T> 
+    struct Model : Concept {
         T value;
         Model(T v) : value(std::move(v)) {}
-        TypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
+        ModelTypeID GetModelID() const override { return typeid(T).hash_code(); }
     };
 
-    template<class T> void Set(T v) { ptr = std::make_unique<Model<T>>(std::move(v)); }
-    TypeID GetTypeID() const { return ptr->GetTypeID(); }
-    template<class T> const T& Get() const { return static_cast<Model<T>*>(ptr.get())->value; }
+    ModelHandle() = default;
+
+    // Set: Erase the concrete type T but keep its Identity
+    template<class T> 
+    void Set(T v) { 
+        m_ptr = std::make_unique<Model<T>>(std::move(v)); 
+    }
+
+    // GetID: Returns the identity of the stored model
+    ModelTypeID GetID() const { 
+        return m_ptr ? m_ptr->GetModelID() : 0; 
+    }
+
+    // GetAs: Recover the data (requires knowing the type)
+    template<class T> 
+    const T& GetAs() const { 
+        return static_cast<const Model<T>*>(m_ptr.get())->value; 
+    }
 
 private:
-    std::unique_ptr<Concept> ptr;
+    std::unique_ptr<Concept> m_ptr;
 };
 
-struct HeavyLifter { std::string name{"Loader-99"}; };
+// 2. DATA MODELS (Pure State, No Logic, No Base Class)
+struct Scout { std::string callsign; };
+struct HeavyTank { int armor_plating; };
+
+// =============================================================================
+// MAIN: IDENTITY DEMO
+// =============================================================================
 
 int main() {
-    HardwareHandle handle;
-    handle.Set(HeavyLifter{"Loader-99"});
+    std::cout << "--- CRG STAGE 2: Identity Space ---\n";
 
-    std::cout << "[IDENTITY] Hash: " << handle.GetTypeID() << "\n";
-    std::cout << "[IDENTITY] Name: " << handle.Get<HeavyLifter>().name << "\n";
+    ModelHandle handle;
+    
+    // Identity 1: The Scout
+    handle.Set(Scout{"Vanguard-01"});
+    std::cout << "[ID] Model Type ID: " << handle.GetID() << "\n";
+    std::cout << "[DATA] Scout Name: " << handle.GetAs<Scout>().callsign << "\n\n";
+
+    // Identity 2: The HeavyTank
+    handle.Set(HeavyTank{600});
+    std::cout << "[ID] Model Type ID: " << handle.GetID() << "\n";
+    std::cout << "[DATA] Tank Armor: " << handle.GetAs<HeavyTank>().armor_plating << "mm\n";
+
     return 0;
 }
