@@ -63,12 +63,35 @@ public:
 template<typename... Enums>
 struct Selector {
     template<std::size_t I> using EnumAt = std::tuple_element_t<I, std::tuple<Enums...>>;
+    
+    // Volume total du tenseur
     static constexpr std::size_t Volume() { return (EnumTraits<Enums>::Count * ... * 1); }
-    static constexpr std::size_t ComputeOffset(Enums... args) { return ComputeOffsetImpl<0>(args...); }
+    
+    static constexpr std::size_t ComputeOffset(Enums... args) { 
+        return ComputeOffsetImpl<0>(args...); 
+    }
+
 private:
-    template<std::size_t I> static constexpr std::size_t ComputeOffsetImpl(Enums... args) {
-        if constexpr (I == sizeof...(Enums)) return 0;
-        else return static_cast<std::size_t>(std::get<I>(std::make_tuple(args...))) + ComputeOffsetImpl<I + 1>(args...);
+    // Calcule le produit des dimensions restantes (le Stride) : S_{i+1} * S_{i+2} * ...
+    template<std::size_t Start>
+    static constexpr std::size_t ComputeStride() {
+        if constexpr (Start >= sizeof...(Enums)) {
+            return 1;
+        } else {
+            return EnumTraits<EnumAt<Start>>::Count * ComputeStride<Start + 1>();
+        }
+    }
+
+    // Implémentation de la méthode de Horner
+    template<std::size_t I> 
+    static constexpr std::size_t ComputeOffsetImpl(Enums... args) {
+        if constexpr (I == sizeof...(Enums)) {
+            return 0;
+        } else {
+            std::size_t coord = static_cast<std::size_t>(std::get<I>(std::make_tuple(args...)));
+            // index = (coord * stride) + reste
+            return (coord * ComputeStride<I + 1>()) + ComputeOffsetImpl<I + 1>(args...);
+        }
     }
 };
 
