@@ -1,94 +1,188 @@
 // Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
-// Licensed under the Apache License, Version 2.0.
-// See LICENSE file in the project root for full license information.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 6: THE TEMPORAL AXIS (1D PROJECTION)
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 6: TEMPORAL AXIS (DECOUPLED)
 // =============================================================================
 //
 // @intent:
-// Introduce a generic axis projection (Temporal/Contextual) while keeping the 
-// Gameplay API absolutely pristine and stable. This is the "Hypercube".
-//
-// @what_changed:
-// - The Engine hides the `std::span` internally for stateful behavior resolution.
-// - The Gameplay uses a unified API: GetBehavior<Interface>(modelID, coordinate).
-// - Default parameters allow 0D interfaces to be queried without coordinates.
-// - Strict O(1) resolution remains intact under the hood without graph mutations.
-//
-// @note:
-// ModelHandle uses std::unique_ptr for clarity on GitHub. Production uses SBO.
+// Introduce contextual resolution (1D) with ABSOLUTE decoupling.
+// Interfaces are pure and have no knowledge of the variation Axis.
+// The link between Interface and Axis is managed by an external Topology.
+// Specialization utilizes native C++ template priority.
 // =============================================================================
 
 #include <iostream>
 #include <typeinfo>
-#include <string>
-#include <memory>
-#include <tuple>
+#include <vector>
 #include <span>
 
 // =============================================================================
-// [ ENGINE CORE ] 1. IDENTITY & GENERICS
+// 1. INFRASTRUCTURE (DLL SAFE)
 // =============================================================================
-using ModelTypeID = std::size_t;
-template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).hash_code(); } };
-template<typename... Ts> struct TypeList {};
 
-// The Code Gen trait template for dimensions
+#ifndef CRG_DLL_ENABLED
+#define CRG_DLL_ENABLED 1
+#endif
+
+template<class T> struct RegistrySlot {
+#if !CRG_DLL_ENABLED
+    static inline T s_Value{}; 
+#else
+    static T s_Value;
+#endif
+};
+
+#if CRG_DLL_ENABLED
+    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+#else
+    #define CRG_BIND_SLOT(T) 
+#endif
+
+template<class TNode> using NodeListAnchor = RegistrySlot<const TNode*>;
+
+template<class TNode, class TInterface>
+struct NodeList : public TInterface {
+    const TNode* m_Next = nullptr;
+    NodeList() {
+        const TNode* derivedThis = static_cast<const TNode*>(this);
+        m_Next = NodeListAnchor<TNode>::s_Value;
+        NodeListAnchor<TNode>::s_Value = derivedThis;
+    }
+};
+
+// =============================================================================
+// 2. DIMENSIONS & COORDINATES (DECOUPLING)
+// =============================================================================
+
 template<typename T> struct EnumTraits;
 
-// A generic axis for Interfaces that do NOT depend on Time or Biomes (0D)
-struct MonoState { constexpr operator std::size_t() const { return 0; } };
-template<> struct EnumTraits<MonoState> { static constexpr std::size_t Count = 1; };
+// Global state for 0D capabilities (no axis)
+struct GlobalState { constexpr operator std::size_t() const { return 0; } };
+template<> struct EnumTraits<GlobalState> { static constexpr std::size_t Count = 1; };
+
+// --- EXTERNAL TOPOLOGY ---
+// Defines the axis of an interface without modifying it (Zero coupling)
+template<class TInterface> 
+struct CapabilityTopology {
+    using AxisType = GlobalState; 
+};
+
+// Coordinate selector for specialization
+template<auto... Values> struct At {};
+
+// Conversion helpers: Index -> At coordinate
+template<class AxisType, std::size_t I> struct AxisToAt { using Type = At<static_cast<AxisType>(I)>; };
+template<std::size_t I> struct AxisToAt<GlobalState, I> { using Type = At<>; };
 
 // =============================================================================
-// [ ENGINE CORE ] 2. TYPE ERASED SHELL (The Data Container)
+// 3. CORE TYPES
 // =============================================================================
-class ModelHandle {
-public:
-    struct Concept { virtual ~Concept() = default; virtual ModelTypeID GetTypeID() const = 0; };
-    template<class T> struct Model : Concept {
-        T value; Model(T v) : value(std::move(v)) {}
-        ModelTypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
-    };
+
+using ModelTypeID = std::size_t;
+using InterfaceTypeID = std::size_t; 
+template<class T> struct TypeIDOf { static std::size_t Get() { return typeid(T).hash_code(); } };
+template<typename... Ts> struct TypeList {};
+
+// Capability Helper: Injects InterfaceType alias for the Baker
+template<class TInterface> 
+struct Capability : public TInterface { 
+    using InterfaceType = TInterface; 
+};
+
+struct IRegistryNode {
+    virtual ~IRegistryNode() = default;
+    virtual ModelTypeID GetTargetModelID() const = 0;
+    virtual const void* ResolveSpanRaw(InterfaceTypeID interfaceID) const = 0;
+};
+
+using RegistryVector = std::vector<const IRegistryNode*>;
+using RouterSlot = RegistrySlot<RegistryVector>;
+CRG_BIND_SLOT(RegistryVector) 
+
+struct IAssembler { virtual void Assemble(RegistryVector& registry) const = 0; };
+struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
+CRG_BIND_SLOT(const IBakerNode*)
+
+// =============================================================================
+// 4. THE BAKER (SPATIO-TEMPORAL COMPILER)
+// =============================================================================
+
+template<class TModel, template<class, class> class Cap, class IdxSeq>
+struct CapabilityNode;
+
+template<class TModel, template<class, class> class Cap, std::size_t... Is>
+struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>> 
+    // Resolves axis via external Topology and injects the correct At coordinate
+    : public Cap<TModel, typename AxisToAt<typename CapabilityTopology<typename Cap<TModel, At<>>::InterfaceType>::AxisType, Is>::Type>... 
+{
+    using Intf = typename Cap<TModel, At<>>::InterfaceType;
+    using Axis = typename CapabilityTopology<Intf>::AxisType;
     
-    ModelHandle() = default;
-    template<class T> void Set(T v) { m_ptr = std::make_unique<Model<T>>(std::move(v)); }
-    ModelTypeID GetTypeID() const { return m_ptr ? m_ptr->GetTypeID() : 0; }
-private:
-    std::unique_ptr<Concept> m_ptr;
+    static constexpr std::size_t Size = sizeof...(Is);
+    const Intf* m_buffer[Size];
+
+    CapabilityNode() {
+        const Intf* ptrs[] = { static_cast<const Intf*>(static_cast<const Cap<TModel, typename AxisToAt<Axis, Is>::Type>*>(this))... };
+        for(std::size_t i=0; i<Size; ++i) m_buffer[i] = ptrs[i];
+    }
+    
+    const void* GetSpanRaw() const { return m_buffer; }
 };
 
-// =============================================================================
-// [ ENGINE CORE ] 3. EXTERNAL POLYMORPHISM ROUTER
-// =============================================================================
-struct IModelRegistryNode {
-    virtual ModelTypeID GetModelTypeID() const = 0;
-    virtual const void* ResolveSpanRaw(ModelTypeID interfaceID) const = 0;
-};
-
-class BehaviorMatrixList {
-    static inline const IModelRegistryNode* s_nodes[128] = {};
-    static inline std::size_t s_nodeCount = 0;
-
+template<class TModel, template<class, class> class... TCapabilities>
+class CapabilitySpace : public IRegistryNode, 
+    public CapabilityNode<TModel, TCapabilities, std::make_index_sequence<EnumTraits<typename CapabilityTopology<typename TCapabilities<TModel, At<>>::InterfaceType>::AxisType>::Count>>... 
+{
 public:
-    static void Register(const IModelRegistryNode* node) {
-        if (s_nodeCount < 128) s_nodes[s_nodeCount++] = node;
+    ModelTypeID GetTargetModelID() const override { return TypeIDOf<TModel>::Get(); }
+    
+    const void* ResolveSpanRaw(InterfaceTypeID interfaceID) const override {
+        const void* result = nullptr;
+        (void)((interfaceID == TypeIDOf<typename TCapabilities<TModel, At<>>::InterfaceType>::Get() && 
+         (result = static_cast<const CapabilityNode<TModel, TCapabilities, std::make_index_sequence<EnumTraits<typename CapabilityTopology<typename TCapabilities<TModel, At<>>::InterfaceType>::AxisType>::Count>>*>(this)->GetSpanRaw())), ...);
+        return result;
+    }
+};
+
+template<class TModel, template<class, class> class... TCapabilities>
+struct CapabilityBaker : public IBakerNode {
+    CapabilitySpace<TModel, TCapabilities...> m_unit;
+    void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
+};
+
+template<class... Models, template<class, class> class... TCapabilities>
+struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
+    void Assemble(RegistryVector& registry) const override {
+        (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...);
+    }
+};
+
+// =============================================================================
+// 5. THE ROUTER
+// =============================================================================
+
+class CapabilityRouter {
+private:
+    static void EnsureBaked() {
+        struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
+        static StaticGuard s_Guard;
+    }
+public:
+    static void Bake() {
+        auto& registry = RouterSlot::s_Value;
+        registry.clear();
+        for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) {
+            b->Assemble(registry);
+        }
     }
 
-    // THE UNIFIED ECS API: Hides the tensor, returns the exact pointer in O(1).
-    // Uses '= {}' so 0D interfaces can be called without arguments.
     template<class InterfaceT>
-    static const InterfaceT* GetBehavior(ModelTypeID modelID, typename InterfaceT::AxisType coordinate = {}) {
-        for (std::size_t i = 0; i < s_nodeCount; ++i) {
-            if (s_nodes[i]->GetModelTypeID() == modelID) {
-                if (const void* ptr = s_nodes[i]->ResolveSpanRaw(TypeIDOf<InterfaceT>::Get())) {
-                    // Reconstruct the span to ensure bounds
-                    std::span<const InterfaceT* const> span(
-                        static_cast<const InterfaceT* const*>(ptr), 
-                        EnumTraits<typename InterfaceT::AxisType>::Count
-                    );
-                    return span[static_cast<std::size_t>(coordinate)];
+    static const InterfaceT* Find(ModelTypeID modelID, typename CapabilityTopology<InterfaceT>::AxisType coord = {}) {
+        EnsureBaked();
+        for (const auto* node : RouterSlot::s_Value) {
+            if (node->GetTargetModelID() == modelID) {
+                if (const void* ptr = node->ResolveSpanRaw(TypeIDOf<InterfaceT>::Get())) {
+                    return static_cast<const InterfaceT* const*>(ptr)[static_cast<std::size_t>(coord)];
                 }
             }
         }
@@ -97,134 +191,58 @@ public:
 };
 
 // =============================================================================
-// [ ENGINE CORE ] 4. THE CAPABILITY NODE & BAKER
-// =============================================================================
-template<class ModelT, template<class> class... Behaviors>
-class BakedCapabilityNode : public IModelRegistryNode, public Behaviors<ModelT>... {
-    
-    template<class InterfaceT>
-    struct SpanBaker {
-        static constexpr std::size_t Size = EnumTraits<typename InterfaceT::AxisType>::Count;
-        const InterfaceT* buffer[Size] = {nullptr};
-        
-        SpanBaker(const BakedCapabilityNode* node) {
-            ((std::is_same_v<InterfaceT, typename Behaviors<ModelT>::InterfaceType> ? 
-                (void)(buffer[static_cast<std::size_t>(Behaviors<ModelT>::State)] = static_cast<const InterfaceT*>(static_cast<const Behaviors<ModelT>*>(node))) 
-                : (void)0), ...);
-        }
-    };
-
-    template<class InterfaceT>
-    const void* GetSpanBuffer() const {
-        static SpanBaker<InterfaceT> baker(this);
-        return baker.buffer;
-    }
-
-public:
-    BakedCapabilityNode() { BehaviorMatrixList::Register(this); }
-    ModelTypeID GetModelTypeID() const override { return TypeIDOf<ModelT>::Get(); }
-
-    const void* ResolveSpanRaw(ModelTypeID interfaceID) const override {
-        const void* result = nullptr;
-        ((interfaceID == TypeIDOf<typename Behaviors<ModelT>::InterfaceType>::Get() && 
-         (result = GetSpanBuffer<typename Behaviors<ModelT>::InterfaceType>())), ...);
-        return result;
-    }
-};
-
-template<class ModelList, template<class> class... Behaviors>
-struct DomainBaker;
-
-template<class... Models, template<class> class... Behaviors>
-struct DomainBaker<TypeList<Models...>, Behaviors...> {
-    std::tuple<BakedCapabilityNode<Models, Behaviors...>...> m_nodes;
-};
-
-// =============================================================================
-// [ GAMEPLAY SPACE ] 5. GPP DEFINITIONS
+// 6. DEMO (PURE DOD - ZERO COUPLING)
 // =============================================================================
 
-// The Axis (Context)
-enum class WorldState : std::size_t { Day, Night };
+// --- A. CONTRACTS ---
+struct IDiagnostic { virtual void Run() const = 0; };
+struct ITelemetry  { virtual void Ping() const = 0; };
+
+// --- B. AXES ---
+enum class WorldState { Day, Night };
 template<> struct EnumTraits<WorldState> { static constexpr std::size_t Count = 2; };
 
-// The Models (Data)
-struct Drone { std::string name; };
-struct HeavyLifter { std::string name; };
+// --- C. TOPOLOGY (External Mapping) ---
+template<> struct CapabilityTopology<ITelemetry> { using AxisType = WorldState; };
 
-// The Interfaces (Domain)
-struct IDiagnostic {
-    using InterfaceType = IDiagnostic;
-    using AxisType = MonoState; // 0D (Context-Agnostic)
-    virtual void Execute(const ModelHandle& h) const = 0;
+// --- D. LOGIC ---
+
+// 0D : Diagnostic (Matches At<> by default)
+template<class T, class TAt = At<>> 
+struct DiagLogic : Capability<IDiagnostic> { 
+    void Run() const override { std::cout << "[Diag] System check OK.\n"; } 
 };
 
-struct IMovement {
-    using InterfaceType = IMovement;
-    using AxisType = WorldState; // 1D (Context-Aware)
-    virtual void Move(const ModelHandle& h) const = 0;
-};
+// 1D : Specialized Telemetry
+template<class T, class TAt = At<>> struct TeleLogic : Capability<ITelemetry> {}; 
 
-// The Behaviors (Logic)
 template<class T>
-struct DiagnosticBehavior : IDiagnostic {
-    static constexpr MonoState State = {};
-    void Execute(const ModelHandle& h) const override { std::cout << "[0D] Running Diagnostics.\n"; }
+struct TeleLogic<T, At<WorldState::Day>> : Capability<ITelemetry> {
+    void Ping() const override { std::cout << "[Tele] Day: Standard Radio Ping.\n"; }
 };
 
 template<class T>
-struct DayMovementBehavior : IMovement {
-    static constexpr WorldState State = WorldState::Day;
-    void Move(const ModelHandle& h) const override { std::cout << "[1D - DAY] Visual Patrol.\n"; }
+struct TeleLogic<T, At<WorldState::Night>> : Capability<ITelemetry> {
+    void Ping() const override { std::cout << "[Tele] Night: Encrypted Burst.\n"; }
 };
 
-template<class T>
-struct NightMovementBehavior : IMovement {
-    static constexpr WorldState State = WorldState::Night;
-    void Move(const ModelHandle& h) const override { std::cout << "[1D - NIGHT] Infrared Stealth.\n"; }
-};
+// --- E. REGISTRATION ---
+struct Drone {};
+using AirModels = TypeList<Drone>;
+static const CapabilityBaker<AirModels, DiagLogic, TeleLogic> g_AirBaker{};
 
-// =============================================================================
-// [ GAMEPLAY SPACE ] 6. MODULE INSTANTIATIONS
-// =============================================================================
-using SimulationModels = TypeList<Drone, HeavyLifter>;
-
-static const DomainBaker<SimulationModels, DiagnosticBehavior> g_DiagBaker{};
-static const DomainBaker<SimulationModels, DayMovementBehavior, NightMovementBehavior> g_MovementBaker{};
-
-// =============================================================================
-// USER CODE (ECS Hot Path Simulation)
-// =============================================================================
 int main() {
-    std::cout << "--- CRG STAGE 6: THE TEMPORAL AXIS (UNIFIED API) ---\n\n";
+    std::cout << "--- CRG STAGE 6: TEMPORAL AXIS (DECOUPLED) ---\n\n";
 
-    ModelHandle h; 
-    h.Set(Drone{"Scout-1"});
-    
-    ModelTypeID currentModelID = h.GetTypeID();
-    WorldState currentTime = WorldState::Day;
+    auto id = TypeIDOf<Drone>::Get();
 
-    std::cout << "--- TIME: DAY ---\n";
-    
-    // API is completely agnostic of the underlying span/buffer
-    if (auto* move = BehaviorMatrixList::GetBehavior<IMovement>(currentModelID, currentTime)) {
-        move->Move(h);
-    }
-    
-    // 0D Interfaces don't even need the coordinate argument thanks to the default parameter!
-    if (auto* diag = BehaviorMatrixList::GetBehavior<IDiagnostic>(currentModelID)) {
-        diag->Execute(h);
-    }
+    std::cout << "--- [ ENGINE TIME: DAY ] ---\n";
+    CapabilityRouter::Find<IDiagnostic>(id)->Run();
+    CapabilityRouter::Find<ITelemetry>(id, WorldState::Day)->Ping();
 
-    currentTime = WorldState::Night;
-    std::cout << "\n--- TIME: NIGHT ---\n";
-    
-    if (auto* move = BehaviorMatrixList::GetBehavior<IMovement>(currentModelID, currentTime)) {
-        move->Move(h);
-    }
-    if (auto* diag = BehaviorMatrixList::GetBehavior<IDiagnostic>(currentModelID)) {
-        diag->Execute(h);
-    }
+    std::cout << "\n--- [ ENGINE TIME: NIGHT ] ---\n";
+    CapabilityRouter::Find<IDiagnostic>(id)->Run();
+    CapabilityRouter::Find<ITelemetry>(id, WorldState::Night)->Ping();
 
     return 0;
 }

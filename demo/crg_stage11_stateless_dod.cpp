@@ -1,38 +1,48 @@
 // Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
-// Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 11: STATELESS DOD (THE CEILING)
-// =============================================================================
-//
-// @intent:
-// Achieve Zero-Cost Data-Oriented Polymorphism by eradicating VTables completely.
-// Combine the Flat Tensor (Broad Phase) and Dynamic Rules (Narrow Phase) with 
-// pure stateless function pointers.
-//
-// @what_changed:
-// - VTable Eradication: The Interface (e.g., ICombat) is no longer abstract. 
-//   It holds a raw C-style function pointer and wraps it (The Polymorphism Illusion).
-// - The Sandbox: Behaviors no longer receive 'this' or generic handles. They 
-//   receive a strictly typed Data Contract (Params).
-// - Synthesized Node: The Baker extracts the static `Execute` function from the 
-//   Gameplay logic and binds it directly into the RouteNode.
-//
-// @key_insight:
-// We have reached the hardware limit. The CPU evaluates an O(1) math offset, 
-// checks a quick contiguous rule, and jumps directly to a static memory address.
-// Zero object allocations, zero virtual overhead, absolute L1 cache bliss.
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 11: STATELESS DOD (FINAL)
 // =============================================================================
 
 #include <iostream>
 #include <vector>
-#include <string>
 #include <tuple>
-#include <type_traits>
+#include <typeinfo>
 
 // =============================================================================
-// [ ENGINE CORE ] 1. IDENTITY
+// 1. INFRASTRUCTURE (STAGE 10 COMPLIANT - DLL SAFE)
 // =============================================================================
+
+#ifndef CRG_DLL_ENABLED
+#define CRG_DLL_ENABLED 1
+#endif
+
+template<class T> struct RegistrySlot {
+#if !CRG_DLL_ENABLED
+    static inline T s_Value{}; 
+#else
+    static T s_Value;
+#endif
+};
+
+#if CRG_DLL_ENABLED
+    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+#else
+    #define CRG_BIND_SLOT(T) 
+#endif
+
+template<class TNode> using NodeListAnchor = RegistrySlot<const TNode*>;
+
+template<class TNode, class TInterface>
+struct NodeList : public TInterface {
+    const TNode* m_Next = nullptr;
+    NodeList() {
+        const TNode* derivedThis = static_cast<const TNode*>(this);
+        m_Next = NodeListAnchor<TNode>::s_Value;
+        NodeListAnchor<TNode>::s_Value = derivedThis;
+    }
+};
+
 using DenseID = std::size_t;
 
 struct TypeIDGenerator {
@@ -44,242 +54,210 @@ struct DenseTypeID {
     static DenseID Get() { static DenseID s_id = TypeIDGenerator::GetNext(); return s_id; } 
 };
 
-template<typename... Ts> struct TypeList {};
-template<auto V> using When = std::integral_constant<decltype(V), V>;
+// =============================================================================
+// 2. SPACE MATH (HORNER'S METHOD)
+// =============================================================================
 
-// =============================================================================
-// [ ENGINE CORE ] 2. TENSOR MATH (The Selector)
-// =============================================================================
 template<typename T> struct EnumTraits;
 
-template<typename... Enums>
-struct Selector {
-    static constexpr std::size_t Dimensions = sizeof...(Enums);
-    template<std::size_t I> using EnumAt = std::tuple_element_t<I, std::tuple<Enums...>>;
+template<class... TAxes>
+struct Space {
+    static constexpr std::size_t Dimensions = sizeof...(TAxes);
+    static constexpr std::size_t Volume = (1 * ... * EnumTraits<TAxes>::Count);
 
-    template<std::size_t I>
-    static constexpr std::size_t DimSize() {
-        using E = EnumAt<I>;
-        return EnumTraits<E>::Count - (EnumTraits<E>::HasAny ? 1 : 0);
-    }
-
-    template<std::size_t I>
-    static constexpr std::size_t Stride() {
-        if constexpr (I + 1 >= Dimensions) return 1;
-        else return DimSize<I + 1>() * Stride<I + 1>();
-    }
-
-    static constexpr std::size_t Volume() { return (DimSize<0>() * ... * 1); }
-    static constexpr std::size_t ComputeOffset(Enums... args) { return ComputeOffsetImpl<0>(args...); }
-
-private:
-    template<std::size_t I>
-    static constexpr std::size_t ComputeOffsetImpl(Enums... args) {
-        if constexpr (I == Dimensions) return 0;
-        else {
-            auto val_enum = std::get<I>(std::make_tuple(args...));
-            std::size_t val = static_cast<std::size_t>(val_enum);
-            if constexpr (EnumTraits<EnumAt<I>>::HasAny) val -= 1; 
-            return val * Stride<I>() + ComputeOffsetImpl<I + 1>(args...);
-        }
+    static constexpr std::size_t ComputeOffset(TAxes... coords) {
+        std::size_t offset = 0;
+        ((offset = offset * EnumTraits<TAxes>::Count + static_cast<std::size_t>(coords)), ...);
+        return offset;
     }
 };
 
+template<class TInterface> struct CapabilityTopology;
+
 // =============================================================================
-// [ ENGINE CORE ] 3. NARROW PHASE NODE
+// 3. CORE ROUTING TYPES (STATELESS DOD)
 // =============================================================================
+
 template<class InterfaceT>
 struct RouteNode {
-    using CondFunc = bool(*)(const typename InterfaceT::RuleContext&);
-    
-    CondFunc Condition;
-    bool isFallback;
-    
-    // The "Polymorphism Illusion" Descriptor
-    InterfaceT descriptor; 
-    
-    RouteNode* next = nullptr;
+    using ContextT = typename InterfaceT::RuleContext;
+    using PredicatePtr = bool (*)(const ContextT&);
+
+    InterfaceT   descriptor;   
+    PredicatePtr predicate = nullptr; 
+    int          priority  = 0;
+    RouteNode* next      = nullptr;
+
+    bool Matches(const ContextT& ctx) const { return !predicate || predicate(ctx); }
 };
 
+template<class InterfaceT>
+struct Bucket {
+    RouteNode<InterfaceT>* head = nullptr;      
+    InterfaceT             fallback; 
+    bool                   hasFallback = false;
+};
+
+template<class InterfaceT>
+using TensorArena = RegistrySlot<std::vector<Bucket<InterfaceT>>>;
+
 // =============================================================================
-// [ ENGINE CORE ] 4. FLAT TENSOR ROUTER (O(1) + Narrow Phase)
+// 4. THE ROUTER (HOT PATH)
 // =============================================================================
+
+struct IBakerNode;
+struct IAssembler { virtual void Bake() const = 0; };
+struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
+
+CRG_BIND_SLOT(const IBakerNode*)
+
 template<class InterfaceT>
 class BehaviorRouter {
-    static inline std::vector<std::vector<RouteNode<InterfaceT>*>> s_flat_tensor;
-
 public:
-    static void Register(DenseID modelID, std::size_t offset, RouteNode<InterfaceT>* node) {
-        if (modelID >= s_flat_tensor.size()) {
-            s_flat_tensor.resize(modelID + 1, std::vector<RouteNode<InterfaceT>*>(InterfaceT::Context::Volume(), nullptr));
-        }
+    static void EnsureBaked() {
+        static struct StaticGuard {
+            StaticGuard() {
+                for (const IBakerNode* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) {
+                    b->Bake();
+                }
+            }
+        } s_guard;
+    }
 
-        auto& cell = s_flat_tensor[modelID][offset];
+    static void Register(DenseID modelID, std::size_t localOffset, RouteNode<InterfaceT>* node) {
+        auto& arena = TensorArena<InterfaceT>::s_Value;
+        using TSpace = typename CapabilityTopology<InterfaceT>::SpaceType;
+        
+        std::size_t globalIdx = (modelID * TSpace::Volume) + localOffset;
+        if (globalIdx >= arena.size()) arena.resize(globalIdx + 1, {});
 
-        if (!cell || (cell->isFallback && !node->isFallback)) {
-            node->next = cell;
-            cell = node;
+        auto& b = arena[globalIdx];
+        if (!node->predicate) { b.fallback = node->descriptor; b.hasFallback = true; }
+
+        if (!b.head || node->priority > b.head->priority) {
+            node->next = b.head; b.head = node;
         } else {
-            auto* curr = cell;
-            while (curr->next && !curr->next->isFallback) curr = curr->next;
-            node->next = curr->next;
-            curr->next = node;
+            auto* curr = b.head;
+            while (curr->next && curr->next->priority >= node->priority) curr = curr->next;
+            node->next = curr->next; curr->next = node;
         }
     }
 
     template<class... Args>
-    static const InterfaceT* Find(DenseID modelID, const typename InterfaceT::RuleContext& ctx, Args... args) {
-        if (modelID >= s_flat_tensor.size()) return nullptr;
-        std::size_t offset = InterfaceT::Context::ComputeOffset(args...); 
+    static const InterfaceT* Find(DenseID modelID, const typename InterfaceT::RuleContext& ctx, Args... coords) {
+        EnsureBaked();
+        auto& arena = TensorArena<InterfaceT>::s_Value;
+        using TSpace = typename CapabilityTopology<InterfaceT>::SpaceType;
+        std::size_t idx = (modelID * TSpace::Volume) + TSpace::ComputeOffset(coords...);
         
-        for (auto* node = s_flat_tensor[modelID][offset]; node; node = node->next) {
-            if (node->Condition(ctx)) return &node->descriptor;
+        if (idx >= arena.size()) return nullptr;
+
+        for (auto* n = arena[idx].head; n; n = n->next) {
+            if (n->Matches(ctx)) return &n->descriptor;
         }
-        return nullptr;
+        return &arena[idx].fallback;
     }
 };
 
 // =============================================================================
-// [ ENGINE CORE ] 5. DOD BAKER
+// 5. THE BAKER (DOD COMPILER)
 // =============================================================================
-template<class InterfaceT, class ModelT, class... Constraints>
-struct CapabilityDefinition {
-    using InterfaceType = InterfaceT;
-    
-    static constexpr bool IsFallback = true;
-    static bool Condition(const typename InterfaceT::RuleContext&) { return true; }
 
-    static constexpr bool MatchIndex(std::size_t offset) { return MatchIndexImpl<0>(offset); }
+template<class TInterface> 
+struct Capability : public TInterface { using InterfaceType = TInterface; };
+
+template<typename T, typename = void> struct PriorityOf { static constexpr int Value = 0; };
+template<typename T> struct PriorityOf<T, std::void_t<decltype(T::Priority)>> { static constexpr int Value = T::Priority; };
+
+template<typename T, typename Context, typename = void> struct HasCondition : std::false_type {};
+template<typename T, typename Context> struct HasCondition<T, Context, std::void_t<decltype(T::Condition(std::declval<const Context&>()))>> : std::true_type {};
+
+template<class TModel, template<class> class... TCapabilities>
+struct CapabilityBaker : public IBakerNode {
+    void Bake() const override { (BakeOne<TCapabilities<TModel>>(), ...); }
+
 private:
-    template<std::size_t I>
-    static constexpr bool MatchIndexImpl(std::size_t offset) {
-        if constexpr (I == sizeof...(Constraints)) return true;
-        else {
-            using Context = typename InterfaceT::Context;
-            using EnumType = typename Context::template EnumAt<I>;
-            using ConstraintWrapper = std::tuple_element_t<I, std::tuple<Constraints...>>;
-            
-            std::size_t c_val = (offset / Context::template Stride<I>()) % Context::template DimSize<I>();
-            auto runtime_val = static_cast<EnumType>(c_val + (EnumTraits<EnumType>::HasAny ? 1 : 0));
-            
-            return (EnumTraits<EnumType>::HasAny && (static_cast<std::size_t>(ConstraintWrapper::value) == 0) || 
-                   (ConstraintWrapper::value == runtime_val)) && MatchIndexImpl<I + 1>(offset);
-        }
-    }
-};
+    template<class TImpl>
+    void BakeOne() const {
+        using Intf = typename TImpl::InterfaceType;
+        using TSpace = typename CapabilityTopology<Intf>::SpaceType;
+        using Ctx = typename Intf::RuleContext;
+        
+        for (std::size_t i = 0; i < TSpace::Volume; ++i) {
+            auto* node = new RouteNode<Intf>();
+            node->descriptor.pfnExecute = &TImpl::Execute; 
+            node->priority = PriorityOf<TImpl>::Value;
 
-template<class ModelT, template<class> class... Behaviors>
-class BakedDODNode {
-    template<class InterfaceT, class ConcreteT>
-    void RegisterConcrete() {
-        // We capture the static &ConcreteT::Execute and pass it to the Descriptor
-        static RouteNode<InterfaceT> s_node {
-            &ConcreteT::Condition, 
-            ConcreteT::IsFallback, 
-            { &ConcreteT::Execute }, // <--- The Polymorphism Illusion binds here!
-            nullptr
-        };
-
-        for (std::size_t i = 0; i < InterfaceT::Context::Volume(); ++i) {
-            if (ConcreteT::MatchIndex(i)) {
-                BehaviorRouter<InterfaceT>::Register(DenseTypeID<ModelT>::Get(), i, &s_node);
+            if constexpr (HasCondition<TImpl, Ctx>::value) {
+                node->predicate = &TImpl::Condition;
             }
+
+            BehaviorRouter<Intf>::Register(DenseTypeID<TModel>::Get(), i, node);
         }
     }
-
-public:
-    BakedDODNode() {
-        (RegisterConcrete<typename Behaviors<ModelT>::InterfaceType, Behaviors<ModelT>>(), ...);
-    }
 };
 
-template<class ModelList, template<class> class... Behaviors> struct DomainBaker;
-template<class... Models, template<class> class... Behaviors>
-struct DomainBaker<TypeList<Models...>, Behaviors...> {
-    std::tuple<BakedDODNode<Models, Behaviors...>...> m_nodes;
-};
-
-
 // =============================================================================
-// [ GAMEPLAY SPACE ] 1. DATA, ENUMS & SANDBOX
+// 6. GAMEPLAY DOMAIN (NESTED PARAMS)
 // =============================================================================
-enum class State { Any, Idle, Aggressive };
-template<> struct EnumTraits<State> { static constexpr std::size_t Count = 3; static constexpr bool HasAny = true; };
 
-struct EntityData { int health; };
-struct CombatSettings { int criticalThreshold = 30; int dmgBonus = 10; };
-
-struct Scout {};
-
-// =============================================================================
-// [ GAMEPLAY SPACE ] 2. THE CONTRACT (STATELESS INTERFACE)
-// =============================================================================
 struct ICombat {
-    using Context = Selector<State>;
+    // Nested action payload (Stateless action data)
+    struct Params { int hp; int ammo; };
+
+    // Nested query context (Decision data)
+    struct RuleContext { const Params& data; };
     
-    struct RuleContext { const EntityData& entity; };
-    struct Params { EntityData& entity; const CombatSettings& settings; };
-
-    // The Function Pointer (No VTable!)
     void (*pfnExecute)(Params&);
-
-    // Static wrapper (The Illusion)
     void Execute(Params& p) const { pfnExecute(p); }
 };
 
-// =============================================================================
-// [ GAMEPLAY SPACE ] 3. BEHAVIORS (Pure Static Logic)
-// =============================================================================
-template<class T>
-struct StandardStrikeLogic : CapabilityDefinition<ICombat, T, When<State::Aggressive>> {
-    static void Execute(ICombat::Params& p) {
-        std::cout << " [DOD] Standard Strike! Base Damage applied.\n";
-        p.entity.health -= 5; 
+CRG_BIND_SLOT(std::vector<Bucket<ICombat>>)
+
+enum class CombatState { Idle, Aggressive };
+template<> struct EnumTraits<CombatState> { static constexpr std::size_t Count = 2; };
+template<> struct CapabilityTopology<ICombat> { using SpaceType = Space<CombatState>; };
+
+template<class T> 
+struct StandardStrike : Capability<ICombat> {
+    static void Execute(Params& p) { 
+        std::cout << " [DOD] Standard Strike. Ammo: " << --p.ammo << "\n"; 
     }
 };
 
-template<class T>
-struct CriticalStrikeLogic : CapabilityDefinition<ICombat, T, When<State::Aggressive>> {
-    static constexpr bool IsFallback = false;
-    static bool Condition(const ICombat::RuleContext& ctx) {
-        return ctx.entity.health < 50; // Critical mode triggers below 50 HP
-    }
-
-    static void Execute(ICombat::Params& p) {
-        std::cout << " [DOD] CRITICAL STRIKE! Bonus Damage applied.\n";
-        p.entity.health -= (5 + p.settings.dmgBonus); 
+template<class T> 
+struct CriticalStrike : Capability<ICombat> {
+    static constexpr int Priority = 100;
+    static bool Condition(const RuleContext& ctx) { return ctx.data.hp < 30; }
+    
+    static void Execute(Params& p) { 
+        std::cout << " [DOD] CRITICAL STRIKE! Ammo used: 2. Remaining: " << (p.ammo -= 2) << "\n"; 
     }
 };
 
-// Injection
-using ScoutModels = TypeList<Scout>;
-static const DomainBaker<ScoutModels, StandardStrikeLogic, CriticalStrikeLogic> g_ScoutModule{};
+struct Soldier {};
+static CapabilityBaker<Soldier, StandardStrike, CriticalStrike> g_SoldierCombatModule;
 
 // =============================================================================
-// [ THE SYSTEM ] HOT PATH SIMULATION
+// 7. MAIN
 // =============================================================================
+
 int main() {
-    std::cout << "--- CRG STAGE 11: STATELESS DOD & NARROW PHASE ---\n\n";
+    std::cout << "--- CRG STAGE 11: STATELESS DOD (NESTED PARAMS) ---\n\n";
 
-    DenseID scoutID = DenseTypeID<Scout>::Get();
-    CombatSettings settings;
+    DenseID soldierID = DenseTypeID<Soldier>::Get();
+    ICombat::Params p { 100, 50 };
+    ICombat::RuleContext ruleCtx { p };
 
-    std::cout << "--- SCENARIO 1: Scout at 100 HP ---\n";
-    EntityData healthyScout { 100 };
-    ICombat::RuleContext ruleCtx1 { healthyScout };
-    ICombat::Params sandbox1 { healthyScout, settings };
-
-    if (auto* combat = BehaviorRouter<ICombat>::Find(scoutID, ruleCtx1, State::Aggressive)) {
-        combat->Execute(sandbox1); // DOD static jump!
+    std::cout << "1. Healthy (100 HP):\n -> ";
+    if (auto* c = BehaviorRouter<ICombat>::Find(soldierID, ruleCtx, CombatState::Aggressive)) {
+        c->Execute(p);
     }
 
-    std::cout << "\n--- SCENARIO 2: Scout at 40 HP ---\n";
-    EntityData hurtScout { 40 };
-    ICombat::RuleContext ruleCtx2 { hurtScout };
-    ICombat::Params sandbox2 { hurtScout, settings };
-
-    if (auto* combat = BehaviorRouter<ICombat>::Find(scoutID, ruleCtx2, State::Aggressive)) {
-        combat->Execute(sandbox2); // DOD static jump!
+    std::cout << "\n2. Wounded (20 HP):\n -> ";
+    p.hp = 20;
+    if (auto* c = BehaviorRouter<ICombat>::Find(soldierID, ruleCtx, CombatState::Aggressive)) {
+        c->Execute(p);
     }
 
     return 0;

@@ -1,89 +1,169 @@
 // Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
-// See LICENSE file in the project root for full license information.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 5: FUSION (THE BEHAVIOR BAKER)
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 5: FUSION (THE HERO CODE)
 // =============================================================================
 //
 // @intent:
-// Provide an ECS-ready O(1) resolution API by completely decoupling 
-// memory identity from behavior topology. Prove domain decentralization.
+// The definitive fusion of all previous stages. This stage introduces the 
+// CapabilityBaker, which automates the registration of entire domains, and 
+// the CapabilityRouter, which provides O(1) resolution via a contiguous registry.
 //
-// @what_changed:
-// - ModelHandle acts strictly as a Type-Erased data container.
-// - BehaviorMatrixList acts as the global External Polymorphism Router.
-// - Multiple Domain Bakers demonstrate that behaviors can be compiled 
-//   and injected completely independently for the same Models.
-//
-// @note:
-// For pedagogical clarity on GitHub, ModelHandle uses std::unique_ptr.
-// In a AAA production engine, this relies on Small Buffer Optimization (SBO)
-// to guarantee zero-heap-allocation. See the CppCon paper for details.
+// @architecture:
+// - Capability<T>: Bridge helper that injects metadata into user logic.
+// - CapabilityBaker: Variadic aggregator that "bakes" capabilities into the router.
+// - CapabilityRouter: The high-performance gateway (O(1) lookup).
 // =============================================================================
 
 #include <iostream>
 #include <typeinfo>
-#include <string>
+#include <vector>
 #include <memory>
-#include <tuple>
+#include <string>
 
-// --- CORE UTILITIES ---
+// =============================================================================
+// 1. INFRASTRUCTURE (Universal Storage)
+// =============================================================================
+
+#ifndef CRG_DLL_ENABLED
+#define CRG_DLL_ENABLED 1
+#endif
+
+template<class T>
+struct RegistrySlot {
+#if !CRG_DLL_ENABLED
+    static inline T s_Value{}; 
+#else
+    static T s_Value;
+#endif
+};
+
+#if CRG_DLL_ENABLED
+    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+#else
+    #define CRG_BIND_SLOT(T) 
+#endif
+
+template<class TNode>
+using NodeListAnchor = RegistrySlot<const TNode*>;
+
+template<class TNode, class TInterface>
+struct NodeList : public TInterface {
+    const TNode* m_Next = nullptr;
+
+    NodeList() {
+        const TNode* derivedThis = static_cast<const TNode*>(this);
+        m_Next = NodeListAnchor<TNode>::s_Value;
+        NodeListAnchor<TNode>::s_Value = derivedThis;
+    }
+};
+
+// =============================================================================
+// 2. CORE TYPES & HELPERS
+// =============================================================================
+
 using ModelTypeID = std::size_t;
-template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).hash_code(); } };
+using InterfaceTypeID = std::size_t; 
+
+template<class T> struct TypeIDOf { static std::size_t Get() { return typeid(T).hash_code(); } };
 template<typename... Ts> struct TypeList {};
 
-// --- 1. TYPE ERASED SHELL (The Data Container) ---
-class ModelHandle {
+// --- CAPABILITY HELPER ---
+// This simple bridge eliminates the need for manual 'InterfaceType' aliases.
+template<class TInterface> 
+struct Capability : public TInterface { 
+    using InterfaceType = TInterface; 
+};
+
+// --- ROUTING INTERFACE ---
+struct IRegistryNode {
+    virtual ~IRegistryNode() = default;
+    virtual ModelTypeID GetTargetModelID() const = 0;
+    virtual const void* Resolve(InterfaceTypeID interfaceID) const = 0;
+};
+
+using RegistryVector = std::vector<const IRegistryNode*>;
+using RouterSlot = RegistrySlot<RegistryVector>;
+CRG_BIND_SLOT(RegistryVector)
+
+// --- BAKER INFRASTRUCTURE ---
+struct IAssembler {
+    virtual ~IAssembler() = default;
+    virtual void Assemble(RegistryVector& registry) const = 0;
+};
+
+struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
+CRG_BIND_SLOT(const IBakerNode*)
+
+// =============================================================================
+// 3. THE BAKER CORE (Variadic Aggregation)
+// =============================================================================
+
+// The Space aggregates all provided Capabilities for a specific Model.
+template<class TModel, template<class> class... TCapabilities>
+class CapabilitySpace : public IRegistryNode, public TCapabilities<TModel>... {
 public:
-    struct Concept { virtual ~Concept() = default; virtual ModelTypeID GetTypeID() const = 0; };
+    ModelTypeID GetTargetModelID() const override { return TypeIDOf<TModel>::Get(); }
     
-    template<class T> struct Model : Concept {
-        T value; Model(T v) : value(std::move(v)) {}
-        ModelTypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
-    };
-    
-    ModelHandle() = default;
-    
-    template<class T> void Set(T v) {
-        m_ptr = std::make_unique<Model<T>>(std::move(v)); 
+    const void* Resolve(InterfaceTypeID interfaceID) const override {
+        const void* result = nullptr;
+        // Fold expression: searches through all inherited Capability bases.
+        ((interfaceID == TypeIDOf<typename TCapabilities<TModel>::InterfaceType>::Get() && 
+         (result = static_cast<const typename TCapabilities<TModel>::InterfaceType*>(this))), ...);
+        return result;
     }
-    
-    ModelTypeID GetTypeID() const { return m_ptr ? m_ptr->GetTypeID() : 0; }
-    
-    template<class T> const T& Get() const { 
-        return static_cast<const Model<T>*>(m_ptr.get())->value; 
+};
+
+// Primary Template: Single Model registration
+template<class TModel, template<class> class... TCapabilities>
+struct CapabilityBaker : public IBakerNode {
+    CapabilitySpace<TModel, TCapabilities...> m_unit;
+    void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
+};
+
+// Specialization: Batch registration for multiple Models via TypeList
+template<class... Models, template<class> class... TCapabilities>
+struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
+    void Assemble(RegistryVector& registry) const override {
+        // Delegates assembly to every model-specific baker parent.
+        (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...);
     }
+};
+
+// =============================================================================
+// 4. THE ROUTER (High-Performance Gateway)
+// =============================================================================
+
+class CapabilityRouter {
 private:
-    std::unique_ptr<Concept> m_ptr;
-};
-
-// --- EXTERNAL POLYMORPHISM LAYER ---
-
-// 1. The common interface for all baked behavior nodes
-struct IModelRegistryNode {
-    virtual ModelTypeID GetModelTypeID() const = 0;
-    virtual const void* Resolve(ModelTypeID interfaceID) const = 0;
-};
-
-// 2. The Global Registry (The Router)
-class BehaviorMatrixList {
-    static inline const IModelRegistryNode* s_nodes[128] = {};
-    static inline std::size_t s_nodeCount = 0;
-
-public:
-    static void Register(const IModelRegistryNode* node) {
-        if (s_nodeCount < 128) s_nodes[s_nodeCount++] = node;
+    // Ensures a single global bake happens only once, even with multiple interface queries.
+    static void EnsureBaked() {
+        struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
+        static StaticGuard s_Guard;
     }
 
-    // THE CORE ECS API: Resolves an interface solely from a TypeID.
-    // Iterates over registered domain chunks. 
-    // (Note: In production, this uses dense indexing for true O(1) lookup).
+public:
+    static void Bake() {
+        auto& registry = RouterSlot::s_Value;
+        registry.clear();
+        // Traverse the intrusive list of bakers and collect their assembled units.
+        for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) {
+            b->Assemble(registry);
+        }
+    }
+
     template<class InterfaceT>
-    static const InterfaceT* FindInterface(ModelTypeID modelID) {
-        for (std::size_t i = 0; i < s_nodeCount; ++i) {
-            if (s_nodes[i]->GetModelTypeID() == modelID) {
-                if (const void* ptr = s_nodes[i]->Resolve(TypeIDOf<InterfaceT>::Get())) {
+    static const InterfaceT* Find(ModelTypeID modelID) {
+        EnsureBaked();
+
+        const auto& registry = RouterSlot::s_Value;
+        const InterfaceTypeID iid = TypeIDOf<InterfaceT>::Get();
+
+        // O(1) in concept (direct access), O(N_models) for ID matching.
+        for (const auto* node : registry) {
+            if (node->GetTargetModelID() == modelID) {
+                if (const void* ptr = node->Resolve(iid)) {
                     return static_cast<const InterfaceT*>(ptr);
                 }
             }
@@ -92,101 +172,62 @@ public:
     }
 };
 
-// 3. The Capability Node (The Magic)
-template<class ModelT, template<class> class... Behaviors>
-class BakedCapabilityNode : public IModelRegistryNode, public Behaviors<ModelT>... {
-public:
-    BakedCapabilityNode() {
-        // Auto-Register this baked node into the global matrix at startup
-        BehaviorMatrixList::Register(this);
-    }
-
-    ModelTypeID GetModelTypeID() const override { 
-        return TypeIDOf<ModelT>::Get(); 
-    }
-
-    const void* Resolve(ModelTypeID interfaceID) const override {
-        const void* result = nullptr;
-        // Branchless O(1) evaluation resolved at compile time via C++17 fold expression
-        ((interfaceID == TypeIDOf<typename Behaviors<ModelT>::InterfaceType>::Get() && 
-         (result = static_cast<const typename Behaviors<ModelT>::InterfaceType*>(this))), ...);
-        return result;
-    }
-};
-
-// --- USER INTERFACES (Pure Domain) ---
-struct IDiagnostic {
-    using InterfaceType = IDiagnostic; // Metadata for the Baker
-    virtual void Execute(const ModelHandle& h) const = 0;
-};
-
-struct ITelemetry {
-    using InterfaceType = ITelemetry;
-    virtual void Send(const ModelHandle& h) const = 0;
-};
-
-// --- USER MODELS (Data) ---
-struct Drone { std::string name; };
-struct HeavyLifter { std::string name; };
-
-// --- BEHAVIOR DEFINITIONS (Logic) ---
-template<class T>
-struct DiagnosticBehavior : IDiagnostic {
-    void Execute(const ModelHandle& h) const override { 
-        std::cout << "[CRG] Diagnostic Executed on Model TypeID: " << TypeIDOf<T>::Get() << "\n"; 
-    }
-};
-
-template<class T>
-struct TelemetryBehavior : ITelemetry {
-    void Send(const ModelHandle& h) const override { 
-        std::cout << "[CRG] Telemetry Sent on Model TypeID: " << TypeIDOf<T>::Get() << "\n"; 
-    }
-};
-
-// --- THE COMPILE-TIME BAKER (Instantiator) ---
-template<class ModelList, template<class> class... Behaviors>
-struct DomainBaker;
-
-template<class... Models, template<class> class... Behaviors>
-struct DomainBaker<TypeList<Models...>, Behaviors...> {
-    // Instantiating this tuple automatically triggers the constructors of BakedCapabilityNode
-    // which self-register into the BehaviorMatrixList.
-    std::tuple<BakedCapabilityNode<Models, Behaviors...>...> m_nodes;
-};
-
 // =============================================================================
-// MODULE INSTANTIATIONS (Proving Decentralization)
+// 5. USER DOMAIN (Pure Logic)
 // =============================================================================
 
-// Extracted explicit model list
-using SimulationModels = TypeList<Drone, HeavyLifter>;
+// --- Interfaces ---
+struct IDiagnostic { 
+    virtual ~IDiagnostic() = default; 
+    virtual void Run() const = 0; 
+};
 
-// In a real codebase, these lines would live in completely different .cpp/.dll files!
-// Module A (Diagnostic System) knows nothing about Module B (Telemetry System).
-static const DomainBaker<SimulationModels, DiagnosticBehavior> g_DiagBaker{};
-static const DomainBaker<SimulationModels, TelemetryBehavior> g_TelemetryBaker{};
+struct ITelemetry { 
+    virtual ~ITelemetry() = default; 
+    virtual void Ping() const = 0; 
+};
+
+// --- Implementations (using Capability helper) ---
+template<class T> 
+struct DiagCapability : Capability<IDiagnostic> { 
+    void Run() const override { std::cout << "[Diag] System check for: " << typeid(T).name() << "\n"; } 
+};
+
+template<class T> 
+struct TeleCapability : Capability<ITelemetry> { 
+    void Ping() const override { std::cout << "[Tele] Pinging: " << typeid(T).name() << "\n"; } 
+};
+
+// --- Models ---
+struct Drone {};
+struct Scout {};
+
+// --- Registration ---
+// One line to bind a whole domain of models to their logic.
+using AirModels = TypeList<Drone, Scout>;
+static const CapabilityBaker<AirModels, DiagCapability, TeleCapability> g_AirBaker{};
 
 // =============================================================================
-// USER CODE (ECS Hot Path Simulation)
+// MAIN
 // =============================================================================
 int main() {
-    std::cout << "--- CRG STAGE 5: FUSION (DECENTRALIZED BAKER) ---\n\n";
+    std::cout << "--- CRG STAGE 5: THE CAPABILITY ROUTER ---\n\n";
 
-    ModelHandle h; 
-    h.Set(Drone{"Scout-1"});
-    
-    // 1. The Engine System fetches the ID from the raw data
-    ModelTypeID currentModelID = h.GetTypeID();
+    // Scenario: An ECS system wants to run diagnostics on a Scout
+    ModelTypeID scoutID = TypeIDOf<Scout>::Get();
 
-    // 2. The Systems query the global CRG Matrix independently
-    if (const IDiagnostic* diag = BehaviorMatrixList::FindInterface<IDiagnostic>(currentModelID)) {
-        diag->Execute(h);
+    // The Find call triggers the first Bake() automatically.
+    if (auto* d = CapabilityRouter::Find<IDiagnostic>(scoutID)) {
+        d->Run();
     }
 
-    if (const ITelemetry* telemetry = BehaviorMatrixList::FindInterface<ITelemetry>(currentModelID)) {
-        telemetry->Send(h);
+    if (auto* t = CapabilityRouter::Find<ITelemetry>(scoutID)) {
+        t->Ping();
     }
+
+    // Engine Sync: Simulation of a Hot-Reload
+    std::cout << "\n[Engine] Manual Sync triggered.\n";
+    CapabilityRouter::Bake(); 
 
     return 0;
 }

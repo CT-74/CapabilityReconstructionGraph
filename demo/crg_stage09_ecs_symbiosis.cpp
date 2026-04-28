@@ -1,20 +1,26 @@
 // Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 7: N-DIMENSIONAL HYPERSPACE
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 9: THE SYMBIOSIS (PURE ECS)
 // =============================================================================
 //
 // @intent:
-// Resolve capabilities across N-orthogonal axes in strictly O(1) time.
-// The topology is entirely external (Zero Coupling). The Baker pre-compiles 
-// the Cartesian product of all axis combinations into a flat lookup tensor.
+// Harmonize high-density Data-Oriented Design (ECS) with the compile-time 
+// N-Dimensional tensor. The CRG owns the Logic Projection, while the ECS 
+// owns the Data Pipeline.
+//
+// @architecture:
+// - Zero Coupling: Interfaces are pure and take raw Component references.
+// - N-Dimensional: Logic varies across N-axes (Time, Alert, Biome) in O(1).
+// - Symbiosis: The ECS System extracts coordinates from components to 
+//   query the CapabilityRouter.
 // =============================================================================
 
 #include <iostream>
 #include <typeinfo>
 #include <vector>
-#include <span>
 #include <tuple>
+#include <span>
 
 // =============================================================================
 // 1. INFRASTRUCTURE (DLL SAFE)
@@ -56,37 +62,30 @@ struct NodeList : public TInterface {
 
 template<typename T> struct EnumTraits;
 
-// Base 0D State
 struct GlobalState { constexpr operator std::size_t() const { return 0; } };
 template<> struct EnumTraits<GlobalState> { static constexpr std::size_t Count = 1; };
 
-// Variadic Space definition
 template<class... TAxes>
 struct Space {
     static constexpr std::size_t Dimensions = sizeof...(TAxes);
     static constexpr std::size_t Volume = (EnumTraits<TAxes>::Count * ... * 1);
 
-    // Get the stride (product of counts of all dimensions after DimIdx)
     template<std::size_t DimIdx>
     static constexpr std::size_t GetStride() {
         std::size_t stride = 1;
         auto calc = [&](std::size_t i) {
             if (i > DimIdx) stride *= EnumTraits<std::tuple_element_t<i, std::tuple<TAxes...>>>::Count;
         };
-        []<std::size_t... Is>(std::index_sequence<Is...>, auto f) {
-            (f(Is), ...);
-        }(std::make_index_sequence<Dimensions>{}, calc);
+        []<std::size_t... Is>(std::index_sequence<Is...>, auto f) { (f(Is), ...); }(std::make_index_sequence<Dimensions>{}, calc);
         return stride;
     }
 
-    // Extract a coordinate for a specific dimension from a flat index
     template<std::size_t DimIdx>
     static constexpr auto GetCoordAtIndex(std::size_t index) {
         using AxisT = std::tuple_element_t<DimIdx, std::tuple<TAxes...>>;
         return static_cast<AxisT>((index / GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
     }
 
-    // Compute flat index offset from N coordinates
     static constexpr std::size_t ComputeOffset(TAxes... coords) {
         std::size_t offset = 0;
         ((offset = offset * EnumTraits<TAxes>::Count + static_cast<std::size_t>(coords)), ...);
@@ -94,20 +93,13 @@ struct Space {
     }
 };
 
-// 0D Fallback
-template<> struct Space<> {
-    static constexpr std::size_t Dimensions = 0;
-    static constexpr std::size_t Volume = 1;
-};
+template<> struct Space<> { static constexpr std::size_t Dimensions = 0; static constexpr std::size_t Volume = 1; };
 
-// --- EXTERNAL TOPOLOGY ---
-template<class TInterface> 
-struct CapabilityTopology { using SpaceType = Space<GlobalState>; };
+// --- TOPOLOGY & COORDINATES ---
+template<class TInterface> struct CapabilityTopology { using SpaceType = Space<GlobalState>; };
 
-// --- COORDINATE SELECTOR ---
 template<auto... Values> struct At {};
 
-// Meta-utility to rebuild At<Coords...> from a flat index and a Space
 template<class TSpace, std::size_t Index, std::size_t... DimIs>
 auto MakeAtFromIndex(std::index_sequence<DimIs...>) {
     return At<TSpace::template GetCoordAtIndex<DimIs>(Index)...>{};
@@ -140,7 +132,7 @@ struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
 CRG_BIND_SLOT(const IBakerNode*)
 
 // =============================================================================
-// 4. THE BAKER (CARTESIAN COMPILER)
+// 4. THE BAKER (TENSOR COMPILER)
 // =============================================================================
 
 template<class TModel, template<class, class> class Cap, class IdxSeq>
@@ -152,7 +144,6 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
 {
     using Intf = typename Cap<TModel, At<>>::InterfaceType;
     using TSpace = typename CapabilityTopology<Intf>::SpaceType;
-    
     static constexpr std::size_t Size = TSpace::Volume;
     const Intf* m_buffer[Size];
 
@@ -160,7 +151,6 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
         const Intf* ptrs[] = { static_cast<const Intf*>(static_cast<const Cap<TModel, decltype(MakeAtFromIndex<TSpace, Is>(std::make_index_sequence<TSpace::Dimensions>{}))>*>(this))... };
         for(std::size_t i=0; i<Size; ++i) m_buffer[i] = ptrs[i];
     }
-    
     const void* GetSpanRaw() const { return m_buffer; }
 };
 
@@ -170,7 +160,6 @@ class CapabilitySpace : public IRegistryNode,
 {
 public:
     ModelTypeID GetTargetModelID() const override { return TypeIDOf<TModel>::Get(); }
-    
     const void* ResolveSpanRaw(InterfaceTypeID interfaceID) const override {
         const void* result = nullptr;
         (void)((interfaceID == TypeIDOf<typename TCapabilities<TModel, At<>>::InterfaceType>::Get() && 
@@ -187,9 +176,7 @@ struct CapabilityBaker : public IBakerNode {
 
 template<class... Models, template<class, class> class... TCapabilities>
 struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
-    void Assemble(RegistryVector& registry) const override {
-        (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...);
-    }
+    void Assemble(RegistryVector& registry) const override { (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...); }
 };
 
 // =============================================================================
@@ -198,34 +185,24 @@ struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public Capabilit
 
 class CapabilityRouter {
 private:
-    static void EnsureBaked() {
-        struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
-        static StaticGuard s_Guard;
-    }
+    static void EnsureBaked() { struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } }; static StaticGuard s_Guard; }
 public:
     static void Bake() {
-        auto& registry = RouterSlot::s_Value;
-        registry.clear();
-        for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) b->Assemble(registry);
+        RouterSlot::s_Value.clear();
+        for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) b->Assemble(RouterSlot::s_Value);
     }
 
     template<class InterfaceT, class... Coords>
     static const InterfaceT* Find(ModelTypeID modelID, Coords... coords) {
         EnsureBaked();
-        
         using TSpace = typename CapabilityTopology<InterfaceT>::SpaceType;
         std::size_t offset = 0;
-        if constexpr (sizeof...(Coords) > 0) {
-            static_assert(sizeof...(Coords) == TSpace::Dimensions, "Coordinate count mismatch for this Topology.");
-            offset = TSpace::ComputeOffset(coords...);
-        }
+        if constexpr (sizeof...(Coords) > 0) offset = TSpace::ComputeOffset(coords...);
 
-        const InterfaceTypeID iid = TypeIDOf<InterfaceT>::Get();
         for (const auto* node : RouterSlot::s_Value) {
             if (node->GetTargetModelID() == modelID) {
-                if (const void* ptr = node->ResolveSpanRaw(iid)) {
+                if (const void* ptr = node->ResolveSpanRaw(TypeIDOf<InterfaceT>::Get())) 
                     return static_cast<const InterfaceT* const*>(ptr)[offset];
-                }
             }
         }
         return nullptr;
@@ -233,59 +210,102 @@ public:
 };
 
 // =============================================================================
-// 6. GAMEPLAY DOMAIN
+// 6. GAMEPLAY SYMBIOSIS (ECS + CRG)
 // =============================================================================
 
+// --- ECS COMPONENTS ---
+struct LogicID { ModelTypeID hash; };
+struct Battery { float charge = 100.0f; };
+struct Biome   { enum Type { Desert, Tundra } zone; };
+
+// --- CRG CONTEXT ---
 enum class WorldState { Day, Night };
-enum class AlertState { Calm, Combat };
-
 template<> struct EnumTraits<WorldState> { static constexpr std::size_t Count = 2; };
-template<> struct EnumTraits<AlertState> { static constexpr std::size_t Count = 2; };
+template<> struct EnumTraits<Biome::Type> { static constexpr std::size_t Count = 2; };
 
-// --- CONTRACTS ---
-struct ICombat { virtual void Execute() const = 0; };
-struct IDiagnostic { virtual void Run() const = 0; };
-
-// --- TOPOLOGY ---
-template<> struct CapabilityTopology<ICombat> { using SpaceType = Space<WorldState, AlertState>; };
-
-// --- LOGIC ---
-
-// 2D Implementation
-template<class T, class TAt = At<>> struct CombatLogic : Capability<ICombat> {}; 
-
-template<class T, auto... R>
-struct CombatLogic<T, At<WorldState::Night, AlertState::Combat, R...>> : Capability<ICombat> {
-    void Execute() const override { std::cout << "[Combat] Night: Stealth Takedown.\n"; }
+// --- PURE CONTRACT (DOD) ---
+struct IEnergyDrain {
+    virtual void Execute(Battery& bat) const = 0;
 };
 
-template<class T, auto... R>
-struct CombatLogic<T, At<WorldState::Day, AlertState::Combat, R...>> : Capability<ICombat> {
-    void Execute() const override { std::cout << "[Combat] Day: High-Intensity Strike.\n"; }
+// --- TOPOLOGY (2D Axis: WorldState + Biome) ---
+template<> struct CapabilityTopology<IEnergyDrain> { 
+    using SpaceType = Space<WorldState, Biome::Type>; 
 };
 
-// 0D Implementation
-template<class T, class TAt = At<>> 
-struct DiagLogic : Capability<IDiagnostic> { 
-    void Run() const override { std::cout << "[Diag] Core system nominal.\n"; } 
+// --- BEHAVIORS ---
+template<class T, class TAt = At<>> struct DrainLogic : Capability<IEnergyDrain> {};
+
+// Specialized: Night + Tundra (Freezing penalty)
+template<class T, auto... R>
+struct DrainLogic<T, At<WorldState::Night, Biome::Tundra, R...>> : Capability<IEnergyDrain> {
+    void Execute(Battery& bat) const override { bat.charge -= 10.0f; }
+};
+
+// Fallback / Standard
+template<class T, class TAt>
+struct DrainLogic : Capability<IEnergyDrain> {
+    void Execute(Battery& bat) const override { bat.charge -= 1.0f; }
 };
 
 // --- REGISTRATION ---
-struct Drone {};
-using AirModels = TypeList<Drone>;
-static const CapabilityBaker<AirModels, CombatLogic, DiagLogic> g_AirBaker{};
+struct Scout {};
+struct HeavyLifter {};
+using AirModels = TypeList<Scout, HeavyLifter>;
+static const CapabilityBaker<AirModels, DrainLogic> g_DrainBaker{};
+
+// =============================================================================
+// 7. ECS SYSTEM (The Hot Path)
+// =============================================================================
+
+struct EnergySystem {
+    // Mimicking ECS SoA Storage
+    std::vector<LogicID> logic_ids;
+    std::vector<Battery> batteries;
+    std::vector<Biome>   biomes;
+
+    void Update(WorldState currentTime) {
+        for (std::size_t i = 0; i < logic_ids.size(); ++i) {
+            // 1. Extract context from components and global state
+            ModelTypeID id = logic_ids[i].hash;
+            Biome::Type zone = biomes[i].zone;
+
+            // 2. O(1) Routing through the Hypergraph
+            auto* behavior = CapabilityRouter::Find<IEnergyDrain>(id, currentTime, zone);
+
+            // 3. Execute directly on component data (No object, pure DOD)
+            if (behavior) behavior->Execute(batteries[i]);
+        }
+    }
+};
 
 // =============================================================================
 // MAIN
 // =============================================================================
 int main() {
-    std::cout << "--- CRG STAGE 7: N-DIMENSIONAL HYPERSPACE ---\n\n";
+    EnergySystem ecs;
+    
+    // Add a Scout in the Desert
+    ecs.logic_ids.push_back({ TypeIDOf<Scout>::Get() });
+    ecs.batteries.push_back({ 100.0f });
+    ecs.biomes.push_back({ Biome::Desert });
 
-    auto id = TypeIDOf<Drone>::Get();
+    // Add a HeavyLifter in the Tundra
+    ecs.logic_ids.push_back({ TypeIDOf<HeavyLifter>::Get() });
+    ecs.batteries.push_back({ 100.0f });
+    ecs.biomes.push_back({ Biome::Tundra });
 
-    if (auto* c = CapabilityRouter::Find<ICombat>(id, WorldState::Day, AlertState::Combat)) c->Execute();
-    if (auto* c = CapabilityRouter::Find<ICombat>(id, WorldState::Night, AlertState::Combat)) c->Execute();
-    if (auto* d = CapabilityRouter::Find<IDiagnostic>(id)) d->Run();
+    std::cout << "--- CRG STAGE 9: ECS SYMBIOSIS ---\n\n";
+
+    std::cout << "Frame 1: Day Time\n";
+    ecs.Update(WorldState::Day);
+    std::cout << "  Scout Battery: " << ecs.batteries[0].charge << "%\n";
+    std::cout << "  Heavy Battery: " << ecs.batteries[1].charge << "%\n";
+
+    std::cout << "\nFrame 2: Night Time (Tundra penalty triggers for HeavyLifter)\n";
+    ecs.Update(WorldState::Night);
+    std::cout << "  Scout Battery: " << ecs.batteries[0].charge << "%\n";
+    std::cout << "  Heavy Battery: " << ecs.batteries[1].charge << "% (FROZEN)\n";
 
     return 0;
 }
