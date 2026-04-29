@@ -1,20 +1,21 @@
 // Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 6: TEMPORAL AXIS (DECOUPLED)
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 7: TEMPORAL AXIS (DECOUPLED)
 // =============================================================================
 //
 // @intent:
 // Introduce contextual resolution (1D) with ABSOLUTE decoupling.
 // Interfaces are pure and have no knowledge of the variation Axis.
-// The link between Interface and Axis is managed by an external Topology.
+// The link between Interface and Axis is managed by external CapabilityRoutingTraits.
 // Specialization utilizes native C++ template priority.
 // =============================================================================
 
 #include <iostream>
 #include <typeinfo>
 #include <vector>
-#include <span>
+#include <tuple>
 
 // =============================================================================
 // 1. INFRASTRUCTURE (DLL SAFE)
@@ -60,10 +61,10 @@ template<typename T> struct EnumTraits;
 struct GlobalState { constexpr operator std::size_t() const { return 0; } };
 template<> struct EnumTraits<GlobalState> { static constexpr std::size_t Count = 1; };
 
-// --- EXTERNAL TOPOLOGY ---
+// --- EXTERNAL ROUTING TRAITS ---
 // Defines the axis of an interface without modifying it (Zero coupling)
 template<class TInterface> 
-struct CapabilityTopology {
+struct CapabilityRoutingTraits {
     using AxisType = GlobalState; 
 };
 
@@ -112,11 +113,11 @@ struct CapabilityNode;
 
 template<class TModel, template<class, class> class Cap, std::size_t... Is>
 struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>> 
-    // Resolves axis via external Topology and injects the correct At coordinate
-    : public Cap<TModel, typename AxisToAt<typename CapabilityTopology<typename Cap<TModel, At<>>::InterfaceType>::AxisType, Is>::Type>... 
+    // Resolves axis via external CapabilityRoutingTraits and injects the correct At coordinate
+    : public Cap<TModel, typename AxisToAt<typename CapabilityRoutingTraits<typename Cap<TModel, At<>>::InterfaceType>::AxisType, Is>::Type>... 
 {
     using Intf = typename Cap<TModel, At<>>::InterfaceType;
-    using Axis = typename CapabilityTopology<Intf>::AxisType;
+    using Axis = typename CapabilityRoutingTraits<Intf>::AxisType;
     
     static constexpr std::size_t Size = sizeof...(Is);
     const Intf* m_buffer[Size];
@@ -131,7 +132,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
 
 template<class TModel, template<class, class> class... TCapabilities>
 class CapabilitySpace : public IRegistryNode, 
-    public CapabilityNode<TModel, TCapabilities, std::make_index_sequence<EnumTraits<typename CapabilityTopology<typename TCapabilities<TModel, At<>>::InterfaceType>::AxisType>::Count>>... 
+    public CapabilityNode<TModel, TCapabilities, std::make_index_sequence<EnumTraits<typename CapabilityRoutingTraits<typename TCapabilities<TModel, At<>>::InterfaceType>::AxisType>::Count>>... 
 {
 public:
     ModelTypeID GetTargetModelID() const override { return TypeIDOf<TModel>::Get(); }
@@ -139,7 +140,7 @@ public:
     const void* ResolveSpanRaw(InterfaceTypeID interfaceID) const override {
         const void* result = nullptr;
         (void)((interfaceID == TypeIDOf<typename TCapabilities<TModel, At<>>::InterfaceType>::Get() && 
-         (result = static_cast<const CapabilityNode<TModel, TCapabilities, std::make_index_sequence<EnumTraits<typename CapabilityTopology<typename TCapabilities<TModel, At<>>::InterfaceType>::AxisType>::Count>>*>(this)->GetSpanRaw())), ...);
+         (result = static_cast<const CapabilityNode<TModel, TCapabilities, std::make_index_sequence<EnumTraits<typename CapabilityRoutingTraits<typename TCapabilities<TModel, At<>>::InterfaceType>::AxisType>::Count>>*>(this)->GetSpanRaw())), ...);
         return result;
     }
 };
@@ -177,7 +178,7 @@ public:
     }
 
     template<class InterfaceT>
-    static const InterfaceT* Find(ModelTypeID modelID, typename CapabilityTopology<InterfaceT>::AxisType coord = {}) {
+    static const InterfaceT* Find(ModelTypeID modelID, typename CapabilityRoutingTraits<InterfaceT>::AxisType coord = {}) {
         EnsureBaked();
         for (const auto* node : RouterSlot::s_Value) {
             if (node->GetTargetModelID() == modelID) {
@@ -191,7 +192,7 @@ public:
 };
 
 // =============================================================================
-// 6. DEMO (PURE DOD - ZERO COUPLING)
+// 6. DEMO (PURE OOP - ZERO COUPLING)
 // =============================================================================
 
 // --- A. CONTRACTS ---
@@ -202,8 +203,8 @@ struct ITelemetry  { virtual void Ping() const = 0; };
 enum class WorldState { Day, Night };
 template<> struct EnumTraits<WorldState> { static constexpr std::size_t Count = 2; };
 
-// --- C. TOPOLOGY (External Mapping) ---
-template<> struct CapabilityTopology<ITelemetry> { using AxisType = WorldState; };
+// --- C. ROUTING TRAITS (External Mapping) ---
+template<> struct CapabilityRoutingTraits<ITelemetry> { using AxisType = WorldState; };
 
 // --- D. LOGIC ---
 
@@ -228,11 +229,10 @@ struct TeleLogic<T, At<WorldState::Night>> : Capability<ITelemetry> {
 
 // --- E. REGISTRATION ---
 struct Drone {};
-using AirModels = TypeList<Drone>;
-static const CapabilityBaker<AirModels, DiagLogic, TeleLogic> g_AirBaker{};
+static const CapabilityBaker<Drone, DiagLogic, TeleLogic> g_AirBaker{};
 
 int main() {
-    std::cout << "--- CRG STAGE 6: TEMPORAL AXIS (DECOUPLED) ---\n\n";
+    std::cout << "--- CRG STAGE 7: TEMPORAL AXIS (ROUTING TRAITS) ---\n\n";
 
     auto id = TypeIDOf<Drone>::Get();
 

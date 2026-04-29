@@ -23,9 +23,11 @@
 // =============================================================================
 // 1. THE TRANSPORT (From Stage 2)
 // =============================================================================
+// Global identity type
 using ModelTypeID = std::size_t;
+template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).hash_code(); } };
 
-class ModelHandle {
+class ModelShell {
 public:
     struct Concept { 
         virtual ~Concept() = default; 
@@ -36,7 +38,7 @@ public:
     struct Model : Concept {
         T data;
         Model(T v) : data(std::move(v)) {}
-        ModelTypeID GetModelID() const override { return typeid(T).hash_code(); }
+        ModelTypeID GetModelID() const override { return TypeIDOf<T>::Get(); }
     };
 
     template<class T> 
@@ -57,7 +59,7 @@ private:
 // 2. THE PLUMBING (From Stage 1 - Decentralized)
 // =============================================================================
 #ifndef CRG_DLL_ENABLED
-#define CRG_DLL_ENABLED 1
+#define CRG_DLL_ENABLED 0
 #endif
 
 template<class T>
@@ -95,7 +97,7 @@ struct NodeList : public TInterface {
 struct IMovement {
     virtual ~IMovement() = default;
     virtual ModelTypeID GetTargetModelID() const = 0;
-    virtual void Execute(const ModelHandle& h) const = 0;
+    virtual void Execute(const ModelShell& s) const = 0;
 };
 
 // Concrete Router Node for Movement
@@ -114,9 +116,9 @@ struct TMovementLogic : MovementNode {
         return typeid(TModel).hash_code(); 
     }
     
-    void Execute(const ModelHandle& h) const override {
+    void Execute(const ModelShell& s) const override {
         // Recovering the typed data from the handle using the node's TModel
-        const TModel& data = h.GetAs<TModel>();
+        const TModel& data = s.GetAs<TModel>();
         
         std::cout << "[Traversal Lookup] Found logic for: " << typeid(TModel).name() << "\n";
     }
@@ -126,10 +128,10 @@ struct TMovementLogic : MovementNode {
 // 5. THE LOOKUP ENGINE (O(N) Traversal)
 // =============================================================================
 template<class TNode>
-const TNode* FindBehavior(const ModelHandle& h) {
+const TNode* FindBehavior(const ModelShell& s) {
     // The Traversal: Walking the intrusive list to match the Identity
-    for (const TNode* n = NodeListAnchor<TNode>::s_Head; n != nullptr; n = n->m_Next) {
-        if (n->GetTargetModelID() == h.GetID()) return n;
+    for (const TNode* n = NodeListAnchor<TNode>::s_Value; n != nullptr; n = n->m_Next) {
+        if (n->GetTargetModelID() == s.GetID()) return n;
     }
     return nullptr;
 }
@@ -142,16 +144,16 @@ static const TMovementLogic<HeavyTank> g_tankLogic;
 
 int main() {
     std::cout << "--- CRG STAGE 3: Traversal Lookup ---\n\n";
-    ModelHandle handle;
+    ModelShell shell;
     
-    handle.Set(Scout{"Vanguard-01"});
-    if (const auto* logic = FindBehavior<MovementNode>(handle)) {
-        logic->Execute(handle);
+    shell.Set(Scout{"Vanguard-01"});
+    if (const auto* logic = FindBehavior<MovementNode>(shell)) {
+        logic->Execute(shell);
     }
 
-    handle.Set(HeavyTank{600});
-    if (const auto* logic = FindBehavior<MovementNode>(handle)) {
-        logic->Execute(handle);
+    shell.Set(HeavyTank{600});
+    if (const auto* logic = FindBehavior<MovementNode>(shell)) {
+        logic->Execute(shell);
     }
 
     return 0;

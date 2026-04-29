@@ -69,7 +69,7 @@ struct IBehavior {
 struct BehaviorNode : public NodeList<BehaviorNode, IBehavior> {};
 
 // In DLL mode, this would live in BehaviorNode.cpp
-CRG_DEFINE_ANCHOR(const BehaviorNode*)
+CRG_BIND_SLOT(const BehaviorNode*)
 
 struct DroneBehavior : public BehaviorNode { 
     void Execute() const override { std::cout << "Drone: Scanning area.\n"; } 

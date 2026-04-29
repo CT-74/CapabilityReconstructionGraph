@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 10: FLAT TENSOR DISPATCH (DOD)
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 9: DYNAMIC RULES + MODEL ROUTER
 // =============================================================================
-// @intent:
-// Flatten the N-D Hypercube into a single contiguous memory arena (Tensor)[cite: 4].
-// - Broad Phase: O(1) Indexing via ModelSlot and Cartesian offset[cite: 4].
-// - Narrow Phase: O(K) Flat rule scan inside DispatchCells[cite: 4].
+// @intent: 
+// Resolve overlapping behaviors using prioritized runtime predicates.
+// - Broadphase: O(1) N-Dimensional Tensor Lookup.
+// - Narrowphase: O(K) linear scan of rules inside DispatchCells.
 // - ModelRouter: Zero-cost static proxy for strongly-typed context routing.
 // =============================================================================
 
@@ -16,15 +16,14 @@
 #include <tuple>
 #include <typeinfo>
 #include <algorithm>
-#include <unordered_map>
 #include <type_traits>
 
 // =============================================================================
-// 1. INFRASTRUCTURE & DLL MANAGEMENT
+// 1. INFRASTRUCTURE & DLL SAFETY
 // =============================================================================
 
 #ifndef CRG_DLL_ENABLED
-#define CRG_DLL_ENABLED 0 
+#define CRG_DLL_ENABLED 0
 #endif
 
 template<class T> struct RegistrySlot {
@@ -55,18 +54,21 @@ template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).
 template<typename... Ts> struct TypeList {};
 
 // =============================================================================
-// 2. DOMAINE & CONTEXTES
+// 2. GAMEPLAY DOMAIN & CONTEXT
 // =============================================================================
 
 enum class WorldState { Day, Night };
 enum class AlertState { Calm, Combat };
+enum class Weather    { Clear, Rain };
 
 template<typename T> struct EnumTraits;
 template<> struct EnumTraits<WorldState> { static constexpr std::size_t Count = 2; };
 template<> struct EnumTraits<AlertState> { static constexpr std::size_t Count = 2; };
+template<> struct EnumTraits<Weather>    { static constexpr std::size_t Count = 2; };
 
 struct EnergyContext { float battery; };
 
+// RuleContext : Zero-copy via std::tie for the variadic API.
 template<typename... TArgs>
 struct RuleContext {
     std::tuple<const TArgs&...> values;
@@ -74,14 +76,14 @@ struct RuleContext {
     template<typename T> constexpr const T& Get() const { return std::get<const T&>(values); }
 };
 
-// Patch: Fallback context for contracts without dynamic rules[cite: 6]
+// Patch: Fallback context for contracts without dynamic rules[cite: 11]
 struct NullContext {
     NullContext() = default;
     template<typename... Args> NullContext(const Args&...) {} 
 };
 
 // =============================================================================
-// 3. MATHÉMATIQUES DU TENSEUR (HORNER)
+// 3. TENSOR MATHEMATICS (HORNER)
 // =============================================================================
 
 template<class... TAxes>
@@ -131,12 +133,12 @@ private:
 };
 
 // =============================================================================
-// 4. ARENA & ROUTING TYPES
+// 4. ROUTING TRAITS & RULE DEFINITION
 // =============================================================================
 
 template<class TInterface> struct CapabilityRoutingTraits;
 
-// Patch: Lazy Context Selector to handle optional FullContext definition[cite: 6]
+// Patch: Lazy Context Selector to handle optional FullContext definition[cite: 11]
 template<typename T, typename = void> struct ContextSelector { using Type = NullContext; };
 template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRoutingTraits<T>::FullContext>> {
     using Type = typename CapabilityRoutingTraits<T>::FullContext;
@@ -145,7 +147,7 @@ template<typename T> using ContextTypeOf = typename ContextSelector<T>::Type;
 
 template<class InterfaceT>
 struct Rule {
-    using ContextT = ContextTypeOf<InterfaceT>; // Use lazy selector
+    using ContextT = ContextTypeOf<InterfaceT>; // Switched to lazy selector
     using PredicatePtr = bool (*)(const void*, const ContextT&);
 
     const InterfaceT* implementation;
@@ -159,10 +161,8 @@ struct Rule {
 template<class InterfaceT>
 struct DispatchCell {
     std::vector<Rule<InterfaceT>> dynamicRules;
-    const InterfaceT* fallback = nullptr;      
+    const InterfaceT* fallback = nullptr;  
 };
-
-template<class InterfaceT> using TensorArena = std::vector<DispatchCell<InterfaceT>>;
 
 template<class TInterface, class TConfig = void> 
 struct Capability : public TInterface { 
@@ -178,14 +178,24 @@ struct Capability<TInterface, void> : public TInterface {
 };
 
 // =============================================================================
-// 5. BAKER
+// 5. BAKER (NODE ASSEMBLY)
 // =============================================================================
 
-struct IAssembler { virtual void Bake() const = 0; };
+struct IRegistryNode {
+    virtual ~IRegistryNode() = default;
+    virtual ModelTypeID GetTargetModelID() const = 0;
+    virtual const void* Resolve(std::size_t interfaceID) const = 0;
+};
+
+using RegistryVector = std::vector<const IRegistryNode*>;
+CRG_BIND_SLOT(RegistryVector)
+
+struct IAssembler { virtual void Assemble(RegistryVector& registry) const = 0; };
 struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
 CRG_BIND_SLOT(const IBakerNode*)
 
 template<auto... V> struct At {};
+
 template<class TSpace, std::size_t Index, class IdxSeq = std::make_index_sequence<TSpace::Dimensions>> struct MakeAt;
 template<class TSpace, std::size_t Index, std::size_t... Is>
 struct MakeAt<TSpace, Index, std::index_sequence<Is...>> {
@@ -193,6 +203,7 @@ struct MakeAt<TSpace, Index, std::index_sequence<Is...>> {
 };
 
 template<class TModel, template<class, class> class Cap, class TIdxSeq> struct CapabilityNode;
+
 template<class TModel, template<class, class> class Cap, std::size_t... Is>
 struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>> 
     : public Cap<TModel, typename MakeAt<typename CapabilityRoutingTraits<typename Cap<TModel, At<>>::InterfaceType>::SpaceType, Is>::Type>... 
@@ -200,82 +211,93 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
     using Intf = typename Cap<TModel, At<>>::InterfaceType;
     using TSpace = typename CapabilityRoutingTraits<Intf>::SpaceType;
     using ContextT = ContextTypeOf<Intf>;
+    DispatchCell<Intf> m_cells[TSpace::Volume];
 
-    void FillArena(std::size_t slot) const {
-        auto& arena = RegistrySlot<TensorArena<Intf>>::s_Value;
-        std::size_t baseIdx = slot * TSpace::Volume;
-        if (arena.size() < baseIdx + TSpace::Volume) arena.resize(baseIdx + TSpace::Volume);
-
+    CapabilityNode() {
         ([&]() {
             using Impl = Cap<TModel, typename MakeAt<TSpace, Is>::Type>;
-            auto& cell = arena[baseIdx + Is];
+            auto& cell = m_cells[Is];
             const Intf* ptr = static_cast<const Intf*>(static_cast<const Impl*>(this));
 
             if constexpr (!std::is_same_v<typename Impl::ConfigType, void>) {
                 auto tramp = [](const void* o, const ContextT& c) -> bool { return static_cast<const Impl*>(o)->config.Condition(c); };
-                cell.dynamicRules.push_back({ ptr, static_cast<const void*>(this), tramp, static_cast<const Impl*>(this)->config.priority });
-                std::sort(cell.dynamicRules.begin(), cell.dynamicRules.end(), [](auto& a, auto& b){ return a.priority > b.priority; });
+                cell.dynamicRules.push_back(Rule<Intf>{ ptr, static_cast<const void*>(this), tramp, static_cast<const Impl*>(this)->config.priority });
+                std::sort(cell.dynamicRules.begin(), cell.dynamicRules.end(), [](auto& a, auto& b) { return a.priority > b.priority; });
             } else { cell.fallback = ptr; }
         }(), ...);
     }
+    const void* ResolveData() const { return m_cells; }
 };
 
 template<class TModel, template<class, class> class... TCap>
+class CapabilitySpace : public IRegistryNode, 
+    public CapabilityNode<TModel, TCap, std::make_index_sequence<CapabilityRoutingTraits<typename TCap<TModel, At<>>::InterfaceType>::SpaceType::Volume>>... 
+{
+public:
+    ModelTypeID GetTargetModelID() const override { return TypeIDOf<TModel>::Get(); }
+    const void* Resolve(std::size_t id) const override {
+        const void* res = nullptr;
+        (void)((id == typeid(typename TCap<TModel, At<>>::InterfaceType).hash_code() && 
+               (res = static_cast<const CapabilityNode<TModel, TCap, std::make_index_sequence<CapabilityRoutingTraits<typename TCap<TModel, At<>>::InterfaceType>::SpaceType::Volume>>*>(this)->ResolveData())), ...);
+        return res;
+    }
+};
+
+template<class TModel, template<class, class> class... TCapabilities>
 struct CapabilityBaker : public IBakerNode {
-    template<template<class, class> class C> 
-    static constexpr std::size_t VolOf = CapabilityRoutingTraits<typename C<TModel, At<>>::InterfaceType>::SpaceType::Volume;
-
-    struct Unit : public CapabilityNode<TModel, TCap, std::make_index_sequence<VolOf<TCap>>>... {
-        void Fill(std::size_t s) const { (CapabilityNode<TModel, TCap, std::make_index_sequence<VolOf<TCap>>>::FillArena(s), ...); }
-    } m_unit;
-
-    void Bake() const override {
-        ModelTypeID id = TypeIDOf<TModel>::Get();
-        auto& map = RegistrySlot<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
-        if (map.find(id) == map.end()) map[id] = map.size();
-        m_unit.Fill(map[id]);
-    }
+    CapabilitySpace<TModel, TCapabilities...> m_unit;
+    void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
 };
 
-template<class... Models, template<class, class> class... TCap>
-struct CapabilityBaker<TypeList<Models...>, TCap...> : public CapabilityBaker<Models, TCap...>... {
-    void Bake() const override {
-        (CapabilityBaker<Models, TCap...>::Bake(), ...);
+template<class... Models, template<class, class> class... TCapabilities>
+struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
+    void Assemble(RegistryVector& registry) const override {
+        (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...);
     }
 };
-
 
 // =============================================================================
-// 6. ROUTER (API UNIFIÉE)
+// 6. CAPABILITY ROUTER (ECS / HOT PATH)
 // =============================================================================
 
 class CapabilityRouter {
-public: // Made public to allow ModelRouter synchronization[cite: 6]
+public: // Made public to allow ModelRouter synchronization[cite: 11]
     static void EnsureBaked() {
         struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
         static StaticGuard s_Guard;
     } 
-    static void Bake() { for (auto* b = RegistrySlot<const IBakerNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
+    static void Bake() {
+        RegistrySlot<RegistryVector>::s_Value.clear();
+        for (auto* b = RegistrySlot<const IBakerNode*>::s_Value; b; b = b->m_Next) b->Assemble(RegistrySlot<RegistryVector>::s_Value);
+    }
 
     template<class InterfaceT, typename... TArgs>
     static const InterfaceT* Find(ModelTypeID modelID, const TArgs&... args) {
-        EnsureBaked();
-
-        auto& map = RegistrySlot<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
-        auto it = map.find(modelID); if (it == map.end()) return nullptr;
-
         using TTraits = CapabilityRoutingTraits<InterfaceT>;
         using TSpace = typename TTraits::SpaceType;
         using TFullCtx = ContextTypeOf<InterfaceT>;
 
-        std::size_t idx = (it->second * TSpace::Volume) + TSpace::ComputeOffset(args...);
-        const auto& cell = RegistrySlot<TensorArena<InterfaceT>>::s_Value[idx];
+        EnsureBaked();
 
-        // MVP Fix: Explicit assignment prevents Most Vexing Parse[cite: 6]
-        TFullCtx ctx = TFullCtx(args...); 
-        for (const auto& rule : cell.dynamicRules) if (rule.Matches(ctx)) return rule.implementation;
-        
-        return cell.fallback;
+        // Broadphase O(1) via variadic Enum extraction
+        std::size_t offset = TSpace::ComputeOffset(args...); 
+
+        for (const auto* node : RegistrySlot<RegistryVector>::s_Value) {
+            if (node->GetTargetModelID() == modelID) {
+                if (const void* data = node->Resolve(typeid(InterfaceT).hash_code())) {
+                    const auto& cell = static_cast<const DispatchCell<InterfaceT>*>(data)[offset];
+                    
+                    // Patch: MVP Fix - explicit assignment prevents function declaration ambiguity[cite: 11]
+                    TFullCtx ctx = TFullCtx(args...); 
+                    for (const auto& rule : cell.dynamicRules) {
+                        if (rule.Matches(ctx)) return rule.implementation;
+                    }
+                    
+                    return cell.fallback;
+                }
+            }
+        }
+        return nullptr;
     }
 };
 
@@ -289,20 +311,20 @@ public:
     // Zero-cost static wrapper over CapabilityRouter::Find
     template<class InterfaceT, typename... TArgs>
     static const InterfaceT* Find(const TArgs&... args) {
-        CapabilityRouter::EnsureBaked(); // Order synchronization fix[cite: 6]
+        CapabilityRouter::EnsureBaked(); // Patch: Synchronization for evaluation order[cite: 11]
         return CapabilityRouter::Find<InterfaceT>(TypeIDOf<ModelT>::Get(), args...);
     }
 };
 
 // =============================================================================
-// 8. GPP POV
+// 8. GPP IMPLEMENTATION
 // =============================================================================
 
 struct IUnitAI { virtual void Execute() const = 0; };
 
 template<> struct CapabilityRoutingTraits<IUnitAI> {
     using SpaceType = Space<WorldState, AlertState>;
-    using FullContext = RuleContext<WorldState, AlertState, EnergyContext>;
+    using FullContext = RuleContext<WorldState, AlertState, Weather, EnergyContext>;
 };
 
 struct EmergencyConfig {
@@ -312,47 +334,57 @@ struct EmergencyConfig {
     }
 };
 
-template<class T, class TAt> struct NormalTask : Capability<IUnitAI> {
+template<class T, class TAt> struct NormalAI : Capability<IUnitAI> {
     void Execute() const override { std::cout << "Action: Standard Operative.\n"; }
 };
 
-template<class T, class TAt> struct EmergencyTask : Capability<IUnitAI, EmergencyConfig> {
+template<class T, class TAt> struct LowPowerAI : Capability<IUnitAI, EmergencyConfig> {
     void Execute() const override { std::cout << "Action: !!! EMERGENCY RECHARGE !!!\n"; }
 };
 
-struct Scout {};
-static const CapabilityBaker<Scout, NormalTask, EmergencyTask> g_ScoutBaker{};
+struct Drone {};
+static const CapabilityBaker<Drone, NormalAI, LowPowerAI> g_DroneBaker{};
 
 // =============================================================================
 // 9. MAIN
 // =============================================================================
 
 int main() {
-    auto id = TypeIDOf<Scout>::Get();
+    CapabilityRouter::Bake();
+    auto id = TypeIDOf<Drone>::Get();
 
-    std::cout << "--- CRG STAGE 10: DOD FLAT TENSOR ---\n\n";
+    std::cout << "--- CRG STAGE 9: DYNAMIC RULES + MODEL ROUTER ---\n\n";
 
-    std::cout << "[ ECS PATH: Via CapabilityRouter directly ]\n";
-    // Cas 1 : Batterie à 80% (Broadphase O(1) -> Fallback)
+    // Cas 1 : Batterie OK
     {
         EnergyContext ctx{ 80.0f };
-        std::cout << "Day/Calm, 80% Batt -> ";
-        if (auto* ai = CapabilityRouter::Find<IUnitAI>(id, WorldState::Day, AlertState::Calm, ctx)) ai->Execute();
+        std::cout << "80% Battery : ";
+        if (auto* ai = CapabilityRouter::Find<IUnitAI>(id, WorldState::Day, AlertState::Calm, Weather::Clear, ctx)) {
+            ai->Execute();
+        }
     }
-
-    // Cas 2 : Batterie à 15% (Narrowphase O(K) -> Règle prioritaire)
     {
         EnergyContext ctx{ 15.0f };
-        std::cout << "Day/Calm, 15% Batt -> ";
-        if (auto* ai = CapabilityRouter::Find<IUnitAI>(id, WorldState::Day, AlertState::Calm, ctx)) ai->Execute();
+        std::cout << "15% Battery : ";
+        if (auto* ai = CapabilityRouter::Find<IUnitAI>(id, WorldState::Day, AlertState::Calm, Weather::Clear, ctx)) {
+            ai->Execute();
+        }
     }
-    
+
     std::cout << "\n[ COLD PATH: Via Strongly-Typed ModelRouter ]\n";
-    // Cas 3 : Utilisation du ModelRouter pour la clarté (Cold Path)
+    {
+        EnergyContext ctx{ 90.0f };
+        std::cout << "90% Battery : ";
+        if (auto* ai = ModelRouter<Drone>::Find<IUnitAI>(WorldState::Night, AlertState::Combat, Weather::Rain, ctx)) {
+            ai->Execute();
+        }
+    }
     {
         EnergyContext ctx{ 5.0f };
-        std::cout << "Night/Combat, 5% Batt -> ";
-        if (auto* ai = ModelRouter<Scout>::Find<IUnitAI>(WorldState::Night, AlertState::Combat, ctx)) ai->Execute();
+        std::cout << " 5% Battery : ";
+        if (auto* ai = ModelRouter<Drone>::Find<IUnitAI>(WorldState::Night, AlertState::Combat, Weather::Rain, ctx)) {
+            ai->Execute();
+        }
     }
 
     return 0;

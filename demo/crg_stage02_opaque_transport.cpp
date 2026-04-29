@@ -29,9 +29,10 @@
 
 // Global identity type
 using ModelTypeID = std::size_t;
+template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).hash_code(); } };
 
 // --- 1. THE TRANSPORT (Type-Erased Model Container) ---
-class ModelHandle {
+class ModelShell {
 public:
     // The Bridge: Internal interface to recover Identity
     struct Concept { 
@@ -46,11 +47,11 @@ public:
         Model(T v) : value(std::move(v)) {}
         
         ModelTypeID GetModelID() const override { 
-            return typeid(T).hash_code(); 
+            return TypeIDOf<T>::Get(); 
         }
     };
 
-    ModelHandle() = default;
+    ModelShell() = default;
 
     // Set: Erase the concrete type T but preserve its Identity
     template<class T> 
@@ -86,17 +87,17 @@ struct HeavyTank { int armor_plating;   };
 int main() {
     std::cout << "--- CRG STAGE 2: Opaque Transport ---\n\n";
 
-    ModelHandle handle;
+    ModelShell shell;
     
     // Identity 1: The Scout
-    handle.Set(Scout{"Vanguard-01"});
-    std::cout << "[ID]   Model Type ID: " << handle.GetID() << "\n";
-    std::cout << "[DATA] Scout Name:    " << handle.GetAs<Scout>().callsign << "\n\n";
+    shell.Set(Scout{"Vanguard-01"});
+    std::cout << "[ID]   Model Type ID: " << shell.GetID() << "\n";
+    std::cout << "[DATA] Scout Name:    " << shell.GetAs<Scout>().callsign << "\n\n";
 
     // Identity 2: The HeavyTank
-    handle.Set(HeavyTank{600});
-    std::cout << "[ID]   Model Type ID: " << handle.GetID() << "\n";
-    std::cout << "[DATA] Tank Armor:    " << handle.GetAs<HeavyTank>().armor_plating << "mm\n";
+    shell.Set(HeavyTank{600});
+    std::cout << "[ID]   Model Type ID: " << shell.GetID() << "\n";
+    std::cout << "[DATA] Tank Armor:    " << shell.GetAs<HeavyTank>().armor_plating << "mm\n";
 
     return 0;
 }

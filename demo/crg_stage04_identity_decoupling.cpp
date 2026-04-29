@@ -16,14 +16,14 @@ template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).
 // =============================================================================
 // 1. TYPE ERASED SHELL
 // =============================================================================
-class ModelHandle {
+class ModelShell {
 public:
     struct Concept { virtual ~Concept() = default; virtual ModelTypeID GetTypeID() const = 0; };
     template<class T> struct Model : Concept {
         T value; Model(T v) : value(std::move(v)) {}
         ModelTypeID GetTypeID() const override { return TypeIDOf<T>::Get(); }
     };
-    ModelHandle() = default;
+    ModelShell() = default;
     template<class T> void Set(T v) { m_ptr = std::make_unique<Model<T>>(std::move(v)); }
     ModelTypeID GetTypeID() const { return m_ptr ? m_ptr->GetTypeID() : 0; }
 private:
@@ -33,13 +33,32 @@ private:
 // =============================================================================
 // 2. INFRASTRUCTURE (Intrusive List)
 // =============================================================================
-template<class T> struct RegistrySlot { static inline T s_Value{}; };
+#ifndef CRG_DLL_ENABLED
+#define CRG_DLL_ENABLED 0
+#endif
 
-template<class TNode> using NodeListAnchor = RegistrySlot<const TNode*>;
+template<class T>
+struct RegistrySlot {
+#if !CRG_DLL_ENABLED
+    static inline T s_Value{}; 
+#else
+    static T s_Value;
+#endif
+};
+
+#if CRG_DLL_ENABLED
+    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+#else
+    #define CRG_BIND_SLOT(T) 
+#endif
+
+template<class TNode>
+using NodeListAnchor = RegistrySlot<const TNode*>;
 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
+
     NodeList() {
         const TNode* derivedThis = static_cast<const TNode*>(this);
         m_Next = NodeListAnchor<TNode>::s_Value;
@@ -107,8 +126,8 @@ struct TelemetryCapability : ITelemetry {
 // 5. THE GATEWAY
 // =============================================================================
 template<class InterfaceT>
-const InterfaceT* FindCapability(const ModelHandle& h) {
-    const ModelTypeID id = h.GetTypeID();
+const InterfaceT* FindCapability(const ModelShell& s) {
+    const ModelTypeID id = s.GetTypeID();
     for (auto* n = NodeListAnchor<ICapabilityNode<InterfaceT>>::s_Value; n; n = n->m_Next) {
         if (n->GetTargetModelID() == id) return n->GetInterface();
     }
@@ -125,11 +144,11 @@ static const CapabilityBinding<Drone, TelemetryCapability>  g_DroneTele;
 int main() {
     std::cout << "--- CRG STAGE 4: IDENTITY DECOUPLING ---\n\n";
 
-    ModelHandle h;
-    h.Set(Drone{});
+    ModelShell shell;
+    shell.Set(Drone{});
 
-    if (const auto* diag = FindCapability<IDiagnostic>(h)) diag->Execute();
-    if (const auto* tele = FindCapability<ITelemetry>(h)) tele->Send();
+    if (const auto* diag = FindCapability<IDiagnostic>(shell)) diag->Execute();
+    if (const auto* tele = FindCapability<ITelemetry>(shell)) tele->Send();
 
     return 0;
 }
