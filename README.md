@@ -6,7 +6,7 @@
 ## Overview
 CRG is a compile-time architectural framework designed to eliminate hard dependencies between engine modules. While it enables high-performance Data-Oriented Polymorphism, its core value lies in its **Zero-Dependency Injection** mechanism. It allows disparate systems (AI, Physics, Gameplay) to register and discover capabilities at the linker level, removing the need for centralized registries, "Include Hell," and bloated build times.
 
-## Linker-Driven Discovery (Pillar I)
+## Pillar I: Linker-Driven Discovery
 This is a standalone mechanism for module isolation. The engine core requires no knowledge of external features. Modules "inject" themselves via a **Linker-Driven Registry** using a **Strict Anchor** pattern. This ensures that the linker resolves behavioral chains across DLL/Binary boundaries without the fragility of manual registration or standard static initialization.
 ```mermaid
 graph TD
@@ -23,6 +23,32 @@ graph TD
         E[CapabilityInjector] -.->|Linker-Time Binding| C
         F[Plugin Logic] --- E
     end
+```
+
+## Pillar II: Tensor Visualizer (N-Dimensional Projection)
+The core innovation lies in the mathematical resolution of behaviors. An N-Dimensional behavior space (e.g., WorldState, AlertState, Biome) is projected onto a flat 1D memory arena. Resolution is a simple O(1) Cartesian offset calculation via Horner's Method, bypassing the need for structural entity migration or complex branching.
+```mermaid
+flowchart LR
+    subgraph Space ["N-Dimensional Behavior Space (Input)"]
+        direction TB
+        Axis1["WorldState (Day/Night)"]
+        Axis2["AlertState (Calm/Combat)"]
+        Axis3["Biome (Desert/Tundra)"]
+    end
+
+    Space ==>|Cartesian Mapping| Horner{Horner's Projector}
+    
+    subgraph Arena ["Flat Tensor Arena (Contiguous RAM)"]
+        direction LR
+        C0["[ ]"] --- C1["[ ]"] --- C2["Target Capability"] --- C3["[ ]"] --- C4["[ ]"]
+    end
+
+    Horner -->|O(1) Memory Offset| C2
+    C2 -.->|Zero Overhead| Exec[[Stateless Static Execute]]
+
+    style C2 fill:#2ecc71,stroke:#27ae60,stroke-width:3px
+    style Arena fill:#f4f4f4,stroke:#333
+    style Horner fill:#e74c3c,color:#fff
 ```
 
 ## Performance: Saturating the Memory Wall
