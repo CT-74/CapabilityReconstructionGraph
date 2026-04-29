@@ -1,7 +1,7 @@
 # Capability Routing Gateway (CRG)
 **Linker-Driven Architecture for Decoupled Module Discovery and High-Performance Dispatch**
 
-[Technical White Paper](paper/paper.md) | [Launch Interactive Simulator](https://ct-74.github.io/CapabilityReconstructionGraph/demo/final_simulator/index.html) | [Tensor Visualizer](https://ct-74.github.io/CapabilityReconstructionGraph/img/tensor_visualizer.html)
+[Technical White Paper](paper/paper.md) | [Launch Interactive Simulator](https://ct-74.github.io/CapabilityRoutingGateway/demo/final_simulator/index.html) | [Tensor Visualizer](https://ct-74.github.io/CapabilityRoutingGateway/img/tensor_visualizer.html)
 
 ## Overview
 CRG is a compile-time architectural framework designed to eliminate hard dependencies between engine modules. While it enables high-performance Data-Oriented Polymorphism, its core value lies in its **Zero-Dependency Injection** mechanism. It allows disparate systems (AI, Physics, Gameplay) to register and discover capabilities at the linker level, removing the need for centralized registries, "Include Hell," and bloated build times.
