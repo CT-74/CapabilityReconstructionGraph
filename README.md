@@ -36,15 +36,15 @@ flowchart LR
         Axis3["Biome (Desert/Tundra)"]
     end
 
-    Space ==>|Cartesian Mapping| Horner{Horner's Projector}
+    Space ==>|"Cartesian Mapping"| Horner{Horner's Projector}
     
     subgraph Arena ["Flat Tensor Arena (Contiguous RAM)"]
         direction LR
         C0["[ ]"] --- C1["[ ]"] --- C2["Target Capability"] --- C3["[ ]"] --- C4["[ ]"]
     end
 
-    Horner -->|O(1) Memory Offset| C2
-    C2 -.->|Zero Overhead| Exec[[Stateless Static Execute]]
+    Horner -->|"O(1) Memory Offset"| C2
+    C2 -.->|"Zero Overhead"| Exec[[Stateless Static Execute]]
 
     style C2 fill:#2ecc71,stroke:#27ae60,stroke-width:3px
     style Arena fill:#f4f4f4,stroke:#333
