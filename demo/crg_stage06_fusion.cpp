@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Copyright (c) 2026 Cyril Tissier. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
@@ -171,15 +171,15 @@ public:
 // 5. MODEL ROUTER & SHELL (THE OOP ILLUSION)
 // =============================================================================
 
-class ModelShell; // Forward declaration required for MethodTraits
+class ModelShell; // Forward declaration required for ModelShellMethodTraits
 
-template <typename T> struct MethodTraits;
+template <typename T> struct ModelShellMethodTraits;
 
 // STRICT ENFORCEMENT: 
 // 1. Must be a const method (Stateless logic).
 // 2. The first argument MUST be `const ModelShell&`.
 template <typename R, typename ClassType, typename... Args>
-struct MethodTraits<R (ClassType::*)(const ModelShell&, Args...) const> {
+struct ModelShellMethodTraits<R (ClassType::*)(const ModelShell&, Args...) const> {
     using Interface = ClassType;
     using ReturnType = R;
 };
@@ -187,9 +187,9 @@ struct MethodTraits<R (ClassType::*)(const ModelShell&, Args...) const> {
 // Helper trait to seamlessly handle void vs value return types in TryInvoke
 template<auto FuncPtr>
 using TryInvokeRetType = std::conditional_t<
-    std::is_void_v<typename MethodTraits<decltype(FuncPtr)>::ReturnType>,
+    std::is_void_v<typename ModelShellMethodTraits<decltype(FuncPtr)>::ReturnType>,
     void,
-    std::optional<typename MethodTraits<decltype(FuncPtr)>::ReturnType>
+    std::optional<typename ModelShellMethodTraits<decltype(FuncPtr)>::ReturnType>
 >;
 
 // The ModelRouter directly wraps the central CapabilityRouter
@@ -224,7 +224,7 @@ public:
     // --- Invoke: Assumes success (Fail-fast via assert) ---
     template<auto FuncPtr, class... TArgs>
     auto Invoke(TArgs&&... args) const {
-        using Traits = MethodTraits<decltype(FuncPtr)>;
+        using Traits = ModelShellMethodTraits<decltype(FuncPtr)>;
         using ExpectedInterface = typename Traits::Interface;
 
         assert(m_ptr != nullptr && "Invoke called on empty ModelShell");
@@ -238,7 +238,7 @@ public:
     // --- TryInvoke: Pragmatic silent failure / direct optional return ---
     template<auto FuncPtr, class... TArgs>
     TryInvokeRetType<FuncPtr> TryInvoke(TArgs&&... args) const {
-        using Traits = MethodTraits<decltype(FuncPtr)>;
+        using Traits = ModelShellMethodTraits<decltype(FuncPtr)>;
         using ExpectedInterface = typename Traits::Interface;
         using RetType = typename Traits::ReturnType;
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Copyright (c) 2026 Cyril Tissier. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
@@ -9,6 +9,7 @@
 // - Auto-Extraction: Framework pulls static methods into DODDescriptors.
 // - MakeAt: Fixed to correctly resolve N-Dimensional coordinates.
 // - ModelRouter: Zero-cost static proxy for cold-path access.
+// - ActiveCapability: Unified transparent bridge for DOD Contracts & OOP.
 // =============================================================================
 
 #include <iostream>
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <type_traits>
+#include <utility>
 
 // =============================================================================
 // 1. INFRASTRUCTURE & DLL-SAFE
@@ -309,7 +311,74 @@ public:
 };
 
 // =============================================================================
-// 7. CONTRACTS & GPP
+// 7. ACTIVE CAPABILITY (ECS COMPONENT / GPP BRIDGE)
+// =============================================================================
+
+template<class T, bool IsDOD = HasParams<T>::value>
+struct ActiveCapability;
+
+// =========================================================================
+// OOP SPECIALIZATION (Classic Interfaces)
+// =========================================================================
+template<class T>
+struct ActiveCapability<T, false> {
+    const T* resolvedPtr = nullptr;
+
+    inline ActiveCapability& operator=(const T* ptr) {
+        resolvedPtr = ptr;
+        return *this;
+    }
+
+    // -- Method 1: Explicit Invoke via member function pointer
+    template<auto FuncPtr, class... TArgs>
+    inline void Invoke(TArgs&&... args) const {
+        if (resolvedPtr) {
+            (resolvedPtr->*FuncPtr)(std::forward<TArgs>(args)...);
+        }
+    }
+
+    // -- Method 2: SFINAE auto-detected operator()
+    // The compiler checks if (*T)(TArgs...) is a valid expression.
+    template<class... TArgs, 
+             typename = decltype(std::declval<const T&>()(std::declval<TArgs>()...))>
+    inline void operator()(TArgs&&... args) const {
+        if (resolvedPtr) {
+            (*resolvedPtr)(std::forward<TArgs>(args)...);
+        }
+    }
+
+    inline explicit operator bool() const { return resolvedPtr != nullptr; }
+};
+
+// =========================================================================
+// DOD SPECIALIZATION (High-Performance Contracts)
+// =========================================================================
+template<class T>
+struct ActiveCapability<T, true> {
+    const DODDescriptor<T>* resolvedPtr = nullptr;
+
+    inline ActiveCapability& operator=(const DODDescriptor<T>* ptr) {
+        resolvedPtr = ptr;
+        return *this;
+    }
+
+    // -- Method 1: DOD-constrained Invoke strictly bound to T::Params
+    inline void Invoke(typename T::Params& params) const {
+        if (resolvedPtr) {
+            resolvedPtr->Execute(params);
+        }
+    }
+
+    // -- Method 2: DOD-constrained operator() strictly delegates to Invoke
+    inline void operator()(typename T::Params& params) const {
+        Invoke(params); 
+    }
+
+    inline explicit operator bool() const { return resolvedPtr != nullptr; }
+};
+
+// =============================================================================
+// 8. CONTRACTS & GPP
 // =============================================================================
 
 struct EnergyContract {
@@ -352,7 +421,7 @@ using DroneFleet = TypeList<Scout, HeavyLifter>;
 static const CapabilityBaker<DroneFleet, DrainLogic, DiagLogic> g_DroneBaker{};
 
 // =============================================================================
-// 8. ECS LOOP & MAIN
+// 9. ECS LOOP & MAIN
 // =============================================================================
 
 struct EnergySystem {
@@ -360,13 +429,21 @@ struct EnergySystem {
     std::vector<float>       batteries;
     std::vector<Biome>       biomes;
 
-    void Update(WorldState currentTime) {
+    // Added the ActiveCapability cache for true ECS Symbiosis
+    std::vector<ActiveCapability<EnergyContract>> drainCaps;
+
+    // THE BRAIN - Low frequency context resolution (e.g., 5Hz)
+    void UpdateLogic(WorldState currentTime) {
         for (std::size_t i = 0; i < handles.size(); ++i) {
-            auto* descriptor = CapabilityRouter::Find<EnergyContract>(handles[i], currentTime, biomes[i]);
-            if (descriptor) {
-                EnergyContract::Params params { batteries[i] };
-                descriptor->Execute(params);
-            }
+            drainCaps[i] = CapabilityRouter::Find<EnergyContract>(handles[i], currentTime, biomes[i]);
+        }
+    }
+
+    // THE MUSCLE - High frequency execution loop (e.g., 60Hz)
+    void Execute() {
+        for (std::size_t i = 0; i < handles.size(); ++i) {
+            EnergyContract::Params params { batteries[i] };
+            drainCaps[i](params); // Clean execution via unified operator()
         }
     }
 };
@@ -383,14 +460,27 @@ int main() {
     ecs.batteries.push_back(100.0f);
     ecs.biomes.push_back(Biome::Tundra);
 
+    // Initialize capability cache size
+    ecs.drainCaps.resize(ecs.handles.size());
+
     std::cout << "--- CRG STAGE 12: ECS SYMBIOSIS + MODEL ROUTER (FIXED) ---\n\n";
 
-    ecs.Update(WorldState::Night);
+    // 1. Resolve logical routing paths
+    ecs.UpdateLogic(WorldState::Night);
+    // 2. Pure DOD execution
+    ecs.Execute();
+
     std::cout << "Scout Battery: " << ecs.batteries[0] << "%" << std::endl;
     std::cout << "Heavy Battery: " << ecs.batteries[1] << "%" << std::endl;
 
     DiagnosticsContract::Params p1{"Scout Alpha"};
-    if (auto* d = ModelRouter<Scout>::Find<DiagnosticsContract>()) d->Execute(p1);
+    
+    // Testing the Cold-Path proxy with our new ActiveCapability
+    if (auto* desc = ModelRouter<Scout>::Find<DiagnosticsContract>()) {
+        ActiveCapability<DiagnosticsContract> diagCap;
+        diagCap = desc;
+        diagCap.Invoke(p1);
+    }
 
     return 0;
 }

@@ -1,7 +1,8 @@
-// Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Copyright (c) 2026 Cyril Tissier. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 11: BATTLEFIELD DEMO + MODEL ROUTER
+// CAPABILITY ROUTING GATEWAY (CRG) - FINAL STAGE: BATTLEFIELD DEMO
 // =============================================================================
 //
 // @intent:
@@ -11,6 +12,8 @@
 // - W: Spawn 500 more entities.
 // - I: Toggle immortality (visual test for the Panic/Flee capability).
 // - ModelRouter: Integrated zero-cost proxy for cold-path access.
+// - ActiveCapability: ECS Symbiosis for Brain (Resolution) & Muscle (Execution).
+// - Time-Slicing: The Brain runs at 5Hz smoothly distributed over 60 FPS.
 // =============================================================================
 
 #include "raylib.h"
@@ -23,6 +26,8 @@
 #include <unordered_map>
 #include <iostream>
 #include <chrono>
+#include <type_traits>
+#include <utility>
 
 // =============================================================================
 // [ ENGINE CORE ] 1. IDENTITY & DLL-SAFE INFRASTRUCTURE
@@ -161,7 +166,7 @@ struct NullContext {
     template<typename... Args> NullContext(const Args&...) {} 
 };
 
-// LAZY CONTEXT SELECTOR: Fixes the substitution error for contracts without RuleContext[cite: 14].
+// LAZY CONTEXT SELECTOR: Fixes the substitution error for contracts without RuleContext.
 template<typename T, typename = void> struct ContextSelector { using Type = NullContext; };
 template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRoutingTraits<T>::RuleContext>> {
     using Type = typename CapabilityRoutingTraits<T>::RuleContext;
@@ -258,7 +263,7 @@ template<class TModel, template<class, class> class... TCapabilities>
 struct CapabilityBaker : public IBakerNode {
     struct Unit : public CapabilityNode<TModel, TCapabilities, std::make_index_sequence<CapabilityRoutingTraits<typename TCapabilities<TModel, At<>>::InterfaceType>::SpaceType::Volume>>... {
         void Fill(DenseModelID slot) const { (CapabilityNode<TModel, TCapabilities, std::make_index_sequence<CapabilityRoutingTraits<typename TCapabilities<TModel, At<>>::InterfaceType>::SpaceType::Volume>>::FillArena(slot), ...); }
-    } m_unit{}; // Fixed explicit initialization[cite: 14].
+    } m_unit{};
 
     void Bake() const override {
         ModelTypeID hash = TypeIDOf<TModel>::Get();
@@ -279,7 +284,6 @@ struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public Capabilit
 
 class CapabilityRouter {
 public:
-    // Made public to allow ModelRouter synchronization[cite: 14].
     static void EnsureBaked() {
         static struct StaticGuard { 
             StaticGuard() { for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) b->Bake(); } 
@@ -300,7 +304,6 @@ public:
 
         const auto& cell = arena[idx];
 
-        // MVP Fix: Explicit assignment avoids function declaration ambiguity[cite: 14].
         TFullCtx activeCtx = ctx; 
         for (const auto& rule : cell.dynamicRules) if (rule.Matches(activeCtx)) return &rule.descriptor;
         return cell.hasFallback ? &cell.fallback : nullptr;
@@ -314,17 +317,79 @@ public:
 template<class ModelT>
 class ModelRouter {
 public:
-    // Zero-cost static wrapper over CapabilityRouter::Find[cite: 14].
     template<class TContract, class... Coords>
     static const DODDescriptor<TContract>* Find(const ContextTypeOf<TContract>& ctx, Coords... coords) {
-        // Force evaluation of the Tensor map before handle creation.
         CapabilityRouter::EnsureBaked(); 
         return CapabilityRouter::Find<TContract>(ModelHandle::FromType<ModelT>(), ctx, coords...);
     }
 };
 
 // =============================================================================
-// [ ENGINE CORE ] 7. LAZY INITIALIZATION RESOLVER
+// [ ENGINE CORE ] 7. ACTIVE CAPABILITY (ECS COMPONENT / GPP BRIDGE)
+// =============================================================================
+
+template<class T, bool IsDOD = HasParams<T>::value>
+struct ActiveCapability;
+
+// =========================================================================
+// OOP SPECIALIZATION (Classic Interfaces)
+// =========================================================================
+template<class T>
+struct ActiveCapability<T, false> {
+    const T* resolvedPtr = nullptr;
+
+    inline ActiveCapability& operator=(const T* ptr) {
+        resolvedPtr = ptr;
+        return *this;
+    }
+
+    template<auto FuncPtr, class... TArgs>
+    inline void Invoke(TArgs&&... args) const {
+        if (resolvedPtr) {
+            (resolvedPtr->*FuncPtr)(std::forward<TArgs>(args)...);
+        }
+    }
+
+    template<class... TArgs, 
+             typename = decltype(std::declval<const T&>()(std::declval<TArgs>()...))>
+    inline void operator()(TArgs&&... args) const {
+        if (resolvedPtr) {
+            (*resolvedPtr)(std::forward<TArgs>(args)...);
+        }
+    }
+
+    inline explicit operator bool() const { return resolvedPtr != nullptr; }
+};
+
+// =========================================================================
+// DOD SPECIALIZATION (High-Performance Contracts)
+// =========================================================================
+template<class T>
+struct ActiveCapability<T, true> {
+    const DODDescriptor<T>* resolvedPtr = nullptr;
+
+    inline ActiveCapability& operator=(const DODDescriptor<T>* ptr) {
+        resolvedPtr = ptr;
+        return *this;
+    }
+
+    // -- Method 1: DOD-constrained Invoke
+    inline void Invoke(typename T::Params& params) const {
+        if (resolvedPtr) {
+            resolvedPtr->Execute(params);
+        }
+    }
+
+    // -- Method 2: DOD-constrained operator() strictly delegates to Invoke
+    inline void operator()(typename T::Params& params) const {
+        Invoke(params); 
+    }
+
+    inline explicit operator bool() const { return resolvedPtr != nullptr; }
+};
+
+// =============================================================================
+// [ ENGINE CORE ] 8. LAZY INITIALIZATION RESOLVER
 // =============================================================================
 
 inline ModelHandle::ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
@@ -428,6 +493,7 @@ static const CapabilityBaker<DroneFleet, DroneLogic, DroneFlee> g_DroneBaker{};
 class BattlefieldEngine {
     entt::registry reg;
     float mutation_rate = 5.0f;
+    size_t frame_count = 0; // Needed for time-slicing
     
 public:
     void Init() { AddWave(1000); }
@@ -441,6 +507,10 @@ public:
             id.handle = ModelHandle::FromType<Drone>();
             id.current_state = CombatState::Idle;
             reg.emplace<CRGIdentity>(e, id);
+            
+            // Explicitly add our ActiveCapability cache component
+            reg.emplace<ActiveCapability<UnitAIContract>>(e);
+            
             reg.emplace<Health>(e, 100.0f);
             reg.emplace<BehaviorSettings>(e, 25.0f);
             reg.emplace<Renderable>(e, SKYBLUE, 3.0f);
@@ -451,6 +521,8 @@ public:
 
     ProfileResult Update(float dt, bool use_crg, bool immortal) {
         ProfileResult p;
+        frame_count++;
+
         auto t0 = std::chrono::high_resolution_clock::now();
         reg.view<Body>().each([dt](auto& b) {
             b.pos.x += b.vel.x * dt; b.pos.y += b.vel.y * dt;
@@ -480,12 +552,25 @@ public:
 
         auto t4 = std::chrono::high_resolution_clock::now();
         if (use_crg) {
-            reg.view<CRGIdentity, Body, Weapon, Renderable, BehaviorSettings, Health>().each([&](auto entity, auto& id, auto& b, auto& w, auto& r, auto& s, auto& h) {
-                UnitAIContract::RuleContext ctx { h };
-                if (const auto* descriptor = CapabilityRouter::Find<UnitAIContract>(id.handle, ctx, id.current_state)) {
-                    UnitAIContract::Params params { reg, entity, b, w, r, s, dt };
-                    descriptor->Execute(params);
+            // Time-Slicing Math: Spread 5Hz logic updates over a 60 FPS loop
+            const size_t TARGET_FPS = 60;
+            const size_t LOGIC_HZ = 5;
+            const size_t TOTAL_SLICES = TARGET_FPS / LOGIC_HZ; // 12 slices
+            const size_t current_slice = frame_count % TOTAL_SLICES;
+
+            // THE BRAIN - Time-Sliced Resolution
+            reg.view<CRGIdentity, Health, ActiveCapability<UnitAIContract>>().each([&](auto entity, auto& id, auto& h, auto& cap) {
+                // We only perform the routing lookup for 1/12th of the entities this frame
+                if ((static_cast<uint32_t>(entity) % TOTAL_SLICES) == current_slice) {
+                    UnitAIContract::RuleContext ctx { h };
+                    cap = CapabilityRouter::Find<UnitAIContract>(id.handle, ctx, id.current_state);
                 }
+            });
+
+            // THE MUSCLE - Pure DOD Execution (runs for 100% of entities at 60Hz)
+            reg.view<ActiveCapability<UnitAIContract>, Body, Weapon, Renderable, BehaviorSettings>().each([&](auto entity, auto& cap, auto& b, auto& w, auto& r, auto& s) {
+                UnitAIContract::Params params { reg, entity, b, w, r, s, dt };
+                cap(params); 
             });
         } else {
             reg.view<AggressiveTag, Body, Weapon, Renderable, BehaviorSettings>().each([&](auto entity, auto& b, auto& w, auto& r, auto& s) {

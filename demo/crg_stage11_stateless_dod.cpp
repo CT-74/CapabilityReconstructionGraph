@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Copyright (c) 2026 Cyril Tissier. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================

@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Cyril Tissier. All rights reserved.
+// Copyright (c) 2026 Cyril Tissier. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
@@ -8,7 +8,7 @@
 // @intent:
 // Create an OOP-style illusion directly on the ModelShell.
 // - ModelRouter: Implements global resolution for a specific Model.
-// - Stateless Enforcement: MethodTraits strictly rejects non-const methods.
+// - Stateless Enforcement: ModelShellMethodTraits strictly rejects non-const methods.
 // - Pure TryInvoke: Direct return via implicit conversion.
 // =============================================================================
 
@@ -106,11 +106,11 @@ public:
 // 4. TRAITS EXTRACTOR
 // =============================================================================
 
-template <typename T> struct MethodTraits;
+template <typename T> struct ModelShellMethodTraits;
 
 // STRICT ENFORCEMENT: Only const member functions are allowed.
 template <typename R, typename ClassType, typename... Args>
-struct MethodTraits<R (ClassType::*)(Args...) const> {
+struct ModelShellMethodTraits<R (ClassType::*)(Args...) const> {
     using Interface = ClassType;
     using ReturnType = R;
 };
@@ -118,9 +118,9 @@ struct MethodTraits<R (ClassType::*)(Args...) const> {
 // Return type deduction helper to avoid "auto deduction conflict" compilation errors
 template<auto FuncPtr>
 using TryInvokeRetType = std::conditional_t<
-    std::is_void_v<typename MethodTraits<decltype(FuncPtr)>::ReturnType>,
+    std::is_void_v<typename ModelShellMethodTraits<decltype(FuncPtr)>::ReturnType>,
     void,
-    std::optional<typename MethodTraits<decltype(FuncPtr)>::ReturnType>
+    std::optional<typename ModelShellMethodTraits<decltype(FuncPtr)>::ReturnType>
 >;
 
 // =============================================================================
@@ -150,7 +150,7 @@ public:
     // --- Invoke: Assumes success (Fail-fast via assert) ---
     template<auto FuncPtr, class... TArgs>
     auto Invoke(TArgs&&... args) const {
-        using Traits = MethodTraits<decltype(FuncPtr)>;
+        using Traits = ModelShellMethodTraits<decltype(FuncPtr)>;
         using ExpectedInterface = typename Traits::Interface;
 
         assert(m_ptr != nullptr && "Invoke called on empty ModelShell");
@@ -164,7 +164,7 @@ public:
     // --- TryInvoke: Exactly as requested ---
     template<auto FuncPtr, class... TArgs>
     TryInvokeRetType<FuncPtr> TryInvoke(TArgs&&... args) const {
-        using Traits = MethodTraits<decltype(FuncPtr)>;
+        using Traits = ModelShellMethodTraits<decltype(FuncPtr)>;
         using ExpectedInterface = typename Traits::Interface;
         using RetType = typename Traits::ReturnType;
 
