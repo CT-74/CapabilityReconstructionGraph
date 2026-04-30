@@ -86,7 +86,7 @@ classDiagram
 
 Behavioral resolution is modeled as a coordinate lookup within an **N-Dimensional Tensor** (CapabilitySpace).
 
-![N-Dimensional Behavior Tensor Resolution](img/tensor_routing.png)
+![N-Dimensional Behavior Tensor Resolution](../img/tensor_routing.png)
 
 * **Pure Arithmetic Dispatch:** Contextual axes (State, Zone, Authority) are resolved via Horner’s method into a flat offset. Complexity is free: whether you have one or ten dimensions, the lookup remains two array accesses.
 * **Immutable Topology:** Behavior transitions are coordinate updates, not structural rewirings. The memory addresses of the logic never shift, allowing the prefetcher to maintain a perfect stream.
@@ -144,7 +144,7 @@ By avoiding memory fragmentation and cache-thrashing `Swap & Pop` operations dur
 
 CRG does not deprecate ECS; it complements it. The architectural decision between traditional ECS archetype migration and CRG pointer caching depends on two variables: **Entity Size** (Data Payload) and **Structural Mutation Rate** (State Volatility).
 
-![ECS vs CRG Break-Even Analysis](img/breakeven_curve.png)
+![ECS vs CRG Break-Even Analysis](../img/breakeven_curve.png)
 
 * **ECS Supremacy (Static Loops & Micro-Entities):** For data payloads strictly under 32-bytes exhibiting highly static behavior (< 4% mutation rate), ECS archetype processing is mathematically optimal. The occasional `memcpy` penalty is offset by zero-indirection loops.
 * **CRG Supremacy (Zero-Migration & Heavy Logic):** Once an entity exceeds the 64-byte L1 cache-line threshold, or if state volatility exceeds 4%, the memory-wall constraints dominate CPU performance. By caching a `DODDescriptor` rather than migrating data structures, CRG preserves prefetcher momentum and linear memory access, effectively decoupling logical state from physical memory location.
