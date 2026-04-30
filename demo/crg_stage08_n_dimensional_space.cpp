@@ -6,7 +6,7 @@
 // =============================================================================
 // @intent:
 // O(1) N-Dimensional Tensor Routing using Horner's Method.
-// - Space: Robust implementation supporting 0D to N-Dimensional spaces.
+// - CapabilitySpace: Robust implementation supporting 0D to N-Dimensional spaces.
 // - CapabilityRouter: The core high-performance gateway (ECS / Hot path).
 // - ModelRouter: A zero-cost static proxy for direct type access (Cold path).
 // =============================================================================
@@ -59,7 +59,7 @@ template<typename... Ts> struct TypeList {};
 template<typename T> struct EnumTraits;
 
 template<class... TAxes>
-struct Space {
+struct CapabilitySpace {
     using AxisTuple = std::tuple<TAxes...>;
     static constexpr std::size_t Dimensions = sizeof...(TAxes);
     
@@ -82,7 +82,7 @@ struct Space {
         if constexpr (Dimensions == 0) return 0;
         else {
             using AxisT = std::tuple_element_t<DimIdx, AxisTuple>;
-            return static_cast<AxisT>((index / Space<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
+            return static_cast<AxisT>((index / CapabilitySpace<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
         }
     }
 
@@ -108,8 +108,8 @@ private:
 // 3. CORE ROUTING & BAKER ENGINE
 // =============================================================================
 
-// Default Space traits fallback to 0D Space<>
-template<class TInterface> struct CapabilityRoutingTraits { using SpaceType = Space<>; };
+// Default CapabilitySpace traits fallback to 0D CapabilitySpace<>
+template<class TInterface> struct CapabilityRoutingTraits { using SpaceType = CapabilitySpace<>; };
 template<auto... Values> struct At {};
 template<class TInterface> struct Capability : public TInterface { using InterfaceType = TInterface; };
 
@@ -245,7 +245,7 @@ struct IUnitAI {
     virtual void Execute() const = 0; 
 };
 template<> struct CapabilityRoutingTraits<IUnitAI> { 
-    using SpaceType = Space<WorldState, AlertState, Weather>; 
+    using SpaceType = CapabilitySpace<WorldState, AlertState, Weather>; 
 };
 
 // Default Logic
@@ -272,7 +272,7 @@ struct UnitLogic<T, At<World, AlertState::Combat, Weather::Rain, Rest...>> : Cap
     void Execute() const override { std::cout << "[AI] Logic: Tactical Combat under Heavy Rain.\n"; }
 };
 
-// 0D Capability Fallback (No Space defined)
+// 0D Capability Fallback (No CapabilitySpace defined)
 struct ISimplePing {
     using InterfaceType = ISimplePing;
     virtual ~ISimplePing() = default;

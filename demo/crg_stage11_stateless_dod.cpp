@@ -92,7 +92,7 @@ struct ModelHandle {
 template<typename T> struct EnumTraits;
 
 template<class... TAxes>
-struct Space {
+struct CapabilitySpace {
     using AxisTuple = std::tuple<TAxes...>;
     static constexpr std::size_t Dimensions = sizeof...(TAxes);
     
@@ -115,7 +115,7 @@ struct Space {
         if constexpr (Dimensions == 0) return 0;
         else {
             using AxisT = std::tuple_element_t<DimIdx, AxisTuple>;
-            return static_cast<AxisT>((index / Space<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
+            return static_cast<AxisT>((index / CapabilitySpace<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
         }
     }
 
@@ -340,7 +340,7 @@ struct ITask {
 };
 
 template<> struct CapabilityRoutingTraits<ITask> { 
-    using SpaceType = Space<OpState>; 
+    using SpaceType = CapabilitySpace<OpState>; 
     using FullContext = ITask::RuleContext; 
 };
 

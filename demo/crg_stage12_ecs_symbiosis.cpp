@@ -81,7 +81,7 @@ template<class TNode, class TInterface> struct NodeList : public TInterface {
 template<typename T> struct EnumTraits;
 
 template<class... TAxes>
-struct Space {
+struct CapabilitySpace {
     using AxisTuple = std::tuple<TAxes...>;
     static constexpr std::size_t Dimensions = sizeof...(TAxes);
     static constexpr std::size_t Volume = (Dimensions == 0) ? 1 : (EnumTraits<TAxes>::Count * ... * 1);
@@ -102,7 +102,7 @@ struct Space {
         if constexpr (Dimensions == 0) return 0;
         else {
             using AxisT = std::tuple_element_t<DimIdx, AxisTuple>;
-            return static_cast<AxisT>((index / Space<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
+            return static_cast<AxisT>((index / CapabilitySpace<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
         }
     }
 
@@ -123,7 +123,7 @@ private:
     }
 };
 
-template<class TContract> struct CapabilityRoutingTraits { using SpaceType = Space<>; }; 
+template<class TContract> struct CapabilityRoutingTraits { using SpaceType = CapabilitySpace<>; }; 
 template<auto... Values> struct At {};
 
 template<class TSpace, std::size_t Index, class IdxSeq> struct MakeAt;
@@ -327,7 +327,7 @@ template<> struct EnumTraits<WorldState> { static constexpr std::size_t Count = 
 template<> struct EnumTraits<Biome> { static constexpr std::size_t Count = 2; };
 
 template<> struct CapabilityRoutingTraits<EnergyContract> { 
-    using SpaceType = Space<WorldState, Biome>; 
+    using SpaceType = CapabilitySpace<WorldState, Biome>; 
 };
 
 template<class T, class TAt = At<>> 

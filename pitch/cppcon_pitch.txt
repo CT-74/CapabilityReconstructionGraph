@@ -17,6 +17,6 @@ Outline:
 * 00-05: The Dependency Wall: The cost of coupling; why "Include Hell" and Archetype Fragmentation are the same architectural flaw.
 * 05-15: Anchor-Based Discovery: Implementing auto-registration via static anchor points in DLLs; making the linker do the "wiring" work across module boundaries.
 * 15-25: Selective Projection: Dual-backend strategy. The Stateless Shell (TES) for flexibility vs. the Stateless DOD sniper for throughput.
-* 25-40: The N-Dimensional Tensor & Logic Math: Transforming decisions into O(1) arithmetic; implementing "Space" evaluation via Horner’s method.
+* 25-40: The N-Dimensional Tensor & Logic Math: Transforming decisions into O(1) arithmetic; implementing "CapabilitySpace" evaluation via Horner’s method.
 * 40-55: Data-Driven Performance Masterclass: Analyzing the "Archetype Poisoning" penalty. 60% throughput reclamation and the 30.8 Gi/s memory wall.
 * 55-60: Q&A

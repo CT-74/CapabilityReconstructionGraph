@@ -87,7 +87,7 @@ struct NullContext {
 // =============================================================================
 
 template<class... TAxes>
-struct Space {
+struct CapabilitySpace {
     using AxisTuple = std::tuple<TAxes...>;
     static constexpr std::size_t Dimensions = sizeof...(TAxes);
     
@@ -110,7 +110,7 @@ struct Space {
         if constexpr (Dimensions == 0) return 0;
         else {
             using AxisT = std::tuple_element_t<DimIdx, AxisTuple>;
-            return static_cast<AxisT>((index / Space<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
+            return static_cast<AxisT>((index / CapabilitySpace<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
         }
     }
 
@@ -323,7 +323,7 @@ public:
 struct IUnitAI { virtual void Execute() const = 0; };
 
 template<> struct CapabilityRoutingTraits<IUnitAI> {
-    using SpaceType = Space<WorldState, AlertState>;
+    using SpaceType = CapabilitySpace<WorldState, AlertState>;
     using FullContext = RuleContext<WorldState, AlertState, Weather, EnergyContext>;
 };
 

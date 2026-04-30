@@ -29,14 +29,14 @@ graph TD
 The core innovation lies in the mathematical resolution of behaviors. An N-Dimensional behavior space (e.g., WorldState, AlertState, Biome) is projected onto a flat 1D memory arena. Resolution is a simple O(1) Cartesian offset calculation via Horner's Method, bypassing the need for structural entity migration or complex branching.
 ```mermaid
 flowchart LR
-    subgraph Space ["N-Dimensional Behavior Space (Input)"]
+    subgraph CapabilitySpace ["N-Dimensional Behavior CapabilitySpace (Input)"]
         direction TB
         Axis1["WorldState (Day/Night)"]
         Axis2["AlertState (Calm/Combat)"]
         Axis3["Biome (Desert/Tundra)"]
     end
 
-    Space ==>|"Cartesian Mapping"| Horner{Horner's Projector}
+    CapabilitySpace ==>|"Cartesian Mapping"| Horner{Horner's Projector}
     
     subgraph Arena ["Flat Tensor Arena (Contiguous RAM)"]
         direction LR

@@ -95,7 +95,7 @@ struct GlobalState { constexpr operator std::size_t() const { return 0; } };
 template<> struct EnumTraits<GlobalState> { static constexpr std::size_t Count = 1; };
 
 template<class... TAxes>
-struct Space {
+struct CapabilitySpace {
     using AxisTuple = std::tuple<TAxes...>;
     static constexpr std::size_t Dimensions = sizeof...(TAxes);
     
@@ -118,7 +118,7 @@ struct Space {
         if constexpr (Dimensions == 0) return 0;
         else {
             using AxisT = std::tuple_element_t<DimIdx, AxisTuple>;
-            return static_cast<AxisT>((index / Space<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
+            return static_cast<AxisT>((index / CapabilitySpace<TAxes...>::template GetStride<DimIdx>()) % EnumTraits<AxisT>::Count);
         }
     }
 
@@ -140,7 +140,7 @@ private:
     }
 };
 
-template<class TContract> struct CapabilityRoutingTraits { using SpaceType = Space<GlobalState>; }; 
+template<class TContract> struct CapabilityRoutingTraits { using SpaceType = CapabilitySpace<GlobalState>; }; 
 template<auto... Values> struct At {};
 
 // Variadic index sequence expansion for axes coordinates.
@@ -371,7 +371,7 @@ struct UnitAIContract {
 };
 
 template<> struct CapabilityRoutingTraits<UnitAIContract> { 
-    using SpaceType = Space<CombatState>; 
+    using SpaceType = CapabilitySpace<CombatState>; 
     using RuleContext = UnitAIContract::RuleContext;
 };
 
