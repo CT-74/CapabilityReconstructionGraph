@@ -436,7 +436,7 @@ C'est ici que l'on frappe le "Memory Wall". À 10% de mutation, l'ECS classique 
 ## Code
 ```cpp
 // Visualizing the Memory Wall
-// Scenario: 50k Entities, 10% Mutation Rate
+// Scenario: 50k Entities, Dynamic Mutation (0% -> 46%)
 // Red: ECS Archetype Migration | Green: CRG Static Tensor
 ```
 ## Mermaid

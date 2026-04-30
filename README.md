@@ -130,7 +130,7 @@ CRG saturates physical memory bandwidth by maintaining **structural immutability
     Your browser does not support HTML5 video. Here is a <a href="https://github.com/user-attachments/assets/8c464085-1856-439a-9fad-517db26dbb09">direct link to the video</a>.
   </video>
   <br>
-  <p><i>Real-time simulation (50k entities, 10% mutation): CRG (Green) remains immune to structural churn while traditional ECS (Red) collapses under memory migration costs.</i></p>
+  <p><i>Real-time simulation (50k entities): CRG (Green) remains immune to structural churn while traditional ECS (Red) collapses under memory migration costs.</i></p>
 </div>
 
 ---
