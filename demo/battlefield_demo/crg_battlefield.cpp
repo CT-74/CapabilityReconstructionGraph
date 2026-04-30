@@ -174,8 +174,15 @@ template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRo
 
 template<typename T> using ContextTypeOf = typename ContextSelector<T>::Type;
 
-template<typename T, typename = void> struct HasParams : std::false_type {};
-template<typename T> struct HasParams<T, std::void_t<typename T::Params>> : std::true_type {};
+// =========================================================================
+// STRICT DOD CONTRACT VALIDATOR
+// =========================================================================
+template<typename T, typename = void> 
+struct IsDODContract : std::false_type {};
+
+template<typename T> 
+struct IsDODContract<T, std::void_t<typename T::Params>> 
+    : std::bool_constant<!std::is_polymorphic_v<T>> {};
 
 // DODDescriptor: The structural wrapper holding the raw static function pointer.
 template<class TContract>
@@ -328,7 +335,7 @@ public:
 // [ ENGINE CORE ] 7. ACTIVE CAPABILITY (ECS COMPONENT / GPP BRIDGE)
 // =============================================================================
 
-template<class T, bool IsDOD = HasParams<T>::value>
+template<class T, bool IsDOD = IsDODContract<T>::value>
 struct ActiveCapability;
 
 // =========================================================================

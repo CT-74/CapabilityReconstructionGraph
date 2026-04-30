@@ -154,8 +154,15 @@ template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRo
 
 template<typename T> using ContextTypeOf = typename ContextSelector<T>::Type;
 
-template<typename T, typename = void> struct HasParams : std::false_type {};
-template<typename T> struct HasParams<T, std::void_t<typename T::Params>> : std::true_type {};
+// =========================================================================
+// STRICT DOD CONTRACT VALIDATOR
+// =========================================================================
+template<typename T, typename = void> 
+struct IsDODContract : std::false_type {};
+
+template<typename T> 
+struct IsDODContract<T, std::void_t<typename T::Params>> 
+    : std::bool_constant<!std::is_polymorphic_v<T>> {};
 
 template<class TContract>
 struct DODDescriptor {
@@ -314,7 +321,7 @@ public:
 // 7. ACTIVE CAPABILITY (ECS COMPONENT / GPP BRIDGE)
 // =============================================================================
 
-template<class T, bool IsDOD = HasParams<T>::value>
+template<class T, bool IsDOD = IsDODContract<T>::value>
 struct ActiveCapability;
 
 // =========================================================================
@@ -338,7 +345,6 @@ struct ActiveCapability<T, false> {
     }
 
     // -- Method 2: SFINAE auto-detected operator()
-    // The compiler checks if (*T)(TArgs...) is a valid expression.
     template<class... TArgs, 
              typename = decltype(std::declval<const T&>()(std::declval<TArgs>()...))>
     inline void operator()(TArgs&&... args) const {
@@ -449,8 +455,6 @@ struct EnergySystem {
 };
 
 int main() {
-    CapabilityRouter::EnsureBaked(); 
-
     EnergySystem ecs;
     ecs.handles.push_back(ModelHandle::FromType<Scout>());
     ecs.batteries.push_back(100.0f);
