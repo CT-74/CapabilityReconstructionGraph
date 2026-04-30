@@ -9,8 +9,9 @@ from pptx.enum.text import PP_ALIGN
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BENCH_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "..", "benchmarks"))
 TALK_FILE = os.path.join(CURRENT_DIR, "cppcon_talk.md")
-# Assure-toi que ce chemin pointe bien vers le dossier contenant tes images
+# Chemin vers le dossier contenant tes images et la vidéo
 IMG_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "img")) 
+VIDEO_PATH = os.path.join(IMG_DIR, "CRG_vs_ECS_Simulation.mov")
 
 # --- COULEURS CPPCON ---
 DARK_GREY = RGBColor(15, 15, 15)
@@ -28,7 +29,7 @@ def get_latest_bench_img(prefix):
     return max(files, key=os.path.getctime) if files else None
 
 def generate_tes_layout():
-    """Génère le schéma du layout mémoire du ModelShell (très simple, on garde la génération à la volée)"""
+    """Génère le schéma du layout mémoire du ModelShell"""
     fig, ax = plt.subplots(figsize=(8, 2))
     ax.barh(0, 48, color='#3498db', edgecolor='white', label='Data (T)')
     ax.barh(0, 8, left=48, color='#e74c3c', edgecolor='white', label='Padding')
@@ -56,6 +57,23 @@ class PPTXGenerator:
         self.lang = lang
         self.prs = Presentation()
         self.prs.slide_width, self.prs.slide_height = Inches(13.333), Inches(7.5)
+
+    def add_video_to_slide(self, slide, video_path):
+        """Insère une vidéo native dans la slide PowerPoint"""
+        if os.path.exists(video_path):
+            # Positionnement à droite (miroir du bloc de code)
+            left, top = Inches(7.2), Inches(1.8)
+            width, height = Inches(5.5), Inches(4.0)
+            
+            # Note: mime_type est important pour les fichiers .mov sur Windows/Office
+            slide.shapes.add_movie(
+                video_path, 
+                left, top, width, height,
+                poster_frame_image=None, 
+                mime_type='video/quicktime'
+            )
+            return True
+        return False
 
     def create_deck(self, slides_data):
         for data in slides_data:
@@ -89,38 +107,41 @@ class PPTXGenerator:
                     paragraph.font.color.rgb = WHITE
                     paragraph.alignment = PP_ALIGN.LEFT
 
-            # Image Logic (Droite)
+            # Média (Droite)
             img_stream = None
+            video_inserted = False
             
-            # PRIORITÉ 1 : Chargement strict de tes images existantes (Aucun écrasement)
-            if "THE HYPERCUBE" in data['title'].upper() or "TENSOR" in data['title'].upper():
-                tensor_path = os.path.join(IMG_DIR, "tensor_routing.png")
-                if os.path.exists(tensor_path):
-                    with open(tensor_path, 'rb') as f: img_stream = io.BytesIO(f.read())
-                else:
-                    print(f"⚠️ Image not found: {tensor_path}")
-            elif "DECISION MATRIX" in data['title'].upper() or "THRESHOLD" in data['title'].upper():
-                breakeven_path = os.path.join(IMG_DIR, "breakeven_curve.png")
-                if os.path.exists(breakeven_path):
-                    with open(breakeven_path, 'rb') as f: img_stream = io.BytesIO(f.read())
-                else:
-                    print(f"⚠️ Image not found: {breakeven_path}")
-            
-            # PRIORITÉ 2 : Rendu Mermaid
-            elif data['mermaid']:
-                img_stream = get_mermaid_img(data['mermaid'])
-                
-            # PRIORITÉ 3 : Schémas volants & Benchmarks
-            elif "ModelShell" in data['title']:
-                img_stream = generate_tes_layout()
-            elif "Benchmark" in data['title'] or "Silicon Limit" in data['title']:
-                latest_path = get_latest_bench_img("crg_benchmark_final")
-                if latest_path:
-                    with open(latest_path, 'rb') as f: img_stream = io.BytesIO(f.read())
+            # PRIORITÉ 0 : Vidéo pour les slides de simulation/stress test
+            title_upper = data['title'].upper()
+            if any(k in title_upper for k in ["STRESS TEST", "SIMULATION", "LIMIT"]):
+                video_inserted = self.add_video_to_slide(slide, VIDEO_PATH)
 
-            # Insertion
-            if img_stream:
-                slide.shapes.add_picture(img_stream, Inches(7.2), Inches(1.8), width=Inches(5.5))
+            if not video_inserted:
+                # PRIORITÉ 1 : Images statiques haute définition
+                if "THE HYPERCUBE" in title_upper or "TENSOR" in title_upper:
+                    tensor_path = os.path.join(IMG_DIR, "tensor_routing.png")
+                    if os.path.exists(tensor_path):
+                        with open(tensor_path, 'rb') as f: img_stream = io.BytesIO(f.read())
+                elif "DECISION MATRIX" in title_upper or "THRESHOLD" in title_upper:
+                    breakeven_path = os.path.join(IMG_DIR, "breakeven_curve.png")
+                    if os.path.exists(breakeven_path):
+                        with open(breakeven_path, 'rb') as f: img_stream = io.BytesIO(f.read())
+                
+                # PRIORITÉ 2 : Rendu Mermaid
+                elif data['mermaid']:
+                    img_stream = get_mermaid_img(data['mermaid'])
+                    
+                # PRIORITÉ 3 : Schémas automatiques & Benchmarks
+                elif "ModelShell" in data['title']:
+                    img_stream = generate_tes_layout()
+                elif "Benchmark" in data['title']:
+                    latest_path = get_latest_bench_img("crg_benchmark_final")
+                    if latest_path:
+                        with open(latest_path, 'rb') as f: img_stream = io.BytesIO(f.read())
+
+                # Insertion finale de l'image si trouvée
+                if img_stream:
+                    slide.shapes.add_picture(img_stream, Inches(7.2), Inches(1.8), width=Inches(5.5))
 
             # Notes de présentation
             notes = data['fr_notes'] if self.lang == 'FR' else data['en_notes']
@@ -138,9 +159,7 @@ if __name__ == "__main__":
         try:
             subprocess.run(["python3", "run_all.py"], cwd=BENCH_DIR, check=True)
         except Exception as e:
-            print(f"⚠️ Could not update benchmarks automatically: {e}")
-    else:
-         print("⚠️ Benchmarks directory not found, skipping update.")
+            print(f"⚠️ Could not update benchmarks: {e}")
 
     # 2. Parse Talk
     print("📄 Parsing Talk File...")
@@ -152,18 +171,18 @@ if __name__ == "__main__":
         for s in raw_slides:
             parsed_data.append({
                 'title': s.split('\n')[0].strip(),
-                'code': (re.search(r'## Code\n```cpp\n(.*?)\n```', s, re.S) or [None,None])[1],
+                'code': (re.search(r'## Code\n+```cpp\n+(.*?)\n+```', s, re.S) or [None, None])[1],
                 'mermaid': (re.search(r'## Mermaid\n```mermaid\n(.*?)\n```', s, re.S) or [None,None])[1],
                 'en_notes': (re.search(r'## EN\n(.*?)(?=\n##|$)', s, re.S) or [None,""])[1].strip(),
                 'fr_notes': (re.search(r'## FR\n(.*?)(?=\n##|$)', s, re.S) or [None,""])[1].strip()
             })
 
         # 3. Generate Decks
-        print("🎨 Generating FR Deck...")
-        PPTXGenerator('FR').create_deck(parsed_data)
-        print("🎨 Generating EN Deck...")
-        PPTXGenerator('EN').create_deck(parsed_data)
+        for lang in ['FR', 'EN']:
+            print(f"🎨 Generating {lang} Deck...")
+            PPTXGenerator(lang).create_deck(parsed_data)
+        
         print("✅ Decks Generated Successfully!")
         
-    except FileNotFoundError:
-        print(f"❌ Error: Could not find talk file at {TALK_FILE}")
+    except Exception as e:
+        print(f"❌ Error during generation: {e}")

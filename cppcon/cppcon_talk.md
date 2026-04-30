@@ -412,13 +412,13 @@ graph TD
 ## EN
 Three levels of speed. Level 1: classic OOP vtable dispatch (~20ns). Level 2: CRG Shell Invoke, paying a virtual jump for type erasure (~7ns) — perfect for cold paths. Level 3: ActiveCapability, cached results called directly via function pointer (1.5ns). We've reached the physical hardware limit.
 ## FR
-TODO
+Trois niveaux de vitesse. Niveau 1 : le dispatch classique par vtable OOP (~20ns). Niveau 2 : ModelShell Invoke, payant un saut virtuel pour l'effacement de type (~7ns) — idéal pour les chemins froids. Niveau 3 : ActiveCapability, résultat mis en cache et appelé directement via pointeur de fonction (1.5ns). Nous avons atteint la limite physique du matériel.
 
 # SLIDE: 16 - REACHING THE SILICON LIMIT (Benchmarks)
 ## Code
 ```cpp
 // Throughput at Scale (1M entities)
-// Classic ECS: 19.26 Gi/s
+// Classic ECS (10% Mutation): 19.26 Gi/s
 // CRG Projection: 30.83 Gi/s
 ```
 ## Mermaid
@@ -430,9 +430,23 @@ graph LR
 ## EN
 At 10% mutation, ECS is 30% slower because of structural migrations. CRG stays flat because data never moves. As the dataset grows past L3 cache, ECS spikes while CRG flatlines. CRG makes data immobile, which makes it predictable for the hardware.
 ## FR
-TODO
+À 10% de mutation, l'ECS est 30% plus lent à cause des migrations structurelles. Le CRG reste stable car les données ne bougent jamais. Quand le dataset dépasse le cache L3, l'ECS subit des pics de latence alors que le CRG reste linéaire. Le CRG rend les données immobiles, ce qui les rend prédictibles pour le hardware.
 
-# SLIDE: 17 - CONCLUSION
+# SLIDE: 17 - STRESS TEST SIMULATION (High Volatility)
+## Code
+```cpp
+// Visualizing the Memory Wall
+// Scenario: 50k Entities, 10% Mutation Rate
+
+// ECS (Red): Archetype migration overhead
+// CRG (Green): Static tensor dispatch
+```
+## EN
+Real-time simulation of the memory wall. Observe the red line (ECS) skyrocketing as behavioral churn forces memory copies, while the green line (CRG) maintains consistent O(1) performance by strictly decoupling logic from data movement.
+## FR
+Simulation temps réel du "Memory Wall". Observez la ligne rouge (ECS) s'envoler dès que la volatilité des comportements force des copies mémoire, tandis que la ligne verte (CRG) maintient une performance O(1) constante en découplant la logique du mouvement des données.
+
+# SLIDE: 18 - CONCLUSION
 ## Code
 ```cpp
 // 1. Zero Coupling  (Linker)
@@ -452,4 +466,4 @@ graph TD
 ## EN
 CRG is a linker-driven dispatch framework for any C++ system needing decoupling and performance. Three guarantees: Zero coupling (modules self-register), Zero search (context is a coordinate), Zero migration (topology is immutable). Stop fighting C++ and the hardware. Give them what they were built for.
 ## FR
-TODO
+Le CRG est un framework de dispatch piloté par le linker pour tout système C++ exigeant découplage et performance. Trois garanties : Zéro couplage (auto-enregistrement), Zéro recherche (coordonnées mathématiques), Zéro migration (topologie immuable). Arrêtez de vous battre contre le C++ et le matériel. Donnez-leur ce pour quoi ils ont été conçus.
