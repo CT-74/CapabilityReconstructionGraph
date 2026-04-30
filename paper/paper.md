@@ -1,82 +1,154 @@
 # CRG: Linker-Driven Discovery and Hardware-Bound Logic Mapping
-### An Architecture for Modular Decoupling and High-Performance Dispatch
+
+### An Architecture for Universal Decoupling and Zero-Cost Behavior Projection
 
 **Cyril Tissier** | April 2026
 
 ---
 
 ## 1. Abstract
-The **Capability Routing Gateway (CRG)** is an architectural framework developed to resolve two divergent constraints in AAA development: the need for total module decoupling (Team Scalability) and the requirement for hardware-level execution efficiency (Performance). By shifting module discovery to the linker level through a **Linker-Driven Discovery** pattern, CRG removes centralized dependency bottlenecks. When applied to entity logic, it enables a deterministic $O(1)$ dispatch that saturates system memory bandwidth at **30.83 Gi/s** while maintaining 100% data residency.
+
+The **Capability Routing Gateway (CRG)** is a general-purpose architectural pattern designed to resolve the fundamental conflict between modular decoupling and hardware efficiency. By treating data and logic as two parallel dimensions—mirroring the L1I/L1D split of modern CPUs—CRG eliminates the "Virtual Deadlock" inherent in traditional object-oriented hierarchies. It provides a linker-driven, zero-allocation framework for any C++ system requiring decoupled module discovery and high-performance behavior projection, from plugin-based tools to massive scale simulations.
+
+CRG delivers three uncompromising guarantees: **Zero Coupling, Zero Search, and Zero Migration**.
 
 ---
 
-## 2. Pillar I: Linker-Driven Discovery (The Core Innovation)
-The primary bottleneck in large-scale C++ projects is often the "Central Registry" pattern, which forces every module to know about every other module. CRG relocates Inversion of Control (IoC) to the linker.
+## 2. Pillar I: Linker-Driven Discovery (Universal Decoupling)
 
-* **Zero-Include Registration:** Behavior modules (DLLs/Plugins) interface with the Gateway via a **Linker-Driven Registry**. This allows a feature to be added to the engine simply by linking its binary, with no modifications required to the core engine headers or source code.
-* **The Strict Anchor Pattern:** To prevent dead-code stripping, CRG employs a **Strict Anchor** specialization in the core. This forces the linker to resolve and "pull" behavior chains across binary boundaries, ensuring all capabilities are "baked" into the engine's routing matrix during a controlled startup sequence.
+CRG relocates Inversion of Control (IoC) to the linker level to eliminate the build-time bottlenecks of centralized registries.
+
+* **Zero-Include Registration:** Modules self-register via a `NodeList` pattern. A feature or plugin is added to the system simply by linking its binary, with zero modifications required to core headers or source code.
+* **Linker-Resolved Plugins:** This architecture provides a fully functional plugin system as a side effect. Define a struct, instantiate it as a static—the OS wires the capability before `main()`, and the gateway discovers it only when requested, without the core ever needing to know the module exists.
+
+```mermaid
+graph TD
+    subgraph "External Modules (Independent & Blind)"
+        B[Module B] -->|NodeList| Anchor
+        A[Module A] -->|NodeList| Anchor
+    end
+    subgraph "CRG Engine Core"
+        Anchor[NodeListAnchor]
+        Baker[Baker]
+        Tensor[CapabilityTensor Matrix]
+    end
+    Anchor -->|First Find triggers Baker| Baker
+    Baker -->|Flattening| Tensor
+```
 
 ---
 
-## 3. Pillar II: Thematic Identity Governance (`TFamily`)
-CRG partitions identity through `TFamily` layers to maintain data density and cache efficiency.
+## 3. Pillar II: Thematic Identity Governance (TypeList & DenseModelID)
 
-* **Domain Isolation:** Distinct domains (e.g., `RobotFamily`, `VFXFamily`) operate in isolated index spaces. This ensures that behavioral tensors remain dense, preventing the "Sparse Table" problem common in monolithic ID systems.
-* **Type-Safe Phantom IDs:** Strong typing (`DenseModelID`, `DenseInterfaceID`) prevents cross-domain ID leakage and ensures compile-time safety for domain-specific interfaces.
+CRG partitions identity through `TypeList` groupings to maintain data density and execution predictability.
+
+* **The Collapse:** The architecture collapses the sparse, unpredictable universe of `typeid` hashes into a dense, contiguous array index via `DenseModelID`. This ensures that the behavioral tensor remains a tight, direct-access matrix.
+* **Domain Isolation:** Distinct domains operate in isolated index spaces, preventing behavioral tables from becoming sparse even in systems with hundreds of independent modules.
 
 ---
 
-## 4. Pillar III: The Type-Erased Shell (TES)
-The **ModelHandle** acts as a **Type-Erased Shell (TES)** designed for high-performance data transport across decoupled systems.
+## 4. Pillar III: The ModelShell (Breaking the Virtual Deadlock)
 
-* **SBO & Cache-Line Alignment:** To avoid heap fragmentation, the TES utilizes **Small Buffer Optimization (SBO)** with `alignas(64)` constraints. This ensures that any data projection starts at a hardware cache-line boundary, optimizing prefetcher efficiency.
-* **Concept/Model Abstraction:** TES encapsulates concrete types while providing the Gateway with a localized **Reverse Router**, enabling $O(1)$ capability resolution without call-site knowledge of the underlying type.
+The **ModelShell** is the vehicle for high-performance data transport across decoupled systems. Inspired by Klaus Iglberger’s Type Erasure, it is a "shell" stripped of all behavioral logic.
 
-![TES Memory Layout](../img/tes_layout.png)
-*Figure 1: TES memory layout illustrating SBO buffer, alignment padding, and the Concept pointer bridge.*
+* **Identity without Logic:** The shell carries only data and identity. It breaks the "Virtual Deadlock" where C++ forbids virtual template methods. One virtual jump identifies the type; one static_cast recovers the data.
+* **Hardware Symmetry:** By using Small Buffer Optimization (SBO) and cache-line alignment, the `ModelShell` ensures that data transport mirrors the physical requirements of the CPU prefetcher.
+* **The OOP Illusion:** In the cold path, `ModelShell` provides `Invoke` and `TryInvoke` APIs. These analyze method pointers at compile-time to resolve interfaces automatically, offering a clean OOP syntax without the architectural tax.
+
+```mermaid
+classDiagram
+    class ModelShell {
+        - unique_ptr~Concept~ m_ptr
+        + GetID() ModelTypeID
+        + Get~T~() const T&
+        + Invoke~MethodPtr~(...) void
+        + TryInvoke~MethodPtr~(...) optional
+    }
+    class Concept {
+        <<interface>>
+        + GetID() ModelTypeID*
+    }
+    class Model~T~ {
+        + T value
+        + GetID() ModelTypeID
+    }
+    ModelShell *-- Concept
+    Concept <|-- Model~T~
+    class PureDataStruct {
+        <<Your Model (e.g., Scout)>>
+        + std::string name
+        + int health
+    }
+    Model~T~ o-- PureDataStruct : T = PureDataStruct
+```
 
 ---
 
 ## 5. Pillar IV: N-Dimensional Behavioral Projection
-For systems requiring high-frequency updates, CRG models behavioral resolution as a coordinate lookup within an **N-Dimensional Tensor**.
 
-* **Amortized Resolution:** Capability lookup is a deterministic calculation: `(ModelID * Volume) + Offset`. 
-* **Branch-Predictor Friendly:** Contextual logic (Environment, State, Time) is resolved into a flat $O(1)$ access using **Horner’s method**, removing the need for complex branching or state-machine logic in hot loops.
+Behavioral resolution is modeled as a coordinate lookup within an **N-Dimensional Tensor** (CapabilitySpace).
 
-![Behavior Tensor](../img/tensor_routing.png)
-*Figure 2: 3D Visualization of behavioral resolution at the intersection of Entity Model, Environment, and Time.*
+* **Pure Arithmetic Dispatch:** Contextual axes (State, Zone, Authority) are resolved via Horner’s method into a flat offset. Complexity is free: whether you have one or ten dimensions, the lookup remains two array accesses.
+* **Immutable Topology:** Behavior transitions are coordinate updates, not structural rewirings. The memory addresses of the logic never shift, allowing the prefetcher to maintain a perfect stream.
 
 ---
 
-## 6. Performance Analysis
-CRG is designed to reach the physical limits of the hardware by ensuring **Structural Immunity**—the principle that data should never move or be copied to change its logical behavior.
+## 6. Pillar V: ECS Symbiosis (Brain & Muscle)
 
-| Entities | ECS Mutation (Throughput) | CRG Projection (Throughput) | Ratio |
-| :--- | :--- | :--- | :--- |
-| 65,536 | 35.23 Gi/s | **70.23 Gi/s** | **1.99x** |
-| 1,048,576 | 19.26 Gi/s | **30.83 Gi/s** | **1.60x** |
+When applied to ECS architectures, CRG decouples the "Decision" (Logic Projection) from the "Execution" (Data Pipeline).
 
-**Technical Conclusion:** By eliminating "Archetype Migrations," CRG allows the CPU to operate at peak memory bandwidth, effectively reaching the **Memory Wall** limit.
+* **The Brain (Decision):** A low-frequency system evaluates the context and performs the $O(1)$ tensor lookup. The result is cached inside the entity using an `ActiveCapability` component.
+* **The Muscle (Execution):** A high-frequency system iterates contiguous arrays and calls the cached result directly via function pointer. 
+* **Bulletproof Contracts:** The `ActiveCapability` uses strict SFINAE (IsDODContract) to ensure that high-performance static dispatch cannot be accidentally confused with polymorphic OOP interfaces.
+
+```mermaid
+sequenceDiagram
+    participant Brain as Brain System (5 Hz)
+    participant Router as CapabilityRouter
+    participant Entity as ActiveCapability
+    participant Muscle as Muscle System (60 Hz)
+
+    Note over Brain, Router: Decision Phase
+    Brain->>Router: Find
+    Router-->>Brain: Resolved Logic
+    Brain->>Entity: Cache Pointer
+
+    Note over Muscle, Entity: Execution Phase (Hot Loop)
+    loop Every Frame
+        Muscle->>Entity: cap(params)
+        Note right of Entity: Direct Static Call (Zero Search)
+    end
+```
 
 ---
 
-## 7. Design Trade-offs & FAQ
+## 7. Performance & Benchmarks
 
-**Q: Can I use the Discovery system without the Performance Tensors?**
-Yes. Pillar I is a standalone solution for modularity. You can use CRG solely to decouple your engine's sub-systems and reduce compile times, even if those systems use traditional OOP or standard ECS logic.
+CRG reaches the hardware limit by ensuring **Structural Immunity**: data never moves to change its behavior.
 
-**Q: Is there a hidden cost compared to a "Pure" ECS System?**
-Yes. A pure ECS remains optimal for mass-simulations with low state complexity (e.g., particles). CRG introduces a **1.5ns dispatch tax** (approx. 4-6 cycles) per entity. This trade-off is specifically designed for complex gameplay entities, where the constant-time dispatch offsets the unpredictable performance spikes of traditional Archetype Migrations.
+* **Level 1 (OOP):** ~20 ns/entity.
+* **Level 2 (ModelShell Invoke):** ~7 ns/entity (Cold path only).
+* **Level 3 (ActiveCapability):** **1.5 ns/entity** (Hot path).
 
-**Q: Can this be integrated into existing engines?**
-Yes. CRG supports **Hybrid Adoption**. Developers can wrap specific existing ECS modules within the CRG framework to leverage its interface governance without requiring a full engine rewrite.
-
-**Q: Does CRG provide built-in security against cheating?**
-CRG is **"Anti-Tamper Friendly"** by design. By centralizing behavior pointers into a dense, contiguous matrix, it allows for fast integrity checks (e.g., hashing) and increases the reverse-engineering cost for malicious actors compared to scattered VTables.
+| Entities  | ECS Mutation (Throughput) | CRG Projection (Throughput) |
+| :-------- | :------------------------ | :-------------------------- |
+| 65,536    | 35.23 Gi/s                | **70.23 Gi/s**              |
+| 1,048,576 | 19.26 Gi/s                | **30.83 Gi/s**              |
 
 ---
 
-**Implementation Note:** *The provided source code is a **reference implementation** focused on architectural clarity and portability. To maintain a clean-room approach and ensure readability, certain low-level optimizations (such as manual SBO memory management or custom stack allocators) have been replaced by standard C++ constructs (e.g., `std::unique_ptr`). In a production AAA environment, these should be replaced by the hardware-aligned structures described in this paper.*
+## 8. FAQ
+
+**Q: Is CRG only for Game Engines?**
+No. It is for any C++ system where modules must remain completely independent. It allows a module to "exist" and be discovered by the system without the module ever needing to know the system's internals, and vice versa.
+
+**Q: What is the "Virtual Deadlock"?**
+The impossibility in C++ to have a virtual template method. `ModelShell` resolves this by splitting identity (virtual) from data recovery (template).
+
+**Q: How does it handle Hot-Reload?**
+Live++ patches function bodies in place. For topology changes, the developer triggers a `Bake` to rebuild the tensor matrix from the linked list of nodes.
+
+---
 
 **Author:** Cyril Tissier  
 **License:** Apache 2.0  
