@@ -66,7 +66,7 @@ struct DenseModelID {
 using ModelMap = std::unordered_map<ModelTypeID, std::size_t>; 
 CRG_BIND_SLOT(ModelMap)
 
-class BehaviorRouter; // Forward declaration
+class CapabilityRouter; // Forward declaration
 
 // ModelHandle: Stored in the ECS Component for hot-path O(1) lookups.
 struct ModelHandle {
@@ -277,7 +277,7 @@ struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public Capabilit
 // [ ENGINE CORE ] 5. BEHAVIOR ROUTER (O(1) DISPATCH)
 // =============================================================================
 
-class BehaviorRouter {
+class CapabilityRouter {
 public:
     // Made public to allow ModelRouter synchronization[cite: 14].
     static void EnsureBaked() {
@@ -314,12 +314,12 @@ public:
 template<class ModelT>
 class ModelRouter {
 public:
-    // Zero-cost static wrapper over BehaviorRouter::Find[cite: 14].
+    // Zero-cost static wrapper over CapabilityRouter::Find[cite: 14].
     template<class TContract, class... Coords>
     static const DODDescriptor<TContract>* Find(const ContextTypeOf<TContract>& ctx, Coords... coords) {
         // Force evaluation of the Tensor map before handle creation.
-        BehaviorRouter::EnsureBaked(); 
-        return BehaviorRouter::Find<TContract>(ModelHandle::FromType<ModelT>(), ctx, coords...);
+        CapabilityRouter::EnsureBaked(); 
+        return CapabilityRouter::Find<TContract>(ModelHandle::FromType<ModelT>(), ctx, coords...);
     }
 };
 
@@ -328,7 +328,7 @@ public:
 // =============================================================================
 
 inline ModelHandle::ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
-    BehaviorRouter::EnsureBaked(); 
+    CapabilityRouter::EnsureBaked(); 
     const auto& map = RegistrySlot<ModelMap>::s_Value;
     auto it = map.find(hash);
     if (it != map.end()) denseID = DenseModelID(it->second);
@@ -482,7 +482,7 @@ public:
         if (use_crg) {
             reg.view<CRGIdentity, Body, Weapon, Renderable, BehaviorSettings, Health>().each([&](auto entity, auto& id, auto& b, auto& w, auto& r, auto& s, auto& h) {
                 UnitAIContract::RuleContext ctx { h };
-                if (const auto* descriptor = BehaviorRouter::Find<UnitAIContract>(id.handle, ctx, id.current_state)) {
+                if (const auto* descriptor = CapabilityRouter::Find<UnitAIContract>(id.handle, ctx, id.current_state)) {
                     UnitAIContract::Params params { reg, entity, b, w, r, s, dt };
                     descriptor->Execute(params);
                 }

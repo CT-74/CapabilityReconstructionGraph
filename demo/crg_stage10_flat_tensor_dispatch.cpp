@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 //
 // =============================================================================
-// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 10: FLAT TENSOR DISPATCH (DOD)
+// CAPABILITY ROUTING GATEWAY (CRG) - STAGE 10: CAPABILITY TENSOR DISPATCH (DOD)
 // =============================================================================
 // @intent:
 // Flatten the N-D Hypercube into a single contiguous memory arena (Tensor)[cite: 4].
@@ -330,7 +330,7 @@ static const CapabilityBaker<Scout, NormalTask, EmergencyTask> g_ScoutBaker{};
 int main() {
     auto id = TypeIDOf<Scout>::Get();
 
-    std::cout << "--- CRG STAGE 10: DOD FLAT TENSOR ---\n\n";
+    std::cout << "--- CRG STAGE 10: DOD CAPABILITY TENSOR ---\n\n";
 
     std::cout << "[ ECS PATH: Via CapabilityRouter directly ]\n";
     // Cas 1 : Batterie à 80% (Broadphase O(1) -> Fallback)

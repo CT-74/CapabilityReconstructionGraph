@@ -79,7 +79,7 @@
         </div>
 
         <div class="metric-card crg">
-            <h3 style="margin:0; color:#4dff4d">CRG (Flat Tensor FuncPtr)</h3>
+            <h3 style="margin:0; color:#4dff4d">CRG (Capability Tensor FuncPtr)</h3>
             <div class="metric-value" id="crgStatus" style="color:#4dff4d">0.0 ms</div>
             <div class="memory-wall-box">
                 <div class="memory-label"><span>Pipeline Efficiency (L1 Hit):</span><span id="crgStallText">99%</span></div>
@@ -93,7 +93,7 @@
     </div>
     
     <div class="explanation">
-        <strong>Technical Insight:</strong> As the <strong>Logic Payload</strong> increases, the gap between architectures narrows (Amdahl's Law). However, at high <strong>Mutation Rates</strong>, Classic ECS triggers mass archetype migrations (memcpy), saturating the Memory Wall. The new CRG Flat Tensor avoids VTables entirely, maintaining structural immunity via a pure O(1) C-style function pointer routing (~1.5ns overhead).
+        <strong>Technical Insight:</strong> As the <strong>Logic Payload</strong> increases, the gap between architectures narrows (Amdahl's Law). However, at high <strong>Mutation Rates</strong>, Classic ECS triggers mass archetype migrations (memcpy), saturating the Memory Wall. The new CRG Capability Tensor avoids VTables entirely, maintaining structural immunity via a pure O(1) C-style function pointer routing (~1.5ns overhead).
     </div>
 </div>
 
@@ -167,7 +167,7 @@
         ecsStallBar.style.width = Math.min(100, 5 + stallFactor) + "%";
         document.getElementById('ecsStallText').innerText = Math.floor(Math.min(98, 5 + stallFactor)) + "%";
         
-        crgStallBar.style.width = "99%"; // Flat Tensor + FuncPtr means L1 Cache Hit is virtually guaranteed
+        crgStallBar.style.width = "99%"; // Capability Tensor + FuncPtr means L1 Cache Hit is virtually guaranteed
 
         // UPDATE UI
         ecsStatus.innerText = ecsTotal.toFixed(2) + " ms";

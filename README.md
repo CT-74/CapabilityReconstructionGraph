@@ -38,7 +38,7 @@ flowchart LR
 
     CapabilitySpace ==>|"Cartesian Mapping"| Horner{Horner's Projector}
     
-    subgraph Arena ["Flat Tensor Arena (Contiguous RAM)"]
+    subgraph Arena ["Capability Tensor Arena (Contiguous RAM)"]
         direction LR
         C0["[ ]"] --- C1["[ ]"] --- C2["Target Capability"] --- C3["[ ]"] --- C4["[ ]"]
     end
