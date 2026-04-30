@@ -54,7 +54,8 @@
                 <strong>LOGIC PAYLOAD</strong>
                 <span id="logicValue" class="val-badge">20 ns</span>
             </div>
-            <input type="range" id="logicSlider" min="0" max="5000" step="50" value="20">
+            <!-- Changement ici : step="5" au lieu de "50" pour plus de finesse -->
+            <input type="range" id="logicSlider" min="0" max="5000" step="5" value="20">
             <small style="color: #888;">CPU work per entity (0 to 5µs)</small>
         </div>
 
