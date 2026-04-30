@@ -18,7 +18,9 @@ system requiring decoupled module discovery and high-performance behavior
 projection. CRG is not a game engine framework — it is a general-purpose
 architectural pattern applicable to plugins, simulations, tools, rule
 engines, and any system where modules need to discover each other without
-knowing each other exist.
+knowing each other exist. The session is supported by an interactive 
+WebAssembly simulator, allowing real-time stress-testing of up to 150,000 
+entities directly in the browser.
 
 As a direct consequence of its linker-driven architecture, CRG provides a
 fully functional plugin system for free. Define a struct, instantiate it as
@@ -47,6 +49,9 @@ Attendees will learn how to:
 * Integrate with any data-driven system using the Brain/Muscle pattern:
   ActiveCapability caches the resolved result at decision frequency; the
   hot loop invokes it at execution frequency with a direct function pointer.
+* Visualize the Memory Wall: How to use interactive simulation (up to 150k 
+  entities) to identify the exact threshold where structural mutation 
+  overhead outweighs logical execution.
 
 Outline:
 * 00-05: THE HOOK — Hardware-software symmetry. The L1I/L1D split mirrors
@@ -59,8 +64,12 @@ Outline:
   the flat CapabilityTensor. Turning a search problem into a calculation.
 * 30-40: ACT III — THE SYMBIOSIS: Immutable topology, archetype stability,
   ECS Brain/Muscle pattern, ActiveCapability, three performance levels.
-* 40-50: BENCHMARKS — Honest data: CRG vs ECS at 1%/5%/10% mutation rates.
-  The flatline. When to use CRG and when not to.
+* 40-50: BENCHMARKS — Honest data: CRG vs ECS at 1%/5%/10% mutation rates. 
+  Live visual stress-test (50k entities): watching the ECS frame-time 
+  collapse while CRG maintains O(1) stability. When to use CRG and when not to.
 * 50-55: CONCLUSION — Zero coupling. Zero search. Zero migration.
   Stop fighting C++. Stop fighting the hardware.
 * 55-60: Q&A
+
+Interactive Simulation: 
+https://ct-74.github.io/CapabilityRoutingGateway/demo/final_simulator/index.html

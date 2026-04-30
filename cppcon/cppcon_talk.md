@@ -428,23 +428,26 @@ graph LR
     CRG["CRG: Flat Line"] -- "Structural Immunity" --> OK["Fast"]
 ```
 ## EN
-At 10% mutation, ECS is 30% slower because of structural migrations. CRG stays flat because data never moves. As the dataset grows past L3 cache, ECS spikes while CRG flatlines. CRG makes data immobile, which makes it predictable for the hardware.
+This is the physical reality of the Memory Wall. At a 10% mutation rate, traditional ECS architectures drop to 19 Gi/s because the CPU is busy moving memory instead of executing logic. CRG sustains over 30 Gi/s because the topology is immutable. Note the QR code on the right: you can scan it now to access the live simulator and verify these performance metrics on your own device during the Q&A.
 ## FR
-À 10% de mutation, l'ECS est 30% plus lent à cause des migrations structurelles. Le CRG reste stable car les données ne bougent jamais. Quand le dataset dépasse le cache L3, l'ECS subit des pics de latence alors que le CRG reste linéaire. Le CRG rend les données immobiles, ce qui les rend prédictibles pour le hardware.
+C'est ici que l'on frappe le "Memory Wall". À 10% de mutation, l'ECS classique chute à 19 Go/s car le CPU passe son temps à déplacer de la mémoire plutôt qu'à exécuter de la logique. Le CRG maintient plus de 30 Go/s car la topologie est immuable. Notez le QR code à droite : vous pouvez le scanner dès maintenant pour accéder au simulateur live et vérifier ces mesures de performance sur votre propre appareil.
 
 # SLIDE: 17 - STRESS TEST SIMULATION (High Volatility)
 ## Code
 ```cpp
 // Visualizing the Memory Wall
 // Scenario: 50k Entities, 10% Mutation Rate
-
-// ECS (Red): Archetype migration overhead
-// CRG (Green): Static tensor dispatch
+// Red: ECS Archetype Migration | Green: CRG Static Tensor
+```
+## Mermaid
+```mermaid
+graph LR
+    Search["O(N) Search"] -- "Too slow for 1M" --> Target["O(1) Array Access"]
 ```
 ## EN
-Real-time simulation of the memory wall. Observe the red line (ECS) skyrocketing as behavioral churn forces memory copies, while the green line (CRG) maintains consistent O(1) performance by strictly decoupling logic from data movement.
+In this visual stress test at 50,000 entities, you can see the ECS frame-time (in red) skyrocketing as soon as we introduce behavioral volatility. Every archetype change is a memory copy that destroys cache locality. The green line represents CRG: it remains a flat line because it treats transitions as coordinate updates, not structural rewires. Feel free to use the simulator link to adjust the mutation rate yourself.
 ## FR
-Simulation temps réel du "Memory Wall". Observez la ligne rouge (ECS) s'envoler dès que la volatilité des comportements force des copies mémoire, tandis que la ligne verte (CRG) maintient une performance O(1) constante en découplant la logique du mouvement des données.
+Dans ce stress-test visuel à 50 000 entités, vous voyez le frame-time de l'ECS (en rouge) s'envoler dès que l'on introduit de la volatilité. Chaque changement d'archétype est une copie mémoire qui détruit la localité du cache. La ligne verte, c'est le CRG : elle reste plate car il traite les transitions comme des mises à jour de coordonnées, pas des recâblages structurels. N'hésitez pas à utiliser le lien du simulateur pour ajuster le taux de mutation vous-même.
 
 # SLIDE: 18 - CONCLUSION
 ## Code
