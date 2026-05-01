@@ -1,6 +1,6 @@
 book/
 build/
-talk/
+*.bin
 *.exe
 *.o
 *.obj

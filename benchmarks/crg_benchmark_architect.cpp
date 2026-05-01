@@ -4,6 +4,7 @@
 #include <cmath>
 #include <algorithm>
 #include <type_traits>
+#include <fstream>
 
 // --- INFRASTRUCTURE ---
 using TypeHash = std::size_t;
@@ -18,7 +19,7 @@ private:
     inline static const Interface* s_head = nullptr;
 };
 
-// Structure de 64 bytes pour s'aligner sur les lignes de cache
+// 64-byte structure to align with CPU cache lines[cite: 4, 5]
 struct IPhysics { 
     float pos[3]; 
     float vel[3]; 
@@ -33,7 +34,7 @@ struct IMovement {
     virtual void Execute(IPhysics& p) const = 0; 
 };
 
-// --- COMPORTEMENTS ---
+// --- BEHAVIORS ---
 struct Scout {};
 
 template<class T> 
@@ -48,7 +49,7 @@ struct Combat : IMovement, LinkedNode<Combat<T>, IMovement> {
     void Execute(IPhysics& p) const override { p.pos[0] += 2.0f; }
 };
 
-// --- MATRICE STAGE 6 (CORRIGÉE) ---
+// --- BEHAVIOR MATRIX (Stage 6 Logic)[cite: 4] ---
 template<class...> struct TypeList;
 template<class ModelT, template<class> class... Defs> struct BehaviorMatrixSingle : public Defs<ModelT>... {};
 template<class ModelList, template<class> class... Defs> struct BehaviorMatrix;
@@ -59,7 +60,7 @@ struct BehaviorMatrix<TypeList<Models...>, Defs...> : public BehaviorMatrixSingl
     template<class Interface>
     static const Interface* Find(TypeHash id, int state) {
         const Interface* result = nullptr;
-        // Étage 1 : Résolution de l'identité
+        // Step 1: Identity resolution
         ((id == TypeIDOf<Models>::Get() && (result = Resolve<Interface, Models>(state))), ...);
         return result;
     }
@@ -68,15 +69,13 @@ private:
     template<class Interface, class Model>
     static const Interface* Resolve(int state) {
         const Interface* res = nullptr;
-        // Étage 2 : Résolution de la capacité (Capability)
+        // Step 2: Capability resolution
         ([&]() {
             if constexpr (std::is_base_of_v<Interface, Defs<Model>>) {
                 const Interface* candidate = Defs<Model>::GetHead();
-                // On boucle sur la liste chainée du modèle pour trouver le bon état
+                // Simple linked-list traversal for matching state[cite: 4]
                 while(candidate) {
                     if(candidate->Match(state)) return (res = candidate, void());
-                    // Note: ici on simplifie, dans un vrai CRG on itérerait via GetNext()
-                    // mais pour le benchmark O(1), on prend la tête.
                     break; 
                 }
             }
@@ -88,17 +87,17 @@ private:
 using Domain = BehaviorMatrix<TypeList<Scout>, Patrol, Combat>;
 inline static const Domain g_domain{};
 
-void RunTest(size_t N) {
+void RunTest(size_t N, std::ofstream& out) {
     std::vector<IPhysics> phys(N);
     std::vector<IDCard> ids(N);
     TypeHash scout_id = TypeIDOf<Scout>::Get();
     
     for(size_t i=0; i<N; ++i) {
         ids[i].logic_class = scout_id;
-        phys[i].state = (i % 20 == 0) ? 1 : 0; // Mélange Patrol/Combat
+        phys[i].state = (i % 20 == 0) ? 1 : 0; // Mixed Patrol/Combat behaviors[cite: 4]
     }
 
-    // Benchmark CRG
+    // CRG Benchmark: O(1) Matrix resolution[cite: 4]
     auto s1 = std::chrono::high_resolution_clock::now();
     for(size_t j=0; j<N; ++j) {
         if (auto* b = Domain::Find<IMovement>(ids[j].logic_class, phys[j].state)) {
@@ -108,7 +107,7 @@ void RunTest(size_t N) {
     auto e1 = std::chrono::high_resolution_clock::now();
     double crg_ns = std::chrono::duration<double, std::nano>(e1 - s1).count() / N;
 
-    // Benchmark ECS (Ideal Baseline)
+    // ECS Benchmark: Idealized direct loop[cite: 4]
     auto s2 = std::chrono::high_resolution_clock::now();
     for(size_t j=0; j<N; ++j) {
         if (phys[j].state == 0) phys[j].pos[0] += 1.0f;
@@ -117,13 +116,22 @@ void RunTest(size_t N) {
     auto e2 = std::chrono::high_resolution_clock::now();
     double ecs_ns = std::chrono::duration<double, std::nano>(e2 - s2).count() / N;
 
-    std::cout << N << "," << ecs_ns << "," << crg_ns << std::endl;
+    out << N << "," << ecs_ns << "," << crg_ns << "\n";
 }
 
 int main() {
-    std::cout << "N,ECS_ns,CRG_ns" << std::endl;
-    for (int i = 10; i <= 24; ++i) { 
-        RunTest(std::pow(2, i));
+    // Generate output file in the data/ subfolder
+    std::ofstream out("data/crg_benchmark_architect.csv");
+    if (!out.is_open()) {
+        std::cerr << "Error: Could not open data/crg_benchmark_architect.csv\n";
+        return 1;
     }
+    
+    out << "N,ECS_ns,CRG_ns\n";
+    for (int i = 10; i <= 24; ++i) { 
+        RunTest(std::pow(2, i), out);
+    }
+    
+    std::cout << "Done: Results saved in data/crg_benchmark_architect.csv" << std::endl;
     return 0;
 }

@@ -6,9 +6,12 @@
     <title>CRG Simulator: Extreme Stress Test</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: #e0e0e0; margin: 0; padding: 20px; }
+        /* CSS RESET POUR EVITER LES DEBORDEMENTS */
+        * { box-sizing: border-box; }
+        
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: #e0e0e0; margin: 0; padding: 15px; }
         .container { max-width: 1200px; margin: 0 auto; background: #252525; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #333; }
-        h1 { text-align: center; color: #4da6ff; font-weight: 300; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 2px; }
+        h1 { text-align: center; color: #4da6ff; font-weight: 300; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 2px; line-height: 1.3; }
         
         .controls-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
         .control-panel { background: #323232; padding: 18px; border-radius: 10px; border: 1px solid #444; transition: border-color 0.3s; }
@@ -30,8 +33,18 @@
         .memory-bar-bg { width: 100%; height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
         .memory-bar-fill { height: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 
-        .chart-container { position: relative; height: 400px; width: 100%; background: #121212; border-radius: 10px; padding: 15px; box-sizing: border-box; border: 1px solid #333; }
+        .chart-container { position: relative; height: 400px; width: 100%; background: #121212; border-radius: 10px; padding: 15px; border: 1px solid #333; }
         .explanation { text-align: center; margin-top: 20px; font-style: italic; color: #888; font-size: 0.85em; line-height: 1.5; max-width: 800px; margin-left: auto; margin-right: auto; }
+
+        /* --- FIX RESPONSIVE SMARTPHONE --- */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.3rem; margin-bottom: 20px; }
+            .container { padding: 15px; }
+            .controls-grid { grid-template-columns: 1fr; gap: 15px; }
+            .metrics { flex-direction: column; gap: 15px; }
+            .metric-card { width: 100%; padding: 15px; }
+            .chart-container { height: 300px; padding: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -54,7 +67,6 @@
                 <strong>LOGIC PAYLOAD</strong>
                 <span id="logicValue" class="val-badge">20 ns</span>
             </div>
-            <!-- Changement ici : step="5" au lieu de "50" pour plus de finesse -->
             <input type="range" id="logicSlider" min="0" max="5000" step="5" value="20">
             <small style="color: #888;">CPU work per entity (0 to 5µs)</small>
         </div>
@@ -132,13 +144,13 @@
                 y: { beginAtZero: true, max: 33, grid: { color: '#333' }, ticks: { color: '#888' } },
                 x: { display: false }
             },
-            plugins: { legend: { display: true, labels: { color: '#fff' } } }
+            plugins: { legend: { display: true, labels: { color: '#fff', font: { size: window.innerWidth < 768 ? 10 : 12 } } } }
         }
     });
 
     // Constants
-    const ECS_MEMCPY_TAX_MS = 0.0015; // Cost of moving 1 entity between archetypes
-    const CRG_ROUTING_TAX_NS = 1.5;   // DRASTICALLY REDUCED: Fixed nanosecond cost for L1 array lookup + Jump
+    const ECS_MEMCPY_TAX_MS = 0.0015; 
+    const CRG_ROUTING_TAX_NS = 1.5;   
     const BASE_OS_MS = 0.4;
 
     setInterval(() => {
@@ -151,36 +163,29 @@
         logicDisplay.innerText = logic + " ns";
         mutationDisplay.innerText = mutPct + "%";
 
-        // PHYSICS ENGINE
-        // ECS: Linear logic + Archetype relocation tax
         let ecsLogicTime = (n * (logic + 3)) / 1000000;
         let ecsMutationTax = mutCount * ECS_MEMCPY_TAX_MS;
         let ecsChaos = mutPct > 2 ? Math.random() * (ecsMutationTax * 0.2) : 0;
         let ecsTotal = BASE_OS_MS + ecsLogicTime + ecsMutationTax + ecsChaos;
 
-        // CRG: Linear logic + Fixed routing tax (Mutation is O(1) so it costs ~0)
         let crgLogicTime = (n * (logic + 3 + CRG_ROUTING_TAX_NS)) / 1000000;
-        let crgMutationTax = (mutCount * 5) / 1000000; // Almost zero
+        let crgMutationTax = (mutCount * 5) / 1000000; 
         let crgTotal = BASE_OS_MS + crgLogicTime + crgMutationTax;
 
-        // STALL CALCULATION (Visual only)
         let stallFactor = (ecsMutationTax / (ecsTotal + 0.1)) * 100;
         ecsStallBar.style.width = Math.min(100, 5 + stallFactor) + "%";
         document.getElementById('ecsStallText').innerText = Math.floor(Math.min(98, 5 + stallFactor)) + "%";
         
-        crgStallBar.style.width = "99%"; // Capability Tensor + FuncPtr means L1 Cache Hit is virtually guaranteed
+        crgStallBar.style.width = "99%"; 
 
-        // UPDATE UI
         ecsStatus.innerText = ecsTotal.toFixed(2) + " ms";
         crgStatus.innerText = crgTotal.toFixed(2) + " ms";
 
-        // Update Chart
         chart.data.datasets[0].data.shift();
         chart.data.datasets[0].data.push(ecsTotal);
         chart.data.datasets[1].data.shift();
         chart.data.datasets[1].data.push(crgTotal);
         
-        // Auto-scale Y axis if we go boom
         if (ecsTotal > 30) chart.options.scales.y.max = Math.ceil(ecsTotal * 1.2);
         else chart.options.scales.y.max = 33;
 

@@ -23,10 +23,11 @@ CRG delivers three guarantees:
 ## Plugin System — For Free
 
 As a direct consequence of its linker-driven architecture, CRG provides a fully functional plugin system at zero infrastructure cost. Define a struct, instantiate it as a static global — the OS fires the constructor on load, and the capability is automatically registered. No `Init()` function, no central registry, and no knowledge of other modules is required.
-
 ```cpp
+struct MyFeatureList : NodeList<MyFeatureList, ICapability> {};
+
 // Drop this file anywhere. Link the binary. It wires itself.
-struct MyFeature : NodeList<MyFeature, ICapability> {
+struct MyFeature : MyFeatureList {
     void Execute(const ModelShell& shell) const override { /* ... */ }
 };
 static MyFeature g_feature; // ← OS loads, constructor fires. Done.
@@ -64,7 +65,6 @@ graph TD
 Behaviors are resolved via a flat `CapabilityTensor` indexed by two values: a `DenseTypeID` (model row) and a `CapabilitySpace` offset (context column). The offset is computed via Horner's method — one accumulation loop, no branches, O(1) regardless of the number of axes.
 
 ![N-Dimensional Behavior Tensor Resolution](img/tensor_routing.png)
-
 ```mermaid
 flowchart LR
     subgraph CapabilitySpace ["CapabilitySpace (N Axes)"]
@@ -94,7 +94,6 @@ flowchart LR
 ## Pillar III: ECS Symbiosis (ActiveCapability)
 
 Stage 12 introduces the **ActiveCapability**, a zero-cost bridge between the tensor-based resolution and high-frequency ECS loops. By caching resolved `DODDescriptor` pointers, CRG eliminates the need for repeated lookups or structural migrations during the hot-path.
-
 ```cpp
 struct EnergySystem {
     // Capability cache: no resolution overhead during hot-path execution
@@ -141,8 +140,8 @@ CRG is not a replacement for ECS, but a specialized engine for **high-complexity
 
 ![ECS vs CRG Break-Even Analysis](img/breakeven_curve.png)
 
-* **ECS Supremacy (Static Loops & Micro-Entities):** For tiny data payloads (<32 bytes) that rarely change state (<4% mutation rate), ECS remains mathematically superior. The cost of a rare 16-byte memory copy (`Swap & Pop`) is negligible compared to the baseline indirection of a DOD pointer. ECS is the correct architecture for updating 10 million static particles.
-* **CRG Supremacy (Zero-Migration & Heavy Logic):** Once your entities cross the 64-byte cache-line threshold, or their state mutates frequently (>4%), CRG takes over. By completely eliminating physical memory migrations, CRG allows the hardware prefetcher to stream continuous arrays without interruption. For complex GamePlay code, AI state machines, and volatile business logic, CRG effectively doubles your memory bandwidth efficiency.
+* **ECS Supremacy (Static Loops & Micro-Entities):** For data payloads under the 64-byte threshold (e.g., 32 bytes) or systems with rare state changes (<4% mutation rate), ECS remains mathematically superior. The memory copy cost of a rare `Swap & Pop` is negligible compared to the baseline indirection of a DOD pointer. ECS is the absolute architecture for updating millions of static particles.
+* **CRG Supremacy (Zero-Migration & Heavy Logic):** The moment entities cross the 64-byte cache-line threshold, or their state mutates frequently (>4%), CRG takes over. By completely eliminating physical memory migrations, CRG allows the hardware prefetcher to stream continuous arrays without interruption. For complex GamePlay code, AI state machines, and volatile business logic, CRG effectively doubles your memory bandwidth efficiency.
 
 ---
 
@@ -158,7 +157,7 @@ The `demo/` folder contains 12 stages, each building on the previous:
 | `stage03` | Traversal Lookup                                   |
 | `stage04` | Identity Decoupling (CapabilityBinding)            |
 | `stage05` | Model Router (Invoke / TryInvoke)                  |
-| `stage06` | Fusion (CapabilityBinding)                           |
+| `stage06` | Fusion (CapabilityBaker)                           |
 | `stage07` | Temporal Axis                                      |
 | `stage08` | N-Dimensional Space (CapabilitySpace + Horner)     |
 | `stage09` | Dynamic Rules (Narrow Phase)                       |

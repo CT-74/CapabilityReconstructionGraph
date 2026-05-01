@@ -3,6 +3,7 @@
 #include <chrono>
 #include <algorithm>
 #include <type_traits>
+#include <fstream>
 
 // --- INFRASTRUCTURE ---
 using TypeHash = std::size_t;
@@ -17,6 +18,7 @@ private:
     inline static const Interface* s_head = nullptr;
 };
 
+// 64-byte structure for cache line alignment[cite: 6]
 struct IPhysics { 
     int entity_id;
     float pos[3]; 
@@ -32,7 +34,7 @@ struct IMovement {
     virtual void Execute(IPhysics& p) const = 0; 
 };
 
-// --- COMPORTEMENTS ---
+// --- BEHAVIORS ---
 struct Scout {};
 
 template<class T> 
@@ -47,7 +49,7 @@ struct Combat : IMovement, LinkedNode<Combat<T>, IMovement> {
     void Execute(IPhysics& p) const override { p.pos[0] += 2.0f; }
 };
 
-// --- TA MATRICE PROPRE (STAGE 6) ---
+// --- BEHAVIOR MATRIX (Stage 6)[cite: 6] ---
 template<class...> struct TypeList;
 template<class ModelT, template<class> class... Defs> struct BehaviorMatrixSingle : public Defs<ModelT>... {};
 template<class ModelList, template<class> class... Defs> struct BehaviorMatrix;
@@ -70,7 +72,6 @@ private:
             if constexpr (std::is_base_of_v<Interface, Defs<Model>>) {
                 const Interface* candidate = Defs<Model>::GetHead();
                 if(candidate && candidate->Match(state)) res = candidate;
-                // Note: On pourrait itérer ici avec GetNext() si besoin
             }
         }(), ...);
         return res;
@@ -95,37 +96,32 @@ int main(int argc, char* argv[]) {
         sparse_set[i] = i;
     }
 
-    // --- TEST 1 : CRG (Mutation de valeur O(1)) ---
+    // --- TEST 1: CRG (O(1) Value Mutation)[cite: 6] ---
     auto s1 = std::chrono::high_resolution_clock::now();
     for(size_t i=0; i<N; ++i) {
-        // Exécution normale
         if (auto* b = Domain::Find<IMovement>(ids[i].logic_class, phys[i].state)) {
             b->Execute(phys[i]);
         }
-        // Mutation d'état toutes les 20 entités
-        if (i % 20 == 0) phys[i].state = 1; 
+        if (i % 20 == 0) phys[i].state = 1; // 5% mutation rate
     }
     auto e1 = std::chrono::high_resolution_clock::now();
     double crg_time = std::chrono::duration<double, std::milli>(e1 - s1).count();
 
-    // --- TEST 2 : ECS (Mutation structurelle / Swap & Pop) ---
-    // On reset
-    for(auto& p : phys) p.state = 0;
+    // --- TEST 2: ECS (Structural Mutation / Swap & Pop)[cite: 6] ---
+    for(auto& p : phys) p.state = 0; // Reset
     std::vector<IPhysics> combat_archetype;
     combat_archetype.reserve(N/20);
     size_t current_size = N;
 
     auto s2 = std::chrono::high_resolution_clock::now();
     for(size_t i=0; i<current_size; ++i) {
-        // Exécution (Simulée simple)
         phys[i].pos[0] += (phys[i].state == 0) ? 1.0f : 2.0f;
 
-        // Mutation structurelle (Le cauchemar du cache)
-        if (i % 20 == 0) {
+        if (i % 20 == 0) { // Structural Mutation (Cache Poisoning)[cite: 6, 7]
             phys[i].state = 1;
             combat_archetype.push_back(phys[i]);
             phys[i] = phys[current_size - 1]; // Swap
-            sparse_set[phys[i].entity_id] = i; // Update Sparse Set (Random Access)
+            sparse_set[phys[i].entity_id] = (int)i; // Update Sparse Set (Random Access)
             current_size--;
             i--;
         }
@@ -133,8 +129,13 @@ int main(int argc, char* argv[]) {
     auto e2 = std::chrono::high_resolution_clock::now();
     double ecs_time = std::chrono::duration<double, std::milli>(e2 - s2).count();
 
-    // Output pour le script Python
-    std::cout << N << "," << ecs_time << "," << crg_time << std::endl;
+    // Export results to data/ subfolder
+    std::ofstream out("data/crg_benchmark_bar.csv");
+    if (out.is_open()) {
+        out << "N,ECS_ms,CRG_ms\n";
+        out << N << "," << ecs_time << "," << crg_time << "\n";
+        std::cout << "Success: Data saved in data/crg_benchmark_bar.csv" << std::endl;
+    }
 
     return 0;
 }

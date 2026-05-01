@@ -1,57 +1,43 @@
-"""
-PURPOSE:
-This script reads the last line of 'crg_benchmark_bar.csv' to create a direct 
-bar chart comparison. It visually demonstrates the massive penalty of 
-"Archetype Poisoning" (Structural Mutation in classic ECS) vs O(1) Matrix Resolution (CRG).
-"""
-import matplotlib.pyplot as plt
-import csv
-import os
-from datetime import datetime
+import subprocess, os, platform, csv, matplotlib.pyplot as plt
 
-file_path = 'crg_benchmark_bar.csv'
-MUTATION_RATE = "5%" # On le définit en constante pour le titre
+# Paths configuration[cite: 16]
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BIN_DIR = os.path.join(CURRENT_DIR, "bin")
+DATA_DIR = os.path.join(CURRENT_DIR, "data")
+IMG_DIR = os.path.join(CURRENT_DIR, "..", "img")
 
-if not os.path.exists(file_path):
-    print(f"Erreur : {file_path} non trouvé.")
-    exit(1)
+SOURCE = os.path.join(CURRENT_DIR, "crg_benchmark_bar.cpp")
+EXE = os.path.join(BIN_DIR, "bar.bin" if platform.system() != "Windows" else "bar.exe")
+CSV = os.path.join(DATA_DIR, "crg_benchmark_bar.csv")
 
-with open(file_path, 'r') as f:
-    data = list(csv.reader(f))[-1]
-    ecs_val, crg_val = float(data[1]), float(data[2])
+def run_suite():
+    if not os.path.exists(SOURCE):
+        print(f"Error: {SOURCE} not found.")
+        return
 
-plt.figure(figsize=(10, 7))
-colors = ['#e74c3c', '#2ecc71']
-labels = ['ECS Archetype\n(Structural Mutation)', 'CRG Stage 10\n(Value Mutation)']
+    os.makedirs(BIN_DIR, exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(IMG_DIR, exist_ok=True)
+    
+    # Compilation[cite: 16]
+    print(f"Compiling {os.path.basename(SOURCE)}...")
+    subprocess.run(["clang++", "-O3", "-march=native", "-std=c++17", SOURCE, "-o", EXE], check=True)
+    
+    # Execution[cite: 6]
+    print("Running Mutation Impact Benchmark...")
+    subprocess.run([EXE], check=True, cwd=CURRENT_DIR)
 
-bars = plt.bar(labels, [ecs_val, crg_val], color=colors, edgecolor='black', alpha=0.8)
+    # Visualization[cite: 16]
+    with open(CSV, 'r') as f:
+        data = list(csv.reader(f))[-1]
+        ecs_val, crg_val = float(data[1]), float(data[2])
 
-plt.title(f'State Transition Impact ({MUTATION_RATE} Mutation Rate per Frame)', 
-          fontsize=16, fontweight='bold', pad=20)
-plt.suptitle('1,000,000 Entities - 64 bytes per row', fontsize=10, y=0.92)
+    plt.figure(figsize=(8, 6))
+    plt.bar(['ECS (Structural)', 'CRG (Value)'], [ecs_val, crg_val], color=['#e74c3c', '#2ecc71'])
+    plt.title("Mutation Impact (5% State Transition Rate)")
+    plt.ylabel("Total Execution Time (ms)")
+    
+    plt.savefig(os.path.join(IMG_DIR, "crg_benchmark_bar.png"), dpi=300)
 
-plt.ylabel('Total Execution Time (ms)', fontsize=12)
-plt.grid(axis='y', linestyle='--', alpha=0.3)
-
-for bar in bars:
-    height = bar.get_height()
-    plt.text(bar.get_x() + bar.get_width()/2., height + 0.5,
-             f'{height:.2f} ms', ha='center', va='bottom', 
-             fontsize=12, fontweight='bold')
-
-plt.annotate('Swap & Pop + Sparse Set Update\n= Cache Trashing', 
-             xy=(0, ecs_val), xytext=(0.3, ecs_val + 5),
-             arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=8))
-
-plt.annotate('O(1) Matrix Resolution\n= Cache Friendly', 
-             xy=(1, crg_val), xytext=(0.5, crg_val + 10),
-             arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=8))
-
-plt.tight_layout()
-
-# TIMESTAMP ADDITION
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_filename = f'crg_benchmark_bar_{timestamp}.png'
-
-plt.savefig(output_filename, dpi=300)
-print(f"PNG mis à jour avec les détails de mutation : {output_filename}")
+if __name__ == "__main__":
+    run_suite()
