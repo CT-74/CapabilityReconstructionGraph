@@ -6,8 +6,8 @@
 // =============================================================================
 //
 // @intent:
-// The definitive fusion of the Baker, Router, and OOP Shell.
-// - CapabilityBaker: Automates domain registration.
+// The definitive fusion of the Binding, Router, and OOP Shell.
+// - CapabilityBinding: Automates domain registration.
 // - CapabilityRouter: The central gateway for raw lookup.
 // - ModelRouter & ModelShell: The OOP illusion. Strictly enforces statelessness
 //   and the 'const ModelShell&' context parameter.
@@ -90,8 +90,8 @@ struct IAssembler {
     virtual void Assemble(RegistryVector& registry) const = 0;
 };
 
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*)
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*)
 
 // =============================================================================
 // 3. THE BAKER CORE (Variadic Aggregation)
@@ -112,16 +112,16 @@ public:
 
 // Primary Template: Single Model registration
 template<class TModel, template<class> class... TCapabilities>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     CapabilitySpace<TModel, TCapabilities...> m_unit;
     void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
 };
 
 // Specialization: Batch registration via TypeList
 template<class... Models, template<class> class... TCapabilities>
-struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
+struct CapabilityBinding<TypeList<Models...>, TCapabilities...> : public CapabilityBinding<Models, TCapabilities...>... {
     void Assemble(RegistryVector& registry) const override {
-        (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...);
+        (CapabilityBinding<Models, TCapabilities...>::Assemble(registry), ...);
     }
 };
 
@@ -140,7 +140,7 @@ public:
     static void Bake() {
         auto& registry = RouterSlot::s_Value;
         registry.clear();
-        for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) {
+        for (auto* b = NodeListAnchor<IBindingNode>::s_Value; b; b = b->m_Next) {
             b->Assemble(registry);
         }
     }
@@ -296,7 +296,7 @@ struct Scout {};
 
 // One line binds an entire domain
 using AirModels = TypeList<Drone, Scout>;
-static const CapabilityBaker<AirModels, DiagCapability, TeleCapability> g_AirBaker{};
+static const CapabilityBinding<AirModels, DiagCapability, TeleCapability> g_AirBinding{};
 
 // =============================================================================
 // MAIN

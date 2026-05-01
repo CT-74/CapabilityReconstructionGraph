@@ -123,8 +123,8 @@ using RegistryVector = std::vector<const IRegistryNode*>;
 CRG_BIND_SLOT(RegistryVector)
 
 struct IAssembler { virtual void Assemble(RegistryVector& registry) const = 0; };
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*)
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*)
 
 template<class TSpace, std::size_t Index, class IdxSeq = std::make_index_sequence<TSpace::Dimensions>> struct MakeAt;
 template<class TSpace, std::size_t Index, std::size_t... Is>
@@ -164,14 +164,14 @@ public:
 };
 
 template<class TModel, template<class, class> class... TCapabilities>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     CapabilitySpace<TModel, TCapabilities...> m_unit;
     void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
 };
 
 template<class... Models, template<class, class> class... TCapabilities>
-struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
-    void Assemble(RegistryVector& registry) const override { (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...); }
+struct CapabilityBinding<TypeList<Models...>, TCapabilities...> : public CapabilityBinding<Models, TCapabilities...>... {
+    void Assemble(RegistryVector& registry) const override { (CapabilityBinding<Models, TCapabilities...>::Assemble(registry), ...); }
 };
 
 // =============================================================================
@@ -187,7 +187,7 @@ private:
 public:
     static void Bake() {
         RegistrySlot<RegistryVector>::s_Value.clear();
-        for (auto* b = RegistrySlot<const IBakerNode*>::s_Value; b; b = b->m_Next) {
+        for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) {
             b->Assemble(RegistrySlot<RegistryVector>::s_Value);
         }
     }
@@ -289,7 +289,7 @@ struct PingLogic : Capability<ISimplePing> {
 // =============================================================================
 
 struct ScoutDrone {};
-static const CapabilityBaker<ScoutDrone, UnitLogic, PingLogic> g_DroneBaker{};
+static const CapabilityBinding<ScoutDrone, UnitLogic, PingLogic> g_DroneBinding{};
 
 int main() {
     std::cout << "--- CRG STAGE 8: N-DIMENSIONAL TENSOR ROUTING (CLEAN) ---\n\n";

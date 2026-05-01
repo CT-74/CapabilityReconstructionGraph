@@ -84,7 +84,7 @@ using InterfaceTypeID = std::size_t;
 template<class T> struct TypeIDOf { static std::size_t Get() { return typeid(T).hash_code(); } };
 template<typename... Ts> struct TypeList {};
 
-// Capability Helper: Injects InterfaceType alias for the Baker
+// Capability Helper: Injects InterfaceType alias for the Binding
 template<class TInterface> 
 struct Capability : public TInterface { 
     using InterfaceType = TInterface; 
@@ -101,8 +101,8 @@ using RouterSlot = RegistrySlot<RegistryVector>;
 CRG_BIND_SLOT(RegistryVector) 
 
 struct IAssembler { virtual void Assemble(RegistryVector& registry) const = 0; };
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*)
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*)
 
 // =============================================================================
 // 4. THE BAKER (SPATIO-TEMPORAL COMPILER)
@@ -146,15 +146,15 @@ public:
 };
 
 template<class TModel, template<class, class> class... TCapabilities>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     CapabilitySpace<TModel, TCapabilities...> m_unit;
     void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
 };
 
 template<class... Models, template<class, class> class... TCapabilities>
-struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
+struct CapabilityBinding<TypeList<Models...>, TCapabilities...> : public CapabilityBinding<Models, TCapabilities...>... {
     void Assemble(RegistryVector& registry) const override {
-        (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...);
+        (CapabilityBinding<Models, TCapabilities...>::Assemble(registry), ...);
     }
 };
 
@@ -172,7 +172,7 @@ public:
     static void Bake() {
         auto& registry = RouterSlot::s_Value;
         registry.clear();
-        for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) {
+        for (auto* b = NodeListAnchor<IBindingNode>::s_Value; b; b = b->m_Next) {
             b->Assemble(registry);
         }
     }
@@ -229,7 +229,7 @@ struct TeleLogic<T, At<WorldState::Night>> : Capability<ITelemetry> {
 
 // --- E. REGISTRATION ---
 struct Drone {};
-static const CapabilityBaker<Drone, DiagLogic, TeleLogic> g_AirBaker{};
+static const CapabilityBinding<Drone, DiagLogic, TeleLogic> g_AirBinding{};
 
 int main() {
     std::cout << "--- CRG STAGE 7: TEMPORAL AXIS (ROUTING TRAITS) ---\n\n";

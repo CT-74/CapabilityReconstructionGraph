@@ -80,7 +80,7 @@ struct ModelHandle {
     template<class T> static ModelHandle FromType() { return ModelHandle(TypeIDOf<T>::Get()); }
 };
 
-// NodeList: Static chaining for automatic Baker discovery.
+// NodeList: Static chaining for automatic Binding discovery.
 template<class TNode> using NodeListAnchor = RegistrySlot<const TNode*>; 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
@@ -228,8 +228,8 @@ template<typename T> struct HasConfigType<T, std::void_t<typename T::ConfigType>
 
 template<typename... Ts> struct TypeList {}; 
 struct IAssembler { virtual void Bake() const = 0; };
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*) 
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*) 
 
 template<class TModel, template<class, class> class Cap, class TIdxSeq> 
 struct CapabilityNode;
@@ -267,7 +267,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
 };
 
 template<class TModel, template<class, class> class... TCapabilities>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     struct Unit : public CapabilityNode<TModel, TCapabilities, std::make_index_sequence<CapabilityRoutingTraits<typename TCapabilities<TModel, At<>>::InterfaceType>::SpaceType::Volume>>... {
         void Fill(DenseModelID slot) const { (CapabilityNode<TModel, TCapabilities, std::make_index_sequence<CapabilityRoutingTraits<typename TCapabilities<TModel, At<>>::InterfaceType>::SpaceType::Volume>>::FillArena(slot), ...); }
     } m_unit{};
@@ -281,8 +281,8 @@ struct CapabilityBaker : public IBakerNode {
 };
 
 template<class... Models, template<class, class> class... TCapabilities>
-struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
-    void Bake() const override { (CapabilityBaker<Models, TCapabilities...>::Bake(), ...); }
+struct CapabilityBinding<TypeList<Models...>, TCapabilities...> : public CapabilityBinding<Models, TCapabilities...>... {
+    void Bake() const override { (CapabilityBinding<Models, TCapabilities...>::Bake(), ...); }
 };
 
 // =============================================================================
@@ -293,7 +293,7 @@ class CapabilityRouter {
 public:
     static void EnsureBaked() {
         static struct StaticGuard { 
-            StaticGuard() { for (auto* b = NodeListAnchor<IBakerNode>::s_Value; b; b = b->m_Next) b->Bake(); } 
+            StaticGuard() { for (auto* b = NodeListAnchor<IBindingNode>::s_Value; b; b = b->m_Next) b->Bake(); } 
         } s_guard;
     } 
 
@@ -491,7 +491,7 @@ struct DroneFlee : Capability<UnitAIContract, PanicConfig> {
 
 struct Drone {};
 using DroneFleet = TypeList<Drone>;
-static const CapabilityBaker<DroneFleet, DroneLogic, DroneFlee> g_DroneBaker{};
+static const CapabilityBinding<DroneFleet, DroneLogic, DroneFlee> g_DroneBinding{};
 
 // =============================================================================
 // [ GAMEPLAY ] 4. BATTLEFIELD ENGINE & BENCHMARK

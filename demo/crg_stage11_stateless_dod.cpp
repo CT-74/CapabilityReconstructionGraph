@@ -44,7 +44,7 @@ template<class T> struct RegistrySlot {
     #define CRG_BIND_SLOT(T) 
 #endif
 
-// NodeList: Static chaining for automatic Baker discovery.
+// NodeList: Static chaining for automatic Binding discovery.
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
@@ -200,8 +200,8 @@ struct Capability<TInterface, void> : public TInterface {
 // =============================================================================
 
 struct IAssembler { virtual void Bake() const = 0; };
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*)
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*)
 
 template<class TSpace, std::size_t Index, class IdxSeq = std::make_index_sequence<TSpace::Dimensions>> struct MakeAt;
 template<class TSpace, std::size_t Index, std::size_t... DimIs>
@@ -243,7 +243,7 @@ struct CapabilityNode<TModel, Cap, std::integer_sequence<std::size_t, Is...>>
 };
 
 template<class TModel, template<class, class> class... TCap>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     template<template<class, class> class C>
     static constexpr std::size_t VolOf = CapabilityRoutingTraits<typename C<TModel, At<>>::InterfaceType>::SpaceType::Volume;
 
@@ -260,9 +260,9 @@ struct CapabilityBaker : public IBakerNode {
 };
 
 template<class... Models, template<class, class> class... TCap>
-struct CapabilityBaker<TypeList<Models...>, TCap...> : public CapabilityBaker<Models, TCap...>... {
+struct CapabilityBinding<TypeList<Models...>, TCap...> : public CapabilityBinding<Models, TCap...>... {
     void Bake() const override {
-        (CapabilityBaker<Models, TCap...>::Bake(), ...);
+        (CapabilityBinding<Models, TCap...>::Bake(), ...);
     }
 };
 
@@ -278,7 +278,7 @@ public:
         static StaticGuard s_Guard;
     } 
 
-    static void Bake() { for (auto* b = RegistrySlot<const IBakerNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
+    static void Bake() { for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
 
     template<class InterfaceT, typename... TArgs>
     static const ModelBinding<InterfaceT>* Find(ModelHandle handle, const TArgs&... args) {
@@ -359,7 +359,7 @@ template<class T, class TAt> struct Overdrive : Capability<ITask, EmergencyConfi
 
 struct Scout {};
 
-static const CapabilityBaker<Scout, Scan, Overdrive> g_ScoutBaker{};
+static const CapabilityBinding<Scout, Scan, Overdrive> g_ScoutBinding{};
 
 // =============================================================================
 // 9. MAIN[cite: 13]

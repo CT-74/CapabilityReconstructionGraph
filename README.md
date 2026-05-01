@@ -158,7 +158,7 @@ The `demo/` folder contains 12 stages, each building on the previous:
 | `stage03` | Traversal Lookup                                   |
 | `stage04` | Identity Decoupling (CapabilityBinding)            |
 | `stage05` | Model Router (Invoke / TryInvoke)                  |
-| `stage06` | Fusion (CapabilityBaker)                           |
+| `stage06` | Fusion (CapabilityBinding)                           |
 | `stage07` | Temporal Axis                                      |
 | `stage08` | N-Dimensional Space (CapabilitySpace + Horner)     |
 | `stage09` | Dynamic Rules (Narrow Phase)                       |

@@ -234,20 +234,20 @@ Le pointeur de méthode que vous passez est analysé par ModelShellMethodTraits 
 using AirModels = TypeList<Scout, Drone, Heavy>;
 
 // One line. All models. All capabilities.
-static const CapabilityBaker<AirModels, Diag, Tele> g_AirBaker;
+static const CapabilityBinding<AirModels, Diag, Tele> g_AirBinding;
 ```
 ## Mermaid
 ```mermaid
 graph TD
-    TL["TypeList"] --> Baker["CapabilityBaker"]
-    Baker --> M1["Scout Matrix"]
-    Baker --> M2["Drone Matrix"]
-    Baker --> M3["Heavy Matrix"]
+    TL["TypeList"] --> Binding["CapabilityBinding"]
+    Binding --> M1["Scout Matrix"]
+    Binding --> M2["Drone Matrix"]
+    Binding --> M3["Heavy Matrix"]
 ```
 ## EN
-Manual registration doesn't scale. The Baker fixes this by expanding a TypeList of models across templatized capabilities. One static line generates N entries in the matrix. Group definitions by domain and let the matrix build itself.
+Manual registration doesn't scale. The Binding fixes this by expanding a TypeList of models across templatized capabilities. One static line generates N entries in the matrix. Group definitions by domain and let the matrix build itself.
 ## FR
-L'enregistrement manuel ne passe pas à l'échelle. Ajoutez un modèle : deux lignes de plus. Ajoutez une capability : trois lignes de plus. Le Baker résout ça. DiagCapability devient un template sur TModel. Ensuite, une seule ligne CapabilityBaker expand la TypeList. Trois modèles, deux capabilities : un seul statique, six entrées dans la matrice. Et la décentralisation est préservée. Ajoutez un modèle à la TypeList ? Chaque capability se propage. Ajoutez une capability ? Chaque modèle en bénéficie. La matrice se construit seule.
+L'enregistrement manuel ne passe pas à l'échelle. Ajoutez un modèle : deux lignes de plus. Ajoutez une capability : trois lignes de plus. Le Binding résout ça. DiagCapability devient un template sur TModel. Ensuite, une seule ligne CapabilityBinding expand la TypeList. Trois modèles, deux capabilities : un seul statique, six entrées dans la matrice. Et la décentralisation est préservée. Ajoutez un modèle à la TypeList ? Chaque capability se propage. Ajoutez une capability ? Chaque modèle en bénéficie. La matrice se construit seule.
 
 # SLIDE: 09 - THE PRICE OF FREEDOM (O(N) Search)
 ## Code
@@ -264,9 +264,9 @@ graph LR
     Search["O(N) Search"] -- "Too slow for 100k" --> Target["O(1) Array Access"]
 ```
 ## EN
-The Baker is elegant, but Find() is still O(N) over the number of registered models. For 100k entities, this is a bottleneck. We need pure math: compute an offset and jump. But hashes can't be array indices. We need to collapse the sparse ID universe.
+The Binding is elegant, but Find() is still O(N) over the number of registered models. For 100k entities, this is a bottleneck. We need pure math: compute an offset and jump. But hashes can't be array indices. We need to collapse the sparse ID universe.
 ## FR
-Le Baker est élégant. Mais regardons ce que Find() fait réellement. Il itère sur les nœuds de modèles enregistrés, compare les IDs, résout l'interface. C'est O(N) sur le nombre de modèles enregistrés. Pour trois cents modèles à cent mille entités par frame — c'est un goulot d'étranglement. L'objectif c'est ça : un calcul, zéro recherche. Donné un modelID et un contexte, calculer un offset mémoire et sauter directement. Mais il y a un problème. Notre modelID est un hash — une valeur size_t aléatoire. Ça ne peut pas servir d'index de tableau.
+Le Binding est élégant. Mais regardons ce que Find() fait réellement. Il itère sur les nœuds de modèles enregistrés, compare les IDs, résout l'interface. C'est O(N) sur le nombre de modèles enregistrés. Pour trois cents modèles à cent mille entités par frame — c'est un goulot d'étranglement. L'objectif c'est ça : un calcul, zéro recherche. Donné un modelID et un contexte, calculer un offset mémoire et sauter directement. Mais il y a un problème. Notre modelID est un hash — une valeur size_t aléatoire. Ça ne peut pas servir d'index de tableau.
 
 # SLIDE: 10 - THE ID EXPLOSION (The Sparse Universe)
 ## Code

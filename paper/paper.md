@@ -28,11 +28,11 @@ graph TD
     end
     subgraph "CRG Engine Core"
         Anchor[NodeListAnchor]
-        Baker[Baker]
+        Binding[Binding]
         Tensor[CapabilityTensor Matrix]
     end
-    Anchor -->|First Find triggers Baker| Baker
-    Baker -->|Flattening| Tensor
+    Anchor -->|First Find triggers Binding| Binding
+    Binding -->|Flattening| Tensor
 ```
 
 ---

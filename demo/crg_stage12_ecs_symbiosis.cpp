@@ -209,8 +209,8 @@ template<typename T> struct HasConfigType<T, std::void_t<typename T::ConfigType>
 // =============================================================================
 
 struct IAssembler { virtual void Bake() const = 0; };
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*) 
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*) 
 
 template<class TModel, template<class, class> class Cap, class TIdxSeq> struct CapabilityNode;
 
@@ -246,7 +246,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
 };
 
 template<class TModel, template<class, class> class... TCap>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     template<template<class, class> class C>
     static constexpr std::size_t VolOf = CapabilityRoutingTraits<typename C<TModel, At<>>::InterfaceType>::SpaceType::Volume;
 
@@ -265,8 +265,8 @@ struct CapabilityBaker : public IBakerNode {
 };
 
 template<class... Models, template<class, class> class... TCapabilities>
-struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
-    void Bake() const override { (CapabilityBaker<Models, TCapabilities...>::Bake(), ...); }
+struct CapabilityBinding<TypeList<Models...>, TCapabilities...> : public CapabilityBinding<Models, TCapabilities...>... {
+    void Bake() const override { (CapabilityBinding<Models, TCapabilities...>::Bake(), ...); }
 };
 
 // =============================================================================
@@ -278,7 +278,7 @@ public:
     static void EnsureBaked() {
         static struct StaticGuard {
             StaticGuard() {
-                for (auto* b = RegistrySlot<const IBakerNode*>::s_Value; b; b = b->m_Next) b->Bake();
+                for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake();
             }
         } s_guard;
     } 
@@ -424,7 +424,7 @@ struct Scout {};
 struct HeavyLifter {};
 using DroneFleet = TypeList<Scout, HeavyLifter>;
 
-static const CapabilityBaker<DroneFleet, DrainLogic, DiagLogic> g_DroneBaker{};
+static const CapabilityBinding<DroneFleet, DrainLogic, DiagLogic> g_DroneBinding{};
 
 // =============================================================================
 // 9. ECS LOOP & MAIN

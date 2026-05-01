@@ -182,8 +182,8 @@ struct Capability<TInterface, void> : public TInterface {
 // =============================================================================
 
 struct IAssembler { virtual void Bake() const = 0; };
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*)
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*)
 
 template<auto... V> struct At {};
 template<class TSpace, std::size_t Index, class IdxSeq = std::make_index_sequence<TSpace::Dimensions>> struct MakeAt;
@@ -221,7 +221,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
 };
 
 template<class TModel, template<class, class> class... TCap>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     template<template<class, class> class C> 
     static constexpr std::size_t VolOf = CapabilityRoutingTraits<typename C<TModel, At<>>::InterfaceType>::SpaceType::Volume;
 
@@ -238,9 +238,9 @@ struct CapabilityBaker : public IBakerNode {
 };
 
 template<class... Models, template<class, class> class... TCap>
-struct CapabilityBaker<TypeList<Models...>, TCap...> : public CapabilityBaker<Models, TCap...>... {
+struct CapabilityBinding<TypeList<Models...>, TCap...> : public CapabilityBinding<Models, TCap...>... {
     void Bake() const override {
-        (CapabilityBaker<Models, TCap...>::Bake(), ...);
+        (CapabilityBinding<Models, TCap...>::Bake(), ...);
     }
 };
 
@@ -255,7 +255,7 @@ public: // Made public to allow ModelRouter synchronization[cite: 6]
         struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
         static StaticGuard s_Guard;
     } 
-    static void Bake() { for (auto* b = RegistrySlot<const IBakerNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
+    static void Bake() { for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
 
     template<class InterfaceT, typename... TArgs>
     static const InterfaceT* Find(ModelTypeID modelID, const TArgs&... args) {
@@ -321,7 +321,7 @@ template<class T, class TAt> struct EmergencyTask : Capability<IUnitAI, Emergenc
 };
 
 struct Scout {};
-static const CapabilityBaker<Scout, NormalTask, EmergencyTask> g_ScoutBaker{};
+static const CapabilityBinding<Scout, NormalTask, EmergencyTask> g_ScoutBinding{};
 
 // =============================================================================
 // 9. MAIN

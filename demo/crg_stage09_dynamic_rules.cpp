@@ -191,8 +191,8 @@ using RegistryVector = std::vector<const IRegistryNode*>;
 CRG_BIND_SLOT(RegistryVector)
 
 struct IAssembler { virtual void Assemble(RegistryVector& registry) const = 0; };
-struct IBakerNode : public NodeList<IBakerNode, IAssembler> {};
-CRG_BIND_SLOT(const IBakerNode*)
+struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
+CRG_BIND_SLOT(const IBindingNode*)
 
 template<auto... V> struct At {};
 
@@ -244,15 +244,15 @@ public:
 };
 
 template<class TModel, template<class, class> class... TCapabilities>
-struct CapabilityBaker : public IBakerNode {
+struct CapabilityBinding : public IBindingNode {
     CapabilitySpace<TModel, TCapabilities...> m_unit;
     void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
 };
 
 template<class... Models, template<class, class> class... TCapabilities>
-struct CapabilityBaker<TypeList<Models...>, TCapabilities...> : public CapabilityBaker<Models, TCapabilities...>... {
+struct CapabilityBinding<TypeList<Models...>, TCapabilities...> : public CapabilityBinding<Models, TCapabilities...>... {
     void Assemble(RegistryVector& registry) const override {
-        (CapabilityBaker<Models, TCapabilities...>::Assemble(registry), ...);
+        (CapabilityBinding<Models, TCapabilities...>::Assemble(registry), ...);
     }
 };
 
@@ -268,7 +268,7 @@ public: // Made public to allow ModelRouter synchronization[cite: 11]
     } 
     static void Bake() {
         RegistrySlot<RegistryVector>::s_Value.clear();
-        for (auto* b = RegistrySlot<const IBakerNode*>::s_Value; b; b = b->m_Next) b->Assemble(RegistrySlot<RegistryVector>::s_Value);
+        for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Assemble(RegistrySlot<RegistryVector>::s_Value);
     }
 
     template<class InterfaceT, typename... TArgs>
@@ -343,7 +343,7 @@ template<class T, class TAt> struct LowPowerAI : Capability<IUnitAI, EmergencyCo
 };
 
 struct Drone {};
-static const CapabilityBaker<Drone, NormalAI, LowPowerAI> g_DroneBaker{};
+static const CapabilityBinding<Drone, NormalAI, LowPowerAI> g_DroneBinding{};
 
 // =============================================================================
 // 9. MAIN
