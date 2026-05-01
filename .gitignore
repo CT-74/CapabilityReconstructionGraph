@@ -1,5 +1,6 @@
 book/
 build/
+talk/.venv/
 *.bin
 *.exe
 *.o
