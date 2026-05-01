@@ -39,9 +39,9 @@ template<class T> struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
 #else
-    #define CRG_BIND_SLOT(T) 
+    #define CRG_DEFINE_SLOT(T) 
 #endif
 
 // NodeList: Static chaining for automatic Binding discovery.
@@ -72,7 +72,7 @@ struct DenseModelID {
 };
 
 using ModelMap = std::unordered_map<ModelTypeID, std::size_t>; 
-CRG_BIND_SLOT(ModelMap)
+CRG_DEFINE_SLOT(ModelMap)
 
 // ModelHandle: Resolved once, stored in ECS components for hot-path lookup.
 struct ModelHandle {
@@ -201,7 +201,7 @@ struct Capability<TInterface, void> : public TInterface {
 
 struct IAssembler { virtual void Bake() const = 0; };
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_BIND_SLOT(const IBindingNode*)
+CRG_DEFINE_SLOT(const IBindingNode*)
 
 template<class TSpace, std::size_t Index, class IdxSeq = std::make_index_sequence<TSpace::Dimensions>> struct MakeAt;
 template<class TSpace, std::size_t Index, std::size_t... DimIs>

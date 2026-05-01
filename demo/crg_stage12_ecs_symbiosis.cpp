@@ -38,9 +38,9 @@ template<class T> struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
 #else
-    #define CRG_BIND_SLOT(T) 
+    #define CRG_DEFINE_SLOT(T) 
 #endif
 
 using ModelTypeID = std::size_t;
@@ -56,7 +56,7 @@ struct DenseModelID {
 };
 
 using ModelMap = std::unordered_map<ModelTypeID, std::size_t>; 
-CRG_BIND_SLOT(ModelMap)
+CRG_DEFINE_SLOT(ModelMap)
 
 struct ModelHandle {
     DenseModelID denseID;
@@ -210,7 +210,7 @@ template<typename T> struct HasConfigType<T, std::void_t<typename T::ConfigType>
 
 struct IAssembler { virtual void Bake() const = 0; };
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_BIND_SLOT(const IBindingNode*) 
+CRG_DEFINE_SLOT(const IBindingNode*) 
 
 template<class TModel, template<class, class> class Cap, class TIdxSeq> struct CapabilityNode;
 

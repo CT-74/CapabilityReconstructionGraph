@@ -32,7 +32,7 @@ struct MyFeature : NodeList<MyFeature, ICapability> {
 static MyFeature g_feature; // ← OS loads, constructor fires. Done.
 ```
 
-Supports both **monolithic** (static lib, ship builds) and **DLL** (dev, tools, hot-reload) topologies via a single macro switch — `CRG_BIND_SLOT` — with no GPP-facing changes.
+Supports both **monolithic** (static lib, ship builds) and **DLL** (dev, tools, hot-reload) topologies via a single macro switch — `CRG_DEFINE_SLOT` — with no GPP-facing changes.
 
 ---
 

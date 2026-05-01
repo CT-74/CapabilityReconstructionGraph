@@ -47,9 +47,9 @@ struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
 #else
-    #define CRG_BIND_SLOT(T) 
+    #define CRG_DEFINE_SLOT(T) 
 #endif
 
 template<class TNode>

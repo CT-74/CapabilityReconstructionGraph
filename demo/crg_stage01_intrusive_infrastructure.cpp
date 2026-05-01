@@ -35,9 +35,9 @@ struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
 #else
-    #define CRG_BIND_SLOT(T) 
+    #define CRG_DEFINE_SLOT(T) 
 #endif
 
 // =============================================================================
@@ -69,7 +69,7 @@ struct IBehavior {
 struct BehaviorNode : public NodeList<BehaviorNode, IBehavior> {};
 
 // In DLL mode, this would live in BehaviorNode.cpp
-CRG_BIND_SLOT(const BehaviorNode*)
+CRG_DEFINE_SLOT(const BehaviorNode*)
 
 struct DroneBehavior : public BehaviorNode { 
     void Execute() const override { std::cout << "Drone: Scanning area.\n"; } 

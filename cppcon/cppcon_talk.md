@@ -61,8 +61,8 @@ Vous touchez un header. Un seul bool. Vous lancez le build. Vous allez chercher 
 ## Code
 ```cpp
 // RegistrySlot: Anchored definition in engine core
-#define CRG_BIND_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
-CRG_BIND_SLOT(const BehaviorNode*)
+#define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+CRG_DEFINE_SLOT(const BehaviorNode*)
 
 // MODULE A: Zero dependencies on core internals
 struct DroneBehavior : NodeList<BehaviorNode, IBehavior> {
@@ -84,9 +84,9 @@ graph TD
     end
 ```
 ## EN
-In production, you have modules registering capabilities without the core knowing they exist. CRG_BIND_SLOT anchors the registry in the core, allowing DLLs to resolve to a single address via the linker. Define a struct, instantiate it as a static, and the OS fires the constructor on load. It's a fully functional plugin system obtained for free.
+In production, you have modules registering capabilities without the core knowing they exist. CRG_DEFINE_SLOT anchors the registry in the core, allowing DLLs to resolve to a single address via the linker. Define a struct, instantiate it as a static, and the OS fires the constructor on load. It's a fully functional plugin system obtained for free.
 ## FR
-En production, vous n'avez jamais un seul binaire. Vous avez le core, une DLL réseau, une DLL outils, une DLL robotique — et chacune doit pouvoir enregistrer ses capabilities sans que le core ait à la connaître. L'approche naïve, c'est le static inline partout. Mais en développement, on veut du hot-reload et des plugins. C'est là que le mode DLL entre en jeu. CRG_BIND_SLOT déplace la définition vers l'exécutable core — une spécialisation de template explicite que chaque DLL résout via le linker. L'API de découverte est identique : définissez une struct, instanciez-la en statique, et l'OS déclenche le constructeur au chargement. Aucun Init(), aucun registre central, aucun include du core. Vous déposez un fichier dans une DLL. Il s'enregistre lui-même. C'est tout.
+En production, vous n'avez jamais un seul binaire. Vous avez le core, une DLL réseau, une DLL outils, une DLL robotique — et chacune doit pouvoir enregistrer ses capabilities sans que le core ait à la connaître. L'approche naïve, c'est le static inline partout. Mais en développement, on veut du hot-reload et des plugins. C'est là que le mode DLL entre en jeu. CRG_DEFINE_SLOT déplace la définition vers l'exécutable core — une spécialisation de template explicite que chaque DLL résout via le linker. L'API de découverte est identique : définissez une struct, instanciez-la en statique, et l'OS déclenche le constructeur au chargement. Aucun Init(), aucun registre central, aucun include du core. Vous déposez un fichier dans une DLL. Il s'enregistre lui-même. C'est tout.
 
 # SLIDE: 03 - THE BAKING (Taking Back Control)
 ## Code
@@ -473,7 +473,7 @@ Le CRG est un framework de dispatch piloté par le linker pour tout système C++
 # Q&A PREP
 
 ## Q: "Isn't static inline ODR-unsafe across DLLs?"
-Exactly right — that's precisely why RegistrySlot exists. In monolithic builds, static inline is perfectly safe: one binary, one definition, ODR guaranteed. The moment you cross a DLL boundary, each module gets its own copy of the static and your list fragments. CRG_BIND_SLOT solves this by forcing one explicit template specialization in the engine core, which the linker resolves as a single address across all modules.
+Exactly right — that's precisely why RegistrySlot exists. In monolithic builds, static inline is perfectly safe: one binary, one definition, ODR guaranteed. The moment you cross a DLL boundary, each module gets its own copy of the static and your list fragments. CRG_DEFINE_SLOT solves this by forcing one explicit template specialization in the engine core, which the linker resolves as a single address across all modules.
 
 ## Q: "Does CRG work with Live++?"
 Yes — and it's friendly by design. Two cases:
