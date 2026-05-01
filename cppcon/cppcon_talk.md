@@ -360,7 +360,7 @@ graph LR
 ## EN
 In a mutable topology, behavior changes are structural operations that break the CPU prefetcher. In CRG, the matrix is frozen. A behavior transition is just a coordinate update. The memory addresses never change, so the prefetcher never loses its stream. Immutability is a performance guarantee.
 ## FR
-L'Acte II nous a donné un tenseur. Une matrice plate et contiguë de pointeurs de comportements, indexée par le modèle et le contexte. Construite une fois, jamais retouchée. Cette immutabilité n'est pas un accident — c'est la garantie centrale. Dans une topologie mutable, chaque changement de comportement est une opération structurelle. On ajoute, on retire, on recâble. Le layout mémoire change. Le prefetcher avait fait une prédiction. Maintenant, elle est fausse. Vous payez une pénalité de cache à chaque transition — pas pour une raison logique, mais purement structurelle. Avec le CRG, la matrice ne change jamais. Une transition de comportement n'est qu'une mise à jour de coordonnées. world_state bascule en Combat. Au lookup suivant, le tenseur renvoie un pointeur différent. La matrice n'a pas bougé. Les adresses mémoire n'ont pas changé. Le prefetcher a gardé son flux. L'immutabilité n'est pas une contrainte. C'est une garantie de performance. Et c'est ce qui nous permet d'atteindre la limite matérielle.
+L'Acte II nous a donné un tenseur. Une matrice plate et contiguë de pointeurs de comportements, indexée par le modèle et le contexte. Construite une fois, jamais retouchée. Cette immutabilité n'est pas un accident — c'est la garantie centrale. Dans une topologie mutable, chaque changement de comportement est une opération structurelle. On ajoute, on retire, on recâble. Le layout mémoire change. Le prefetcher avait fait une prédiction. Maintenant, elle est fausse. Vous payez une pénalité de cache à chaque transition — pas pour une raison logique, mais purement structurelle. Avec le CRG, la matrice ne change jamais. Une transition de comportement n'est qu'une mise à jour de coordonnées. world_state bascule en Combat. Au lookup suivant, le tenseur renvoie un pointeur différent. La matrice n'a pas bougé. Les adresses mémoire n'ont pas changé. Le prefetcher a gardé son flux. Une extension à mentionner : pour les conditions continues — santé en dessous de 30, distance sous 10 mètres — chaque cellule du tenseur contient une petite liste triée de prédicats. La Narrow Phase. O(1) jusqu'à la bonne cellule, O(K) à travers K règles. K est toujours petit. L'immutabilité n'est pas une contrainte. C'est une garantie de performance.
 
 # SLIDE: 14 - ECS SYMBIOSIS (The Brain & The Muscle)
 ## Code
@@ -412,7 +412,7 @@ graph TD
 ## EN
 Three levels of speed. Level 1: classic OOP vtable dispatch (~20ns). Level 2: CRG Shell Invoke, paying a virtual jump for type erasure (~7ns) — perfect for cold paths. Level 3: ActiveCapability, cached results called directly via function pointer (1.5ns). We've reached the physical hardware limit.
 ## FR
-Trois niveaux de vitesse. Niveau 1 : le dispatch classique par vtable OOP (~20ns). Niveau 2 : ModelShell Invoke, payant un saut virtuel pour l'effacement de type (~7ns) — idéal pour les chemins froids. Niveau 3 : ActiveCapability, résultat mis en cache et appelé directement via pointeur de fonction (1.5ns). Nous avons atteint la limite physique du matériel.
+Trois niveaux de vitesse. Niveau 1 : le dispatch classique par vtable OOP (~20ns). Niveau 2 : ModelShell Invoke, payant un saut virtuel pour l'effacement de type (~7ns) — idéal pour les chemins froids. Niveau 3 : ActiveCapability, résultat mis en cache et appelé directement via pointeur de fonction (1.5ns). Ce dernier chiffre est important. 1.5 nanosecondes, c'est en dessous du coût d'une boucle ECS avec le cache chaud. On n'est plus limité par la logique. On est limité par la RAM. C'est exactement là où on veut être.
 
 # SLIDE: 16 - REACHING THE SILICON LIMIT (Benchmarks)
 ## Code
@@ -430,7 +430,7 @@ graph LR
 ## EN
 This is the physical reality of the Memory Wall. At a 10% mutation rate, traditional ECS architectures drop to 19 Gi/s because the CPU is busy moving memory instead of executing logic. CRG sustains over 30 Gi/s because the topology is immutable. Note the QR code on the right: you can scan it now to access the live simulator and verify these performance metrics on your own device during the Q&A.
 ## FR
-C'est ici que l'on frappe le "Memory Wall". À 10% de mutation, l'ECS classique chute à 19 Go/s car le CPU passe son temps à déplacer de la mémoire plutôt qu'à exécuter de la logique. Le CRG maintient plus de 30 Go/s car la topologie est immuable. Notez le QR code à droite : vous pouvez le scanner dès maintenant pour accéder au simulateur live et vérifier ces mesures de performance sur votre propre appareil.
+Deux graphiques, deux questions. À gauche : quel est le coût des transitions d'état selon le taux de mutation ? À 1%, les deux systèmes sont pratiquement identiques — c'est visible sur le graphique. À 10%, l'ECS est 30% plus lent. Le CRG ne donne pas de performance supérieure en isolation — il donne de la stabilité. Un coût identique quel que soit le taux de mutation. Si votre taux de mutation est faible et que vous êtes content de votre ECS, le CRG n'est peut-être pas pour vous. Si vous frappez des murs de performance sous forte mutation — c'est exactement le problème que le CRG résout. À droite : le coût par entité à mesure que le dataset dépasse le L3. La ligne ECS monte. La ligne CRG ne bouge pas. Notez le QR code : vous pouvez scanner dès maintenant pour accéder au simulateur live sur votre propre appareil.
 
 # SLIDE: 17 - STRESS TEST SIMULATION (High Volatility)
 ## Code
@@ -470,3 +470,33 @@ graph TD
 CRG is a linker-driven dispatch framework for any C++ system needing decoupling and performance. Three guarantees: Zero coupling (modules self-register), Zero search (context is a coordinate), Zero migration (topology is immutable). Stop fighting C++ and the hardware. Give them what they were built for.
 ## FR
 Le CRG est un framework de dispatch piloté par le linker pour tout système C++ exigeant découplage et performance. Trois garanties : Zéro couplage (auto-enregistrement), Zéro recherche (coordonnées mathématiques), Zéro migration (topologie immuable). Arrêtez de vous battre contre le C++ et le matériel. Donnez-leur ce pour quoi ils ont été conçus.
+# Q&A PREP
+
+## Q: "Isn't static inline ODR-unsafe across DLLs?"
+Exactly right — that's precisely why RegistrySlot exists. In monolithic builds, static inline is perfectly safe: one binary, one definition, ODR guaranteed. The moment you cross a DLL boundary, each module gets its own copy of the static and your list fragments. CRG_BIND_SLOT solves this by forcing one explicit template specialization in the engine core, which the linker resolves as a single address across all modules.
+
+## Q: "Does CRG work with Live++?"
+Yes — and it's friendly by design. Two cases:
+1. Logic changes (the common case): Live++ patches function bodies in place. The tensor never moves. Works transparently, zero CRG involvement.
+2. Topology changes (adding/removing a capability): Hook Live++'s post-patch callback to call Bake(). Since NodeList is append-only, new statics register on top of the existing list. Bake() rebuilds the tensor from the full list including new entries. For pure logic patches: no Bake() needed at all.
+
+## Q: "Can you send DenseIDs over the network?"
+No — DenseID is non-deterministic. It depends on the order types are touched at startup, which varies per process and per machine. Never serialize or send a DenseID. For networking, send the hash (typeid().hash_code() or a stable compile-time CRC). The receiver converts hash → DenseID on its own side. If you need a fully deterministic catalog across machines, register types against a stable key (string, enum, or codegen hash).
+
+## Q: "What about DLL hot-reload? The lazy StaticGuard fires only once."
+In DLL mode you call Bake() manually at your controlled sync point after LoadLibrary(). The lazy init is the default for monolithic builds where all statics are wired by the OS before the first Find(). For plugins and hot-reload, the sync point is yours to own — intentional. You decide when the matrix rebuilds.
+
+## Q: "Why a manual sync point? Why not a dirty flag?"
+Two reasons. First, in DLL mode the lazy StaticGuard has already fired before the new module's statics are wired — lazy re-bake simply can't work. Second: a dirty flag would itself be a thread-safety problem. Two threads could read it simultaneously, trigger two concurrent Bakes, and corrupt the tensor. By forcing Bake() into a controlled sync point, tensor construction is always single-threaded and deterministic. The sync point is not a limitation — it's the contract.
+
+## Q: "Is the StaticGuard thread-safe? Two threads could call Find() simultaneously."
+Yes — thread-safe by the C++11 standard. Static local initialization is guaranteed to execute exactly once, even under concurrent calls. The compiler generates an internal guard. No mutex needed, no race condition possible.
+
+## Q: "What is ActiveCapability exactly? How does operator() work without virtual?"
+ActiveCapability is an ECS component wrapping a resolved capability result. It supports operator= to cache the result from CapabilityRouter::Find(), and operator() to invoke it directly. Internally, IsDODContract<T> selects automatically: if your contract has a Params type AND is not polymorphic, it uses a raw DOD function pointer (zero virtual). Otherwise it holds a virtual interface pointer. The GPP never sees that distinction. Full implementation: GitHub repo, stage 12.
+
+## Q: "Can I use CRG without ECS?"
+Absolutely — ECS is just the most compelling example. CRG works for any C++ system needing decoupled module discovery: plugin systems, rule engines, tool pipelines, embedded systems. The ECS symbiosis in Act III is a consequence of CRG's properties — not a design requirement. The framework is domain-agnostic.
+
+## Q (FR): "Peut-on utiliser le CRG sans ECS ?"
+Absolument — l'ECS n'est que l'exemple le plus parlant. Le CRG fonctionne pour tout système C++ nécessitant une découverte de modules découplée : systèmes de plugins, moteurs de règles, pipelines d'outils, systèmes embarqués. La symbiose ECS de l'Acte III est une conséquence des propriétés du CRG — pas une exigence de conception. Le framework est agnostique au domaine.
