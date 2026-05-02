@@ -352,15 +352,20 @@
             const whereLabels = ['Ground', 'Desert', 'Snow'].map((t, i) => i === targetW ? `<b>${t}</b>` : t);
             const whenLabels = ['Day', 'Night'].map((t, i) => i === targetT ? `<b>${t}</b>` : t);
 
-            // FIX 1: Better default camera framing (pulled back and higher)
-            let currentCamera = { eye: {x: 1.8, y: -1.8, z: 1.2} };
+            // Keep the original zoom (1.5), but shift the focal point (-0.15 on Z) 
+            // to move the cube UP and fill the empty space at the top.
+            let currentCamera = { 
+                eye: {x: 1.5, y: -1.5, z: 0.8},
+                center: {x: 0, y: 0, z: -0.15} 
+            };
+            
             if (plotDiv._fullLayout && plotDiv._fullLayout.scene && plotDiv._fullLayout.scene.camera) {
                 currentCamera = plotDiv._fullLayout.scene.camera;
             }
 
             const layout = {
-                // FIX 2: Added bottom margin (b: 30) to prevent X-axis labels from being cut off
-                margin: { l: 0, r: 0, b: 30, t: 10 },
+                // Reset margins to 0 to maximize screen space
+                margin: { l: 0, r: 0, b: 0, t: 0 },
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 scene: {
@@ -389,8 +394,7 @@
                 if (!plotInitialized) {
                     plotDiv.on('plotly_click', function(data) {
                         
-                        // FIX 3: Read-only 3D plot on mobile devices.
-                        // User can rotate and see tooltips, but tapping won't trigger re-renders.
+                        // Read-only 3D plot on mobile devices to prevent WebGL crashing
                         if (window.innerWidth <= 768) return;
 
                         const pt = data.points[0];
