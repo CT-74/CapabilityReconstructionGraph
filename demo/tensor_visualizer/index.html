@@ -88,7 +88,7 @@
         }
         select:focus { border-color: var(--accent); }
 
-        /* MOBILE FIXES: Prevent 3D canvas bleeding and disable touch tooltips */
+        /* MOBILE FIXES: Prevent 3D canvas bleeding */
         .plot-wrapper {
             flex: 2;
             background: #010409;
@@ -96,8 +96,14 @@
             border: 1px solid var(--border);
             height: 350px;
             position: relative;
-            overflow: hidden; /* Clips WebGL overflow on mobile */
+            overflow: hidden; 
             z-index: 1;
+        }
+        
+        /* FIX: Lock the internal Plotly container to prevent layout jumping */
+        #plot3d {
+            width: 100%;
+            height: 100%;
         }
 
         .stride-explanation {
@@ -135,7 +141,6 @@
             display: grid;
             grid-template-columns: repeat(6, 1fr);
             gap: 8px;
-            /* FIX: Garantit que la grille est au-dessus de tout le reste */
             position: relative;
             z-index: 10;
         }
@@ -147,7 +152,7 @@
             text-align: center;
             transition: all 0.2s ease;
             position: relative;
-            cursor: pointer; /* Indicates clickability */
+            cursor: pointer; 
         }
         .array-slot:hover:not(.active) {
             border-color: #8b949e;
@@ -181,10 +186,7 @@
         @media (max-width: 768px) {
             .top-section { flex-direction: column; }
             .plot-wrapper { width: 100%; height: 300px; }
-            .tensor-array { 
-                grid-template-columns: repeat(3, 1fr); 
-            }
-            .hoverlayer { display: none !important; } /* Hide Plotly tooltips on touch devices */
+            .tensor-array { grid-template-columns: repeat(3, 1fr); }
             .stride-formula { grid-template-columns: 1fr; text-align: left; }
         }
         @media (max-width: 480px) {
@@ -228,7 +230,9 @@
                     </div>
                 </div>
 
-                <div class="plot-wrapper" id="plot3d"></div>
+                <div class="plot-wrapper">
+                    <div id="plot3d"></div>
+                </div>
             </div>
 
             <!-- Middle: Math Calculation -->
@@ -291,21 +295,22 @@
             slot.id = `slot-${i}`;
             slot.innerHTML = `<div class="slot-index">[${i}]</div><div class="slot-content">${text}</div>`;
             
-            // Interaction: Click on a 1D tensor slot
-            slot.addEventListener('click', () => {
-                // Reverse Horner's method to find coordinates from offset
-                const m = Math.floor(i / 6);
-                const remainder = i % 6;
-                const w = Math.floor(remainder / 2);
-                const t = remainder % 2;
-                
-                // Update dropdowns (FIX: Force conversion to String)
-                selects[0].value = m.toString();
-                selects[1].value = w.toString();
-                selects[2].value = t.toString();
-                
-                // Trigger global update (Math, 3D Plot, UI Highlights)
-                updateRouting();
+            // Interaction: Click (PC) or Tap (Mobile) on a 1D tensor slot
+            ['click', 'touchstart'].forEach(eventType => {
+                slot.addEventListener(eventType, (e) => {
+                    e.preventDefault(); // Prevents ghost clicks on mobile
+                    
+                    const m = Math.floor(i / 6);
+                    const remainder = i % 6;
+                    const w = Math.floor(remainder / 2);
+                    const t = remainder % 2;
+                    
+                    selects[0].value = m.toString();
+                    selects[1].value = w.toString();
+                    selects[2].value = t.toString();
+                    
+                    updateRouting();
+                }, { passive: false });
             });
 
             tensorArray.appendChild(slot);
@@ -334,21 +339,22 @@
                 }
             }
 
+            // Detect if screen is mobile size (matches our CSS breakpoint)
+            const isMobile = window.innerWidth <= 768;
+
             const trace = {
                 x: x, y: y, z: z,
                 mode: 'markers',
                 marker: { size: sizes, color: colors, opacity: 0.9 },
                 text: texts,
-                hoverinfo: 'text',
+                hoverinfo: isMobile ? 'none' : 'text', // <--- DYNAMIC TOOLTIP
                 type: 'scatter3d'
             };
 
-            // Dynamic Labels (Bold if selected)
             const modelLabels = ['Scout', 'Heavy', 'Drone'].map((t, i) => i === targetM ? `<b>${t}</b>` : t);
             const whereLabels = ['Ground', 'Desert', 'Snow'].map((t, i) => i === targetW ? `<b>${t}</b>` : t);
             const whenLabels = ['Day', 'Night'].map((t, i) => i === targetT ? `<b>${t}</b>` : t);
 
-            // Keep existing camera rotation if any
             let currentCamera = { eye: {x: 1.5, y: -1.5, z: 0.8} };
             if (plotDiv._fullLayout && plotDiv._fullLayout.scene && plotDiv._fullLayout.scene.camera) {
                 currentCamera = plotDiv._fullLayout.scene.camera;
@@ -358,7 +364,6 @@
                 margin: { l: 0, r: 0, b: 0, t: 0 },
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
-                hovermode: 'closest',
                 scene: {
                     xaxis: { 
                         title: {text: 'Model', font: {color: '#ff7f0e'}}, 
@@ -375,27 +380,25 @@
                         tickvals: [0, 1], ticktext: whenLabels, 
                         tickfont: {color: '#9467bd'}, gridcolor: '#30363d' 
                     },
-                    camera: currentCamera // Apply saved camera state
+                    camera: currentCamera
                 }
             };
 
             const config = { displayModeBar: false, responsive: true };
             
             Plotly.react(plotDiv, [trace], layout, config).then(function() {
-                // Add click listener only once
                 if (!plotInitialized) {
                     plotDiv.on('plotly_click', function(data) {
                         const pt = data.points[0];
                         if (pt) {
-                            // FIX: Force conversion to String here as well
                             selects[0].value = pt.x.toString();
                             selects[1].value = pt.y.toString();
                             selects[2].value = pt.z.toString();
                             
-                            // Give Plotly time to finish its click cycle before updating
+                            // Delay allows touch events to finish before WebGL updates
                             setTimeout(() => {
                                 updateRouting();
-                            }, 10);
+                            }, 150);
                         }
                     });
                     plotInitialized = true;
@@ -403,32 +406,35 @@
             });
         }
 
+        // Add listener to handle window resizing properly
+        window.addEventListener('resize', () => {
+            // Update the plot to toggle hoverinfo if crossing the mobile breakpoint
+            const model = parseInt(selects[0].value);
+            const where = parseInt(selects[1].value);
+            const when = parseInt(selects[2].value);
+            draw3DPlot(model, where, when);
+        });
+
         function updateRouting() {
             const model = parseInt(selects[0].value);
             const where = parseInt(selects[1].value);
             const when = parseInt(selects[2].value);
 
-            // Horner's Method equivalent (Strides: 6, 2, 1)
             const offset = (model * 6) + (where * 2) + (when * 1);
 
-            // Update Math Display
             displays[0].innerText = model;
             displays[1].innerText = where;
             displays[2].innerText = when;
             displays[3].innerText = offset;
 
-            // Update UI 1D Highlights
             document.querySelectorAll('.array-slot').forEach(el => el.classList.remove('active'));
             document.getElementById(`slot-${offset}`).classList.add('active');
 
-            // Update 3D Plot
             draw3DPlot(model, where, when);
         }
 
-        // Listeners
         selects.forEach(select => select.addEventListener('change', updateRouting));
         
-        // Initial call setting to Target (1, 1, 1)
         selects[0].value = "1"; // Heavy
         selects[1].value = "1"; // Desert
         selects[2].value = "1"; // Night
