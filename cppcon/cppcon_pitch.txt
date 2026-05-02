@@ -44,25 +44,26 @@ Attendees will learn how to:
 
 Outline:
 * 00-05: THE HOOK — Hardware-Software Symmetry. Why peak efficiency requires a
-  physical split between instructions (L1I) and data (L1D). The Virtual Deadlock
-  introduced.
-* 05-15: LINKER-DRIVEN DISCOVERY — Achieving mutual anonymity via NodeList and
-  UniversalAnchor. How features register without shared headers or model overhead.
-  Plugin system obtained for free.
+  physical split between instructions (L1I) and data (L1D). The Build Wall: one
+  bool, 38 minutes, every programmer, every day.
+* 05-15: LINKER-DRIVEN DISCOVERY — Mutual anonymity via NodeList and UniversalAnchor.
+  How features self-register without shared headers. CapabilityBinding expands a
+  TypeList across templatized capabilities. Plugin system obtained for free.
 * 15-25: ORTHOGONAL TRANSPORT (COLD PATH) — Breaking the Virtual Deadlock.
-  The optional ModelShell: decoupling concrete models from templated interface
-  implementations. Invoke/TryInvoke as the cold-path OOP illusion.
-* 25-30: THE COMPLEXITY LADDER — CRG as a pay-per-dimension framework. 0D (pure
-  discovery), 1D (interface resolution), 2D (model-logic binding), ND (contextual
-  routing). Data transport is orthogonal — ModelShell is never mandatory.
-* 30-35: N-DIMENSIONAL RESOLUTION (HOT PATH) — Turning sparse hashes into
-  DenseTypeID. Resolving ND capability coordinates in O(1) via Horner's method
+  The optional ModelShell: type erasure stripped of all logic, SBO-guaranteed.
+  Identity Decoupling: Data, Logic, Binding as orthogonal dimensions.
+  Invoke/TryInvoke as the cold-path OOP illusion.
+* 25-35: COMPLEXITY LADDER & N-DIMENSIONAL RESOLUTION — CRG as a pay-per-dimension
+  framework: 0D (discovery) to ND (contextual routing). Collapsing sparse hashes
+  into DenseTypeID. Resolving N-dimensional coordinates in O(1) via Horner's method
   into a flat CapabilityTensor.
-* 35-45: ECS SYMBIOSIS — Brain (Decision) vs. Muscle (Execution). Caching routed
-  results in ActiveCapability for structural immunity and raw static dispatch.
-* 45-55: BENCHMARKS & ANALYSIS — The mathematical break-even point. CRG vs ECS
-  at 1%/5%/10% mutation rates. Live visual stress-test (50k entities). When to
+* 35-45: ECS SYMBIOSIS — Immutable topology as a performance guarantee. Brain
+  (Decision, 5Hz) vs. Muscle (Execution, 60fps). ActiveCapability for structural
+  immunity and raw static dispatch. Three performance levels: 20ns → 7ns → 1.5ns.
+* 45-54: BENCHMARKS & ANALYSIS — CRG vs ECS at 1%/5%/10% mutation rates. Live
+  visual stress-test (50k entities). The mathematical break-even point. When to
   use CRG and when not to.
+* 54-55: CONCLUSION — Zero Coupling. Zero Search. Zero Migration. Stop fighting C++.
 * 55-60: Q&A — Deep dive into DLL boundaries, ODR-safety, and hot-reload integration.
 
 Comments to Reviewers / Additional Materials:
