@@ -339,15 +339,12 @@
                 }
             }
 
-            // Detect if screen is mobile size (matches our CSS breakpoint)
-            const isMobile = window.innerWidth <= 768;
-
             const trace = {
                 x: x, y: y, z: z,
                 mode: 'markers',
                 marker: { size: sizes, color: colors, opacity: 0.9 },
                 text: texts,
-                hoverinfo: isMobile ? 'none' : 'text', // <--- DYNAMIC TOOLTIP
+                hoverinfo: 'text', // Tooltips enabled for all devices
                 type: 'scatter3d'
             };
 
@@ -355,13 +352,15 @@
             const whereLabels = ['Ground', 'Desert', 'Snow'].map((t, i) => i === targetW ? `<b>${t}</b>` : t);
             const whenLabels = ['Day', 'Night'].map((t, i) => i === targetT ? `<b>${t}</b>` : t);
 
-            let currentCamera = { eye: {x: 1.5, y: -1.5, z: 0.8} };
+            // FIX 1: Better default camera framing (pulled back and higher)
+            let currentCamera = { eye: {x: 1.8, y: -1.8, z: 1.2} };
             if (plotDiv._fullLayout && plotDiv._fullLayout.scene && plotDiv._fullLayout.scene.camera) {
                 currentCamera = plotDiv._fullLayout.scene.camera;
             }
 
             const layout = {
-                margin: { l: 0, r: 0, b: 0, t: 0 },
+                // FIX 2: Added bottom margin (b: 30) to prevent X-axis labels from being cut off
+                margin: { l: 0, r: 0, b: 30, t: 10 },
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
                 scene: {
@@ -389,31 +388,26 @@
             Plotly.react(plotDiv, [trace], layout, config).then(function() {
                 if (!plotInitialized) {
                     plotDiv.on('plotly_click', function(data) {
+                        
+                        // FIX 3: Read-only 3D plot on mobile devices.
+                        // User can rotate and see tooltips, but tapping won't trigger re-renders.
+                        if (window.innerWidth <= 768) return;
+
                         const pt = data.points[0];
                         if (pt) {
                             selects[0].value = pt.x.toString();
                             selects[1].value = pt.y.toString();
                             selects[2].value = pt.z.toString();
                             
-                            // Delay allows touch events to finish before WebGL updates
                             setTimeout(() => {
                                 updateRouting();
-                            }, 150);
+                            }, 10);
                         }
                     });
                     plotInitialized = true;
                 }
             });
         }
-
-        // Add listener to handle window resizing properly
-        window.addEventListener('resize', () => {
-            // Update the plot to toggle hoverinfo if crossing the mobile breakpoint
-            const model = parseInt(selects[0].value);
-            const where = parseInt(selects[1].value);
-            const when = parseInt(selects[2].value);
-            draw3DPlot(model, where, when);
-        });
 
         function updateRouting() {
             const model = parseInt(selects[0].value);
