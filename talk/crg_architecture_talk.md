@@ -315,7 +315,47 @@ DenseID is thread-safe (C++11 static local) and assigned exactly once per type. 
 ## FR
 DenseTypeID est d'une simplicité désarmante. Le standard C++11 garantit que c'est thread-safe. Pas de mutex, zéro cérémonie. Maintenant on peut construire le CapabilityTensor. L'index extérieur c'est le DenseID, l'index intérieur c'est l'offset de contexte. Le lookup c'est deux accès tableau. Pas de boucle, pas de comparaison, pas de collision. C'est le moment où la recherche disparaît. Trouver une capability n'est plus une question de 'où est-elle ?' — c'est une question de 'quel est l'offset ?' Et ça, c'est du pur calcul.
 
-# SLIDE: 12 - THE HYPERCUBE (N-Dimensional Space)
+# SLIDE: 12 - THE COMPLEXITY LADDER (From 0D to ND)
+## Code
+```cpp
+// 0D: Pure Discovery (NodeList + UniversalAnchor)
+// Zero overhead, raw static registration.
+
+// 1D: Interface Resolution
+// Base virtual interface implemented by a template class.
+
+// 2D: The Binding (Model x Logic)
+// Orthogonal intersection: CapabilityBinding<Model, Logic>.
+
+// ND: Contextual Routing (The Tensor)
+// State x Zone x Authority...
+```
+## Mermaid
+```mermaid
+graph LR
+    subgraph "0D (Point)"
+        A["Anchor"]
+    end
+    subgraph "1D (Line)"
+        I["Interface"] --- T["Template Impl"]
+    end
+    subgraph "2D (Grid)"
+        M["Model"] --- B["Logic"]
+    end
+    subgraph "ND (Hypercube)"
+        M2["Model"] --- B2["Logic"]
+        C["Context"] --- B2
+    end
+    A --> I
+    I --> M
+    M --> M2
+```
+## EN
+CRG is not a monolithic framework; it is a ladder. You pay only for the dimensions you need. At 0D, it's pure linker-driven discovery—just a NodeList and a UniversalAnchor for simple plugins. At 1D, we introduce a polymorphic boundary: a simple virtual interface resolved to a templated implementation. At 2D, we bind a concrete Model to a Logic capability. And finally, ND, where we introduce context: State, Zone, Authority. Notice what isn't here: the ModelShell. That's because data transport is completely orthogonal to routing. You advance from 0D to ND to expand the mathematical volume of your O(1) tensor, while choosing whatever transport mechanism fits your need.
+## FR
+Le CRG n'est pas un framework monolithique qui vous force la main ; c'est une échelle. Vous ne payez que pour les dimensions dont vous avez besoin. En 0D, c'est de la découverte pure pilotée par le linker — juste une NodeList et un UniversalAnchor. En 1D, on introduit une frontière polymorphique : une simple interface virtuelle résolue vers une implémentation template. En 2D, on lie concrètement un Modèle à une Logique. Et enfin, le ND, où l'on introduit le contexte : l'État, la Zone, l'Autorité. Remarquez ce qui n'est pas sur cette slide : le ModelShell. Car le transport de la donnée est purement orthogonal au routage. Vous passez de la 0D à la ND pour étendre le volume mathématique de votre tenseur O(1), tout en gardant la liberté totale sur comment votre donnée circule.
+
+# SLIDE: 13 - THE HYPERCUBE (N-Dimensional Space)
 ## Code
 ```cpp
 // Horner's Method: Resolve N-dims into 1 offset
@@ -338,7 +378,7 @@ A behavior depends on context axes: State, Zone, Authority. Space encodes these 
 ## FR
 Un comportement ne dépend pas seulement de ce qu'est l'entité. Il dépend de où elle est, quand elle est, qui la contrôle. State. Zone. Authority. Ce sont vos axes de contexte. CapabilitySpace encode les axes à la compilation. ComputeOffset utilise la méthode de Horner — une boucle d'accumulation, pas de branches, pas de divisions. Un seul nombre. Maintenant le lookup c'est deux nombres. Deux accès tableau. Le CPU calcule les deux dans le même cycle. Et le plus beau ? Chaque axe que vous ajoutez multiplie le Volume — mais le coût du lookup reste absolument identique. Une dimension ou dix, ce sont toujours les mêmes deux accès tableau. La complexité est gratuite.
 
-# SLIDE: 13 - THE CRG CURE (Immutable Topology)
+# SLIDE: 14 - THE CRG CURE (Immutable Topology)
 ## Code
 ```cpp
 // MUTABLE: Behavior change = structural rewire
@@ -362,7 +402,7 @@ In a mutable topology, behavior changes are structural operations that break the
 ## FR
 L'Acte II nous a donné un tenseur. Une matrice plate et contiguë de pointeurs de comportements, indexée par le modèle et le contexte. Construite une fois, jamais retouchée. Cette immutabilité n'est pas un accident — c'est la garantie centrale. Dans une topologie mutable, chaque changement de comportement est une opération structurelle. On ajoute, on retire, on recâble. Le layout mémoire change. Le prefetcher avait fait une prédiction. Maintenant, elle est fausse. Vous payez une pénalité de cache à chaque transition — pas pour une raison logique, mais purement structurelle. Avec le CRG, la matrice ne change jamais. Une transition de comportement n'est qu'une mise à jour de coordonnées. world_state bascule en Combat. Au lookup suivant, le tenseur renvoie un pointeur différent. La matrice n'a pas bougé. Les adresses mémoire n'ont pas changé. Le prefetcher a gardé son flux. L'immutabilité n'est pas une contrainte. C'est une garantie de performance.
 
-# SLIDE: 14 - ECS SYMBIOSIS (The Brain & The Muscle)
+# SLIDE: 15 - ECS SYMBIOSIS (The Brain & The Muscle)
 ## Code
 ```cpp
 // THE BRAIN (5 Hz): Decision
@@ -390,7 +430,7 @@ ECS manages the data pipeline (Muscle); CRG manages logic projection (Brain). Th
 ## FR
 C'est ici qu'on parle de symbiose, pas de remplacement. L'ECS possède le pipeline de données : les entités sont des structures pures packées dans des tableaux contigus. Le prefetcher est ravi. Le CRG possède la projection logique : il sait quel comportement appliquer selon le contexte (état, zone, etc.). Le passage de témoin se fait via le composant ActiveCapability. Le système "Cerveau" tourne à 5Hz. Il appelle le Router pour un lookup O(1) et cache le résultat. Le système "Muscle" tourne à 60Hz. Il itère sur les tableaux et appelle directement le pointeur. Pas de virtuel, pas de recherche. La partie coûteuse est rare, la partie gratuite est constante. On n'est plus limité par la logique, mais par la RAM.
 
-# SLIDE: 15 - THREE LEVELS (The Performance Ladder)
+# SLIDE: 16 - THREE LEVELS (The Performance Ladder)
 ## Code
 ```cpp
 // Level 1: Classic OOP vtable       -> ~20.0 ns
@@ -414,7 +454,7 @@ Three levels of speed. Level 1: classic OOP vtable dispatch (~20ns). Level 2: CR
 ## FR
 Trois niveaux de vitesse. Niveau 1 : le dispatch classique par vtable OOP (~20ns). Niveau 2 : ModelShell Invoke, payant un saut virtuel pour l'effacement de type (~7ns) — idéal pour les chemins froids. Niveau 3 : ActiveCapability, résultat mis en cache et appelé directement via pointeur de fonction (1.5ns). Ce dernier chiffre est important. 1.5 nanosecondes, c'est en dessous du coût d'une boucle ECS avec le cache chaud. On n'est plus limité par la logique. On est limité par la RAM. C'est exactement là où on veut être.
 
-# SLIDE: 16 - REACHING THE SILICON LIMIT (Benchmarks)
+# SLIDE: 17 - REACHING THE SILICON LIMIT (Benchmarks)
 ## Code
 ```cpp
 // Throughput at Scale (1M entities)
@@ -432,7 +472,7 @@ This is the physical reality of the Memory Wall. At a 10% mutation rate, traditi
 ## FR
 Deux graphiques, deux questions. À gauche : quel est le coût des transitions d'état selon le taux de mutation ? À 1%, les deux systèmes sont pratiquement identiques — c'est visible sur le graphique. À 10%, l'ECS est 30% plus lent. Le CRG ne donne pas de performance supérieure en isolation — il donne de la stabilité. Un coût identique quel que soit le taux de mutation. Si votre taux de mutation est faible et que vous êtes content de votre ECS, le CRG n'est peut-être pas pour vous. Si vous frappez des murs de performance sous forte mutation — c'est exactement le problème que le CRG résout. À droite : le coût par entité à mesure que le dataset dépasse le L3. La ligne ECS monte. La ligne CRG ne bouge pas. Notez le QR code : vous pouvez scanner dès maintenant pour accéder au simulateur live sur votre propre appareil.
 
-# SLIDE: 17 - THE DECISION MATRIX (ECS vs CRG)
+# SLIDE: 18 - THE DECISION MATRIX (ECS vs CRG)
 ## Code
 ```cpp
 // The Mathematical Break-Even Point:
@@ -459,7 +499,7 @@ So, when should you use CRG over ECS? The answer is pure math. I've modeled the 
 ## FR
 Alors, quand utiliser le CRG plutôt que l'ECS pur ? La réponse est mathématique. Voici la courbe de bascule. Le coût d'une migration ECS est proportionnel à la taille de l'entité. Pour des données sous les 64 octets (par exemple 32 bytes) avec des changements d'état rares, l'ECS est supérieur. Le coût de la copie mémoire est négligeable par rapport à l'indirection. Mais dès que vous franchissez la ligne de cache de 64 octets, ou que votre taux de mutation dépasse les 4%, le CRG prend le relais. Ce n'est pas un remplacement de l'ECS ; c'est un moteur spécialisé pour votre logique complexe et volatile, là où la copie mémoire tuerait vos performances.
 
-# SLIDE: 18 - STRESS TEST SIMULATION (High Volatility)
+# SLIDE: 19 - STRESS TEST SIMULATION (High Volatility)
 ## Code
 ```cpp
 // Visualizing the Memory Wall
@@ -476,7 +516,7 @@ In this visual stress test at 50,000 entities, you can see the ECS frame-time (i
 ## FR
 Dans ce stress-test visuel à 50 000 entités, vous voyez le frame-time de l'ECS (en rouge) s'envoler dès que l'on introduit de la volatilité. Chaque changement d'archétype est une copie mémoire qui détruit la localité du cache. La ligne verte, c'est le CRG : elle reste plate car il traite les transitions comme des mises à jour de coordonnées, pas des recâblages structurels. N'hésitez pas à utiliser le lien du simulateur pour ajuster le taux de mutation vous-même.
 
-# SLIDE: 19 - CONCLUSION
+# SLIDE: 20 - CONCLUSION
 ## Code
 ```cpp
 // 1. Zero Coupling  (Linker)
@@ -498,7 +538,7 @@ CRG is a linker-driven dispatch framework for any C++ system needing decoupling 
 ## FR
 Le CRG est un framework de dispatch piloté par le linker pour tout système C++ exigeant découplage et performance. Trois garanties : Zéro couplage (auto-enregistrement), Zéro recherche (coordonnées mathématiques), Zéro migration (topologie immuable). Arrêtez de vous battre contre le C++ et le matériel. Donnez-leur ce pour quoi ils ont été conçus.
 
-# SLIDE: 20 - Q&A: DLL Boundaries [BACKUP]
+# SLIDE: 21 - Q&A: DLL Boundaries [BACKUP]
 ## Code
 ```cpp
 // Q: "Isn't static inline ODR-unsafe across DLLs?"
@@ -515,7 +555,7 @@ Exactly right — that's precisely why UniversalAnchor exists. In monolithic bui
 ## FR
 Exactement — c'est précisément pour cela que UniversalAnchor existe. En build monolithique, le static inline est parfaitement sûr. Dès qu'on traverse une DLL, chaque module obtient sa propre copie du statique et la liste se fragmente. CRG_DEFINE_UNIVERSAL_ANCHOR résout cela en forçant une spécialisation explicite dans le core de l'engine, que le linker résout à une adresse unique à travers tous les modules.
 
-# SLIDE: 21 - Q&A: Live++ Integration [BACKUP]
+# SLIDE: 22 - Q&A: Live++ Integration [BACKUP]
 ## Code
 ```cpp
 // Q: "Does CRG work with Live++?"
@@ -532,7 +572,7 @@ Yes — and it's friendly by design. Two cases: 1. Logic changes (common): Live+
 ## FR
 Oui — par design. Deux cas : 1. Changement de logique : Live++ patch le corps des fonctions. Le tenseur ne bouge pas, transparent. 2. Changement de topologie (ajout d'une cap) : Vous branchez le callback post-patch de Live++ pour appeler Bake(). La NodeList est append-only, la nouvelle statique s'ajoute en tête. Bake() reconstruit le tenseur.
 
-# SLIDE: 22 - Q&A: DenseIDs over Network [BACKUP]
+# SLIDE: 23 - Q&A: DenseIDs over Network [BACKUP]
 ## Code
 ```cpp
 // Q: "Can you send DenseIDs over the network?"
@@ -549,7 +589,7 @@ No — DenseID is non-deterministic. It depends on the order types are touched a
 ## FR
 Non — DenseID n'est pas déterministe. Il dépend de l'ordre d'initialisation des statiques au démarrage, qui varie selon la machine. N'envoyez jamais un DenseID. Pour le réseau, envoyez le hash (typeid().hash_code() ou CRC compile-time). Le receveur convertit le hash vers son propre DenseID local.
 
-# SLIDE: 23 - Q&A: DLL Hot-Reload [BACKUP]
+# SLIDE: 24 - Q&A: DLL Hot-Reload [BACKUP]
 ## Code
 ```cpp
 // Q: "What about DLL hot-reload? The lazy StaticGuard fires only once."
@@ -566,7 +606,7 @@ In DLL mode you call Bake() manually at your controlled sync point after LoadLib
 ## FR
 En mode DLL, vous appelez Bake() manuellement à votre point de synchro après LoadLibrary(). L'initialisation paresseuse est le défaut pour les builds monolithiques. Pour les plugins et le hot-reload, c'est à vous de gérer le point de synchro. Vous décidez quand la matrice se reconstruit, évitant les problèmes de thread-safety.
 
-# SLIDE: 24 - Q&A: ActiveCapability [BACKUP]
+# SLIDE: 25 - Q&A: ActiveCapability [BACKUP]
 ## Code
 ```cpp
 // Q: "What is ActiveCapability exactly? How does operator() work without virtual?"
@@ -582,7 +622,7 @@ ActiveCapability is an ECS component wrapping a resolved capability result. Inte
 ## FR
 ActiveCapability est un composant ECS encapsulant un résultat de CapabilityRouter::Find(). En interne, IsDODContract<T> choisit automatiquement : si votre contrat a un type 'Params' ET n'est pas polymorphique, il utilise un pointeur de fonction pur DOD (zéro appel virtuel). Sinon, il garde un pointeur d'interface virtuelle. Le développeur gameplay ne voit jamais la différence.
 
-# SLIDE: 25 - Q&A: CRG without ECS [BACKUP]
+# SLIDE: 26 - Q&A: CRG without ECS [BACKUP]
 ## Code
 ```cpp
 // Q: "Can I use CRG without ECS?"

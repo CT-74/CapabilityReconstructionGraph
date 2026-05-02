@@ -1,6 +1,6 @@
 # CRG: Linker-Driven Discovery and Hardware-Bound Logic Mapping
 
-### An Architecture for Universal Decoupling and Zero-Cost Behavior Projection
+### An Architecture for Universal Decoupling and Zero-Cost Capability Routing
 
 **Cyril Tissier** | April 2026
 
@@ -8,7 +8,7 @@
 
 ## 1. Abstract
 
-The **Capability Routing Gateway (CRG)** is a general-purpose architectural pattern designed to resolve the fundamental conflict between modular decoupling and hardware efficiency. By treating data and logic as two parallel dimensions—mirroring the L1I/L1D split of modern CPUs—CRG eliminates the "Virtual Deadlock" inherent in traditional object-oriented hierarchies. It provides a linker-driven, zero-allocation framework for any C++ system requiring decoupled module discovery and high-performance behavior projection, from plugin-based tools to massive scale simulations.
+The **Capability Routing Gateway (CRG)** is a general-purpose architectural pattern designed to resolve the fundamental conflict between modular decoupling and hardware efficiency. By treating data and logic as two parallel dimensions—mirroring the L1I/L1D split of modern CPUs—CRG eliminates the "Virtual Deadlock" inherent in traditional object-oriented hierarchies. It provides a linker-driven, zero-allocation framework for any C++ system requiring decoupled module discovery and high-performance capability routing, from plugin-based tools to massive scale simulations.
 
 CRG delivers three uncompromising guarantees: **Zero Coupling, Zero Search, and Zero Migration**.
 
@@ -27,7 +27,7 @@ graph TD
         A[Module A] -->|NodeList| Anchor
     end
     subgraph "CRG Engine Core"
-        Anchor[NodeListAnchor]
+        Anchor[UniversalAnchor]
         Binding[Binding]
         Tensor[CapabilityTensor Matrix]
     end
@@ -37,11 +37,11 @@ graph TD
 
 ---
 
-## 3. Pillar II: Thematic Identity Governance (TypeList & DenseModelID)
+## 3. Pillar II: Thematic Identity Governance (TypeList & DenseTypeID)
 
 CRG partitions identity through `TypeList` groupings to maintain data density and execution predictability.
 
-* **The Collapse:** The architecture collapses the sparse, unpredictable universe of `typeid` hashes into a dense, contiguous array index via `DenseModelID`. This ensures that the behavioral tensor remains a tight, direct-access matrix.
+* **The Collapse:** The architecture collapses the sparse, unpredictable universe of `typeid` hashes into a dense, contiguous array index via `DenseTypeID`. This ensures that the behavioral tensor remains a tight, direct-access matrix.
 * **Domain Isolation:** Distinct domains operate in isolated index spaces, preventing behavioral tables from becoming sparse even in systems with hundreds of independent modules.
 
 ---
@@ -146,7 +146,7 @@ CRG does not deprecate ECS; it complements it. The architectural decision betwee
 
 ![ECS vs CRG Break-Even Analysis](../img/breakeven_curve.png)
 
-* **ECS Supremacy (Static Loops & Micro-Entities):** For data payloads strictly under 32-bytes exhibiting highly static behavior (< 4% mutation rate), ECS archetype processing is mathematically optimal. The occasional `memcpy` penalty is offset by zero-indirection loops.
+* **ECS Supremacy (Static Loops & Micro-Entities):** For data payloads strictly under 64-bytes exhibiting highly static behavior (< 4% mutation rate), ECS archetype processing is mathematically optimal. The occasional `memcpy` penalty is offset by zero-indirection loops.
 * **CRG Supremacy (Zero-Migration & Heavy Logic):** Once an entity exceeds the 64-byte L1 cache-line threshold, or if state volatility exceeds 4%, the memory-wall constraints dominate CPU performance. By caching a `DODDescriptor` rather than migrating data structures, CRG preserves prefetcher momentum and linear memory access, effectively decoupling logical state from physical memory location.
 
 ---

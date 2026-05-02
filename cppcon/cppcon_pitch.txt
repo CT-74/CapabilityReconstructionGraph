@@ -1,31 +1,72 @@
-Title: Reaching the Hardware Limit: Universal Decoupling and Zero-Cost Behavior Projection in C++
+Title: Reaching the Hardware Limit: Universal Decoupling and Zero-Cost Capability Routing in C++
 
 Abstract:
-Large-scale C++ systems suffer from two compounding problems. The first is architectural coupling: any system relying on centralized registries, shared headers, or rigid class hierarchies pays a compilation tax that grows with team size. The second is structural coupling: any system that mutates its behavioral topology at runtime pays a cache penalty proportional to its mutation rate — destroying the predictability that modern hardware was built to exploit. In game engines, these manifest as Include Hell and archetype fragmentation. In plugin systems, as init-order dependencies and circular includes. The root cause is always the same: behavior and structure are entangled.
+Large-scale C++ systems suffer from the "Build Wall" — a state where shared headers
+and centralized registries force a compilation tax that scales with team size. This
+session introduces the Capability Routing Gateway (CRG), a linker-driven C++
+framework that eliminates this tax by making modules completely anonymous to each
+other: features self-register at link time, and the core discovers them only when
+needed, with no shared headers and no Init() functions. The result is a fully
+functional plugin system obtained for free as a side effect of the architecture.
+The session is supported by an interactive WebAssembly simulator allowing
+real-time stress-testing of up to 150,000 entities directly in the browser.
 
-This session introduces the Capability Routing Gateway (CRG), a linker-driven, zero-allocation capability dispatch framework for any C++ system requiring decoupled module discovery and high-performance behavior projection. CRG is not a game engine framework — it is a general-purpose architectural pattern applicable to plugins, simulations, tools, rule engines, and any system where modules need to discover each other without knowing each other exist. The session is supported by an interactive WebAssembly simulator, allowing real-time stress-testing of up to 150,000 entities directly in the browser.
+CRG is built on strictly orthogonal pillars — you pay only for the dimensions you
+use. At its simplest, it is pure linker-driven discovery. Add a polymorphic
+boundary, and you get interface-to-template binding. Add contextual axes (State,
+Zone, Authority), and you get O(1) tensor-based routing using Horner's method. At
+each level, the architecture stays C++-idiomatic and zero-allocation. When opaque
+data transport is needed across module boundaries, an optional type-erased shell
+breaks the fundamental C++ constraint that prevents virtual template methods.
 
-As a direct consequence of its linker-driven architecture, CRG provides a fully functional plugin system for free. Define a struct, instantiate it as a static global — the OS fires the constructor on load, and the capability is automatically registered. No Init() function, no central registry, no knowledge of other modules required. Drop a binary, link it, and it wires itself. The ECS symbiosis demonstrated in Act III is one application of this property — not the definition of the system.
-
-CRG delivers three guarantees: Zero Coupling (modules self-register via NodeList; the linker resolves them), Zero Search (context is a coordinate in a CapabilitySpace; Horner's method computes the offset in O(1)), and Zero Migration (the CapabilityTensor is immutable; the prefetcher never loses its stream).
+In high-frequency execution paths, CRG mirrors the L1I/L1D split of modern CPUs
+by caching resolved logic pointers in ECS components. Behavior transitions become
+coordinate updates — the memory layout never changes, so the hardware prefetcher
+never loses its stream. Benchmarks show this "Structural Immunity" effectively
+doubles memory throughput at 10% mutation rates compared to traditional
+archetype-based architectures. At low mutation rates (≤1%), ECS matches CRG —
+the honest answer is that CRG's value scales with state volatility.
 
 Attendees will learn how to:
-* Get a plugin system for free: linker-driven NodeList registration with UniversalAnchor, supporting both monolithic and DLL/hot-reload topologies with a single macro switch and zero GPP-facing ceremony.
-* Transport data across module boundaries using the ModelShell — a type-erased container inspired by Klaus Iglberger's Type Erasure pattern, stripped of all logic, with SBO guarantees and a natvis for debuggability.
-* Project behaviors in O(1) using a flat CapabilityTensor indexed by DenseID and a CapabilitySpace offset computed via Horner's method — no search, no branches, no virtual calls in the hot path.
-* Integrate with any data-driven system using the Brain/Muscle pattern: ActiveCapability caches the resolved result at decision frequency; the hot loop invokes it at execution frequency with a direct function pointer.
-* Visualize the Memory Wall: How to use interactive simulation (up to 150k entities) to identify the exact threshold where structural mutation overhead outweighs logical execution.
+* Achieve mutual anonymity: linker-driven NodeList registration with UniversalAnchor,
+  supporting monolithic and DLL/hot-reload topologies with a single macro switch.
+* Break the Virtual Deadlock using the optional ModelShell — a type-erased container
+  inspired by Klaus Iglberger's Type Erasure pattern, stripped of all logic, with
+  SBO guarantees and natvis debuggability.
+* Project behaviors in O(1) using a flat CapabilityTensor indexed by DenseTypeID
+  and a CapabilitySpace offset computed via Horner's method — no search, no branches,
+  no virtual calls in the hot path.
+* Integrate with any data-driven system using the Brain/Muscle pattern: ActiveCapability
+  caches the resolved result at decision frequency; the hot loop invokes it at
+  execution frequency with a direct function pointer.
+* Identify the mathematical break-even point where CRG's structural immunity
+  outperforms traditional ECS, using interactive simulation (up to 150k entities).
 
 Outline:
-* 00-05: THE HOOK — Hardware-software symmetry. The L1I/L1D split mirrors the CRG architecture. The Virtual Deadlock defined.
-* 05-10: THE COST OF COUPLING — Include Hell: 217 files recompiled for one bool. The build wall is an architecture problem, not a people problem.
-* 10-20: ACT I — THE FOUNDATION: NodeList, UniversalAnchor, ModelShell, CapabilityBinding, Invoke/TryInvoke. The GPP API: one static, zero boilerplate.
-* 20-30: ACT II — THE TENSOR: DenseTypeID, CapabilitySpace, Horner's method, the flat CapabilityTensor. Turning a search problem into a calculation.
-* 30-40: ACT III — THE SYMBIOSIS: Immutable topology, archetype stability, ECS Brain/Muscle pattern, ActiveCapability, three performance levels.
-* 40-50: BENCHMARKS — Honest data: CRG vs ECS at 1%/5%/10% mutation rates. Live visual stress-test (50k entities): watching the ECS frame-time collapse while CRG maintains O(1) stability. When to use CRG and when not to.
-* 50-55: CONCLUSION — Zero coupling. Zero search. Zero migration. Stop fighting C++. Stop fighting the hardware.
-* 55-60: Q&A
+* 00-05: THE HOOK — Hardware-Software Symmetry. Why peak efficiency requires a
+  physical split between instructions (L1I) and data (L1D). The Virtual Deadlock
+  introduced.
+* 05-15: LINKER-DRIVEN DISCOVERY — Achieving mutual anonymity via NodeList and
+  UniversalAnchor. How features register without shared headers or model overhead.
+  Plugin system obtained for free.
+* 15-25: ORTHOGONAL TRANSPORT (COLD PATH) — Breaking the Virtual Deadlock.
+  The optional ModelShell: decoupling concrete models from templated interface
+  implementations. Invoke/TryInvoke as the cold-path OOP illusion.
+* 25-30: THE COMPLEXITY LADDER — CRG as a pay-per-dimension framework. 0D (pure
+  discovery), 1D (interface resolution), 2D (model-logic binding), ND (contextual
+  routing). Data transport is orthogonal — ModelShell is never mandatory.
+* 30-35: N-DIMENSIONAL RESOLUTION (HOT PATH) — Turning sparse hashes into
+  DenseTypeID. Resolving ND capability coordinates in O(1) via Horner's method
+  into a flat CapabilityTensor.
+* 35-45: ECS SYMBIOSIS — Brain (Decision) vs. Muscle (Execution). Caching routed
+  results in ActiveCapability for structural immunity and raw static dispatch.
+* 45-55: BENCHMARKS & ANALYSIS — The mathematical break-even point. CRG vs ECS
+  at 1%/5%/10% mutation rates. Live visual stress-test (50k entities). When to
+  use CRG and when not to.
+* 55-60: Q&A — Deep dive into DLL boundaries, ODR-safety, and hot-reload integration.
 
 Comments to Reviewers / Additional Materials:
-Note: To respect the double-blind review process, the GitHub repository link has been removed. However, the interactive WebAssembly simulator mentioned in the abstract has been hosted on an anonymized domain for your evaluation:
+Note: To respect the double-blind review process, the GitHub repository link has
+been removed. However, the interactive WebAssembly simulator mentioned in the
+abstract has been hosted on an anonymized domain for your evaluation:
 Interactive Simulator: https://dreamy-liger-3c1bd8.netlify.app/

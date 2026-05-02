@@ -1,12 +1,12 @@
 # Capability Routing Gateway (CRG)
 
-**Reaching the Hardware Limit: Universal Decoupling and Zero-Cost Behavior Projection in C++**
+**Reaching the Hardware Limit: Universal Decoupling and Zero-Cost Capability Routing in C++**
 
 [Technical White Paper](paper/paper.md) | [Launch Interactive Simulator](https://ct-74.github.io/CapabilityRoutingGateway/demo/final_simulator/index.html) | [Tensor Visualizer](https://ct-74.github.io/CapabilityRoutingGateway/img/tensor_visualizer.html)
 
 ## Overview
 
-CRG is a **linker-driven, zero-allocation capability dispatch framework** for any C++ system requiring decoupled module discovery and high-performance behavior projection. 
+CRG is a **linker-driven, zero-allocation capability dispatch framework** for any C++ system requiring decoupled module discovery and high-performance capability routing. 
 
 It is not a game engine framework; it is a general-purpose architectural pattern applicable to plugin systems, simulations, tools, rule engines, and any system where modules must register capabilities without the core knowing they exist.
 
@@ -157,7 +157,7 @@ The `demo/` folder contains 12 stages, each building on the previous:
 | `stage03` | Traversal Lookup                                   |
 | `stage04` | Identity Decoupling (CapabilityBinding)            |
 | `stage05` | Model Router (Invoke / TryInvoke)                  |
-| `stage06` | Fusion (CapabilityBaker)                           |
+| `stage06` | Fusion (CapabilityBinding)                           |
 | `stage07` | Temporal Axis                                      |
 | `stage08` | N-Dimensional Space (CapabilitySpace + Horner)     |
 | `stage09` | Dynamic Rules (Narrow Phase)                       |
