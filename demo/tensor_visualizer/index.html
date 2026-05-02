@@ -135,6 +135,9 @@
             display: grid;
             grid-template-columns: repeat(6, 1fr);
             gap: 8px;
+            /* FIX: Garantit que la grille est au-dessus de tout le reste */
+            position: relative;
+            z-index: 10;
         }
         .array-slot {
             background-color: var(--bg-color);
@@ -180,9 +183,6 @@
             .plot-wrapper { width: 100%; height: 300px; }
             .tensor-array { 
                 grid-template-columns: repeat(3, 1fr); 
-                position: relative; 
-                z-index: 10; 
-                background-color: var(--panel-bg);
             }
             .hoverlayer { display: none !important; } /* Hide Plotly tooltips on touch devices */
             .stride-formula { grid-template-columns: 1fr; text-align: left; }
@@ -299,10 +299,10 @@
                 const w = Math.floor(remainder / 2);
                 const t = remainder % 2;
                 
-                // Update dropdowns
-                selects[0].value = m;
-                selects[1].value = w;
-                selects[2].value = t;
+                // Update dropdowns (FIX: Force conversion to String)
+                selects[0].value = m.toString();
+                selects[1].value = w.toString();
+                selects[2].value = t.toString();
                 
                 // Trigger global update (Math, 3D Plot, UI Highlights)
                 updateRouting();
@@ -387,9 +387,10 @@
                     plotDiv.on('plotly_click', function(data) {
                         const pt = data.points[0];
                         if (pt) {
-                            selects[0].value = pt.x;
-                            selects[1].value = pt.y;
-                            selects[2].value = pt.z;
+                            // FIX: Force conversion to String here as well
+                            selects[0].value = pt.x.toString();
+                            selects[1].value = pt.y.toString();
+                            selects[2].value = pt.z.toString();
                             
                             // Give Plotly time to finish its click cycle before updating
                             setTimeout(() => {
@@ -428,9 +429,9 @@
         selects.forEach(select => select.addEventListener('change', updateRouting));
         
         // Initial call setting to Target (1, 1, 1)
-        selects[0].value = 1; // Heavy
-        selects[1].value = 1; // Desert
-        selects[2].value = 1; // Night
+        selects[0].value = "1"; // Heavy
+        selects[1].value = "1"; // Desert
+        selects[2].value = "1"; // Night
         updateRouting();
     </script>
 </body>
