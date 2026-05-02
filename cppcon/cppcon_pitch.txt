@@ -15,9 +15,11 @@ CRG is built on strictly orthogonal pillars — you pay only for the dimensions 
 use. At its simplest, it is pure linker-driven discovery. Add a polymorphic
 boundary, and you get interface-to-template binding. Add contextual axes (State,
 Zone, Authority), and you get O(1) tensor-based routing using Horner's method. At
-each level, the architecture stays C++-idiomatic and zero-allocation. When opaque
-data transport is needed across module boundaries, an optional type-erased shell
-breaks the fundamental C++ constraint that prevents virtual template methods.
+each level, the architecture stays C++-idiomatic and zero-allocation. For opaque
+data transport, an optional type-erased shell breaks the fundamental C++ constraint
+against virtual template methods. Whether crossing architectural boundaries or
+providing callers with a clean OOP illusion (Invoke/TryInvoke), this shell
+completely decouples concrete state from templated logic.
 
 In high-frequency execution paths, CRG mirrors the L1I/L1D split of modern CPUs
 by caching resolved logic pointers in ECS components. Behavior transitions become

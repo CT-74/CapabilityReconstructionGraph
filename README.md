@@ -2,7 +2,7 @@
 
 **Reaching the Hardware Limit: Universal Decoupling and Zero-Cost Capability Routing in C++**
 
-[Technical White Paper](paper/paper.md) | [Launch Interactive Simulator](https://ct-74.github.io/CapabilityRoutingGateway/demo/final_simulator/index.html) | [Tensor Visualizer](https://ct-74.github.io/CapabilityRoutingGateway/img/tensor_visualizer.html)
+[Technical White Paper](paper/paper.md) | [Launch Interactive Simulator](https://ct-74.github.io/CapabilityRoutingGateway/demo/final_simulator/index.html) | [Tensor Visualizer](https://ct-74.github.io/CapabilityRoutingGateway/demo/tensor_visualizer/index.html)
 
 ## Overview
 

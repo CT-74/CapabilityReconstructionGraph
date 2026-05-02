@@ -23,7 +23,20 @@
         .metric-value { font-size: 28px; font-weight: bold; margin: 10px 0; font-family: monospace; }
         .chart-container { position: relative; height: 380px; width: 100%; background: #121212; border-radius: 10px; padding: 15px; border: 1px solid #333; }
         .explanation { text-align: center; margin-top: 20px; font-size: 0.85em; color: #888; line-height: 1.5; max-width: 900px; margin-left: auto; margin-right: auto; }
-        @media (max-width: 768px) { .controls-grid { grid-template-columns: 1fr; } .metrics { flex-direction: column; } }
+        
+        /* Responsive tweaks for mobile (vertical and horizontal) */
+        @media (max-width: 768px) { 
+            body { padding: 5px; }
+            .container { padding: 15px; }
+            h1 { font-size: 1.4em; margin-bottom: 20px; }
+            .controls-grid { grid-template-columns: 1fr; gap: 10px; } 
+            .metrics { flex-direction: column; gap: 10px; } 
+            .chart-container { height: 280px; }
+        }
+        @media (max-height: 500px) and (orientation: landscape) {
+            .chart-container { height: 220px; }
+            h1 { font-size: 1.2em; margin-bottom: 10px; }
+        }
     </style>
 </head>
 <body>
@@ -61,7 +74,7 @@
     </div>
     <div class="chart-container"><canvas id="perfChart"></canvas></div>
     <div class="explanation">
-        <strong>Break-Even Insight:</strong> En ECS classique, la mutation force un `memcpy` des données. Plus l'entité est <strong>grosse</strong>, plus le bus mémoire sature[span_2](start_span)[span_2](end_span). CRG utilise une <strong>immunité structurelle</strong> : on ne déplace que des pointeurs de fonction (8 bytes), rendant le coût indépendant de la taille de la donnée[span_3](start_span)[span_3](end_span).
+        <strong>Break-Even Insight:</strong> In traditional ECS, structural changes trigger a `memcpy` of the entity data. As entity size grows, memory bus saturation becomes a bottleneck. CRG leverages <strong>structural immunity</strong>: we only move function pointers (8 bytes), making the mutation cost independent of the data size.
     </div>
 </div>
 <script>
