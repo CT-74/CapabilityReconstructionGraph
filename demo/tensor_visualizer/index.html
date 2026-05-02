@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRG Tensor Routing Visualizer</title>
-    <!-- Chargement de Plotly.js pour la 3D -->
+    <!-- Load Plotly.js for 3D Graph -->
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         :root {
@@ -88,6 +88,7 @@
         }
         select:focus { border-color: var(--accent); }
 
+        /* MOBILE FIXES: Prevent 3D canvas bleeding and disable touch tooltips */
         .plot-wrapper {
             flex: 2;
             background: #010409;
@@ -95,6 +96,26 @@
             border: 1px solid var(--border);
             height: 350px;
             position: relative;
+            overflow: hidden; /* Clips WebGL overflow on mobile */
+            z-index: 1;
+        }
+
+        .stride-explanation {
+            font-size: 0.8em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px dashed var(--border);
+            text-align: left;
+        }
+
+        .stride-formula {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+            text-align: center;
+            font-family: monospace;
         }
 
         .math-panel {
@@ -152,7 +173,14 @@
         @media (max-width: 768px) {
             .top-section { flex-direction: column; }
             .plot-wrapper { width: 100%; height: 300px; }
-            .tensor-array { grid-template-columns: repeat(3, 1fr); }
+            .tensor-array { 
+                grid-template-columns: repeat(3, 1fr); 
+                position: relative; 
+                z-index: 10; 
+                background-color: var(--panel-bg);
+            }
+            .hoverlayer { display: none !important; } /* Hide Plotly tooltips on touch devices */
+            .stride-formula { grid-template-columns: 1fr; text-align: left; }
         }
         @media (max-width: 480px) {
             .tensor-array { grid-template-columns: repeat(2, 1fr); }
@@ -167,7 +195,7 @@
     <div class="container">
         <div class="layout-grid">
             
-            <!-- Haut : Contrôles + Plot 3D -->
+            <!-- Top: Controls + 3D Plot -->
             <div class="top-section">
                 <div class="controls-wrapper">
                     <div class="control-group">
@@ -198,15 +226,24 @@
                 <div class="plot-wrapper" id="plot3d"></div>
             </div>
 
-            <!-- Milieu : Calcul Math -->
+            <!-- Middle: Math Calculation -->
             <div class="math-panel">
+                <div class="stride-explanation">
+                    <strong>Memory Layout (Row-Major Order):</strong> Dimensions = Model [3] &times; Where [3] &times; When [2]
+                    <div class="stride-formula">
+                        <div>S<sub>When</sub> = 1</div>
+                        <div>S<sub>Where</sub> = 1 &times; 2 = <strong>2</strong></div>
+                        <div>S<sub>Model</sub> = 2 &times; 3 = <strong>6</strong></div>
+                    </div>
+                </div>
+                
                 Offset = (<span class="math-highlight label-model" id="valModel">1</span> * 6) + 
                          (<span class="math-highlight label-where" id="valWhere">1</span> * 2) + 
                          (<span class="math-highlight label-when" id="valWhen">1</span> * 1) 
                        = <span class="offset-result" id="valResult">9</span>
             </div>
 
-            <!-- Bas : Tableau 1D -->
+            <!-- Bottom: 1D Array -->
             <div class="tensor-array" id="tensorArray">
                 <!-- Injected via JS -->
             </div>
@@ -288,7 +325,7 @@
             const whereLabels = ['Ground', 'Desert', 'Snow'].map((t, i) => i === targetW ? `<b>${t}</b>` : t);
             const whenLabels = ['Day', 'Night'].map((t, i) => i === targetT ? `<b>${t}</b>` : t);
 
-            // FIX: Conserver la rotation de la caméra si elle existe déjà
+            // Keep existing camera rotation if any
             let currentCamera = { eye: {x: 1.5, y: -1.5, z: 0.8} };
             if (plotDiv._fullLayout && plotDiv._fullLayout.scene && plotDiv._fullLayout.scene.camera) {
                 currentCamera = plotDiv._fullLayout.scene.camera;
@@ -315,7 +352,7 @@
                         tickvals: [0, 1], ticktext: whenLabels, 
                         tickfont: {color: '#9467bd'}, gridcolor: '#30363d' 
                     },
-                    camera: currentCamera // Application de la caméra sauvegardée
+                    camera: currentCamera // Apply saved camera state
                 }
             };
 
@@ -331,7 +368,7 @@
                             selects[1].value = pt.y;
                             selects[2].value = pt.z;
                             
-                            // FIX: Laisser le temps à Plotly de terminer son cycle de clic avant de mettre à jour
+                            // Give Plotly time to finish its click cycle before updating
                             setTimeout(() => {
                                 updateRouting();
                             }, 10);

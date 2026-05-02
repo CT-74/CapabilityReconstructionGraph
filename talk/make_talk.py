@@ -7,18 +7,25 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
 # --- PATH CONFIGURATION ---
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))               # Dossier talk/
-ROOT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))            # Racine du projet
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))               
+ROOT_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))            
 
-BENCH_DIR = os.path.join(ROOT_DIR, "benchmarks")                       # ../benchmarks/
-IMG_DIR = os.path.join(ROOT_DIR, "img")                                # ../img/
+BENCH_DIR = os.path.join(ROOT_DIR, "benchmarks")                       
+IMG_DIR = os.path.join(ROOT_DIR, "img")                                
 
-TALK_FILE = os.path.join(CURRENT_DIR, "crg_architecture_talk.md")      # Fichier local
+TALK_FILE = os.path.join(CURRENT_DIR, "crg_architecture_talk.md")      
 VIDEO_PATH = os.path.join(IMG_DIR, "CRG_vs_ECS_Simulation.mov")
-QR_PATH = os.path.join(IMG_DIR, "simulator_qr.png")
+TENSOR_VIDEO_PATH = os.path.join(IMG_DIR, "tensor_visualizer.mov") # <-- Ajoute ta vidéo ici
+
+# --- QR CODE PATHS ---
+QR_SIMULATOR_PATH = os.path.join(IMG_DIR, "qr_simulator.png")
+QR_TENSOR_PATH = os.path.join(IMG_DIR, "qr_tensor.png")
+QR_GITHUB_PATH = os.path.join(IMG_DIR, "qr_github.png")
 
 # --- TARGET URLs ---
 SIMULATOR_URL = "https://ct-74.github.io/CapabilityRoutingGateway/demo/final_simulator/index.html"
+TENSOR_URL = "https://ct-74.github.io/CapabilityRoutingGateway/demo/tensor_visualizer/index.html"
+GITHUB_URL = "https://github.com/ct-74/CapabilityRoutingGateway"
 
 # --- CPPCON THEME COLORS ---
 DARK_GREY = RGBColor(15, 15, 15)
@@ -28,27 +35,29 @@ WHITE = RGBColor(220, 220, 220)
 
 # --- ASSET GENERATORS & FETCHERS ---
 
-def generate_simulator_qr():
-    """Generates a static QR code pointing to the live simulator"""
-    print(f"📡 Generating QR Code for: {SIMULATOR_URL}")
+def generate_qr(url, path):
+    """Generates a static QR code for a given URL"""
+    print(f"📡 Generating QR Code for: {url}")
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(SIMULATOR_URL)
+    qr.add_data(url)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     if not os.path.exists(IMG_DIR): 
         os.makedirs(IMG_DIR)
-    img.save(QR_PATH)
-    return QR_PATH
+    img.save(path)
+
+def generate_all_qrs():
+    generate_qr(SIMULATOR_URL, QR_SIMULATOR_PATH)
+    generate_qr(TENSOR_URL, QR_TENSOR_PATH)
+    generate_qr(GITHUB_URL, QR_GITHUB_PATH)
 
 def get_latest_bench_img(prefix):
-    """Retrieves the most recent benchmark result image from the bench directory"""
     if not os.path.exists(BENCH_DIR): 
         return None
     files = glob.glob(os.path.join(BENCH_DIR, f"{prefix}_*.png"))
     return max(files, key=os.path.getctime) if files else None
 
 def generate_tes_layout():
-    """Generates a matplotlib-based diagram of the ModelShell memory layout"""
     fig, ax = plt.subplots(figsize=(8, 2))
     ax.barh(0, 48, color='#3498db', edgecolor='white', label='Data (T)')
     ax.barh(0, 8, left=48, color='#e74c3c', edgecolor='white', label='Padding')
@@ -61,7 +70,6 @@ def generate_tes_layout():
     return buf
 
 def get_mermaid_img(code):
-    """Fetches a rendered Mermaid diagram via the mermaid.ink API"""
     try:
         b64 = base64.b64encode(code.encode('utf-8')).decode('utf-8')
         res = requests.get(f"https://mermaid.ink/img/{b64}", timeout=10)
@@ -75,11 +83,9 @@ class PPTXGenerator:
     def __init__(self, lang='EN'):
         self.lang = lang
         self.prs = Presentation()
-        # Set widescreen aspect ratio (16:9)
         self.prs.slide_width, self.prs.slide_height = Inches(13.333), Inches(7.5)
 
     def add_video_to_slide(self, slide, video_path, left=7.2, top=1.8, width=5.5, height=4.0):
-        """Integrates a native video file into the specified slide"""
         if os.path.exists(video_path):
             slide.shapes.add_movie(
                 video_path, Inches(left), Inches(top), Inches(width), Inches(height),
@@ -94,14 +100,10 @@ class PPTXGenerator:
             slide.background.fill.solid()
             slide.background.fill.fore_color.rgb = DARK_GREY
             
-            # --- HIDDEN SLIDE LOGIC (Q&A / BACKUP) ---
             if "[BACKUP]" in data['title'] or "[HIDDEN]" in data['title'] or "[OPTIONAL]" in data['title']:
-                # Modifying the underlying XML element to hide the slide in Presentation Mode
                 slide._element.set('show', '0')
 
-            # Title Formatting
             title = slide.shapes.title
-            # Clean up the title tag for display
             display_title = data['title'].replace("[BACKUP]", "").replace("[HIDDEN]", "").replace("[OPTIONAL]", "").strip()
             title.text = display_title
             p = title.text_frame.paragraphs[0]
@@ -109,28 +111,45 @@ class PPTXGenerator:
             p.font.size = Pt(36)
 
             title_upper = display_title.upper()
-            
             is_bench_slide = any(k in title_upper for k in ["BENCHMARK", "RESULTS", "STRESS TEST"])
 
-            # --- SPECIAL LAYOUT: PERFORMANCE SHOWCASE (TABLE + VIDEO + QR) ---
+            # --- SPECIAL LAYOUT 1: PERFORMANCE SHOWCASE ---
             if is_bench_slide:
                 latest_path = get_latest_bench_img("crg_benchmark_final")
                 if latest_path:
                     slide.shapes.add_picture(latest_path, Inches(0.5), Inches(1.8), width=Inches(4.5))
-                
                 self.add_video_to_slide(slide, VIDEO_PATH, left=5.2, top=1.8, width=5.0, height=3.8)
-                
-                if os.path.exists(QR_PATH):
-                    slide.shapes.add_picture(QR_PATH, Inches(10.5), Inches(1.8), width=Inches(2.2))
+                if os.path.exists(QR_SIMULATOR_PATH):
+                    slide.shapes.add_picture(QR_SIMULATOR_PATH, Inches(10.5), Inches(1.8), width=Inches(2.2))
                     tx_qr = slide.shapes.add_textbox(Inches(10.5), Inches(4.1), Inches(2.2), Inches(1.0))
                     p_qr = tx_qr.text_frame.paragraphs[0]
                     p_qr.text = "Scan to challenge\nthese results live"
                     p_qr.font.size, p_qr.font.color.rgb = Pt(12), WHITE
                     p_qr.alignment = PP_ALIGN.CENTER
 
+            # --- SPECIAL LAYOUT 2: TENSOR VISUALIZER VIDEO ---
+            elif "TENSOR ROUTING VISUALIZER" in title_upper:
+                # Video centrée et large
+                self.add_video_to_slide(slide, TENSOR_VIDEO_PATH, left=3.6, top=1.5, width=6.0, height=5.5)
+
+            # --- SPECIAL LAYOUT 3: FINAL Q&A (3 QR CODES) ---
+            elif "Q&A" in title_upper and "RESOURCES" in title_upper:
+                qr_data = [
+                    (QR_SIMULATOR_PATH, "ECS vs CRG Simulator", 1.8),
+                    (QR_TENSOR_PATH, "3D Tensor Visualizer", 5.6),
+                    (QR_GITHUB_PATH, "Slides & Repository", 9.4)
+                ]
+                for path, label, left in qr_data:
+                    if os.path.exists(path):
+                        slide.shapes.add_picture(path, Inches(left), Inches(2.5), width=Inches(2.2))
+                        tx = slide.shapes.add_textbox(Inches(left), Inches(4.8), Inches(2.2), Inches(1.0))
+                        p_label = tx.text_frame.paragraphs[0]
+                        p_label.text = label
+                        p_label.font.size, p_label.font.color.rgb = Pt(18), WHITE
+                        p_label.alignment = PP_ALIGN.CENTER
+
             # --- STANDARD LAYOUT: CODE (LEFT) + MEDIA (RIGHT) ---
             else:
-                # Code Block Insertion
                 if data['code']:
                     box = slide.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(6.5), Inches(5.5))
                     box.fill.solid()
@@ -140,7 +159,6 @@ class PPTXGenerator:
                     for paragraph in tf.paragraphs:
                         paragraph.font.name, paragraph.font.size, paragraph.font.color.rgb = 'Consolas', Pt(13), WHITE
 
-                # Media Dispatcher
                 img_stream = None
                 if any(k in title_upper for k in ["LIMIT", "SIMULATION"]):
                     self.add_video_to_slide(slide, VIDEO_PATH)
@@ -160,7 +178,6 @@ class PPTXGenerator:
                 if img_stream:
                     slide.shapes.add_picture(img_stream, Inches(7.2), Inches(1.8), width=Inches(5.5))
 
-            # Speaker Notes
             notes = data['fr_notes'] if self.lang == 'FR' else data['en_notes']
             slide.notes_slide.notes_text_frame.text = notes
 
@@ -168,7 +185,7 @@ class PPTXGenerator:
         self.prs.save(os.path.join(CURRENT_DIR, output_name))
 
 if __name__ == "__main__":
-    generate_simulator_qr()
+    generate_all_qrs()
     
     if os.path.exists(BENCH_DIR):
         try: 
