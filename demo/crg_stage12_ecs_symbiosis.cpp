@@ -29,7 +29,7 @@
 #define CRG_DLL_ENABLED 0
 #endif
 
-template<class T> struct RegistrySlot {
+template<class T> struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -38,9 +38,9 @@ template<class T> struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
 using ModelTypeID = std::size_t;
@@ -56,12 +56,12 @@ struct DenseModelID {
 };
 
 using ModelMap = std::unordered_map<ModelTypeID, std::size_t>; 
-CRG_DEFINE_SLOT(ModelMap)
+CRG_DEFINE_UNIVERSAL_ANCHOR(ModelMap)
 
 struct ModelHandle {
     DenseModelID denseID;
     explicit ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
-        const auto& map = RegistrySlot<ModelMap>::s_Value;
+        const auto& map = UniversalAnchor<ModelMap>::s_Value;
         auto it = map.find(hash);
         if (it != map.end()) denseID = DenseModelID(it->second);
     }
@@ -71,8 +71,8 @@ struct ModelHandle {
 template<class TNode, class TInterface> struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = RegistrySlot<const TNode*>::s_Value;
-        RegistrySlot<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::s_Value;
+        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
     }
 };
 
@@ -191,7 +191,7 @@ struct DispatchCell {
     bool                         hasFallback = false;
 };
 
-template<class TContract> using TensorArena = RegistrySlot<std::vector<DispatchCell<TContract>>>; 
+template<class TContract> using TensorArena = UniversalAnchor<std::vector<DispatchCell<TContract>>>; 
 
 template<class TContract, class TConfig = void> 
 struct Capability { using InterfaceType = TContract; using ConfigType = TConfig; TConfig config; };
@@ -210,7 +210,7 @@ template<typename T> struct HasConfigType<T, std::void_t<typename T::ConfigType>
 
 struct IAssembler { virtual void Bake() const = 0; };
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_DEFINE_SLOT(const IBindingNode*) 
+CRG_DEFINE_UNIVERSAL_ANCHOR(const IBindingNode*) 
 
 template<class TModel, template<class, class> class Cap, class TIdxSeq> struct CapabilityNode;
 
@@ -258,7 +258,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID hash = TypeIDOf<TModel>::Get();
-        auto& map = RegistrySlot<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::s_Value;
         if (map.find(hash) == map.end()) map[hash] = map.size();
         m_unit.Fill(DenseModelID(map[hash]));
     }
@@ -278,7 +278,7 @@ public:
     static void EnsureBaked() {
         static struct StaticGuard {
             StaticGuard() {
-                for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake();
+                for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake();
             }
         } s_guard;
     } 

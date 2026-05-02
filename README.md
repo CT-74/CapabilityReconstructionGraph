@@ -14,7 +14,7 @@ CRG delivers three guarantees:
 
 | Guarantee          | Mechanism                         | Result                                           |
 | :----------------- | :-------------------------------- | :----------------------------------------------- |
-| **Zero Coupling** | NodeList + RegistrySlot           | Modules self-register. The linker resolves them. |
+| **Zero Coupling** | NodeList + UniversalAnchor           | Modules self-register. The linker resolves them. |
 | **Zero Search** | CapabilitySpace + Horner's method | Context is a coordinate. O(1) array offset.      |
 | **Zero Migration** | Immutable CapabilityTensor        | Topology never changes. Prefetcher never blinks. |
 
@@ -33,18 +33,18 @@ struct MyFeature : MyFeatureList {
 static MyFeature g_feature; // ← OS loads, constructor fires. Done.
 ```
 
-Supports both **monolithic** (static lib, ship builds) and **DLL** (dev, tools, hot-reload) topologies via a single macro switch — `CRG_DEFINE_SLOT` — with no GPP-facing changes.
+Supports both **monolithic** (static lib, ship builds) and **DLL** (dev, tools, hot-reload) topologies via a single macro switch — `CRG_DEFINE_UNIVERSAL_ANCHOR` — with no GPP-facing changes.
 
 ---
 
 ## Pillar I: Linker-Driven Discovery
 
-The engine core requires no knowledge of external modules. Capabilities self-register via `NodeList` into a `RegistrySlot` anchor. On the first `CapabilityRouter::Find()` call, a `StaticGuard` triggers the Bake — flattening the linked list into the contiguous `CapabilityTensor` exactly once.
+The engine core requires no knowledge of external modules. Capabilities self-register via `NodeList` into a `UniversalAnchor` anchor. On the first `CapabilityRouter::Find()` call, a `StaticGuard` triggers the Bake — flattening the linked list into the contiguous `CapabilityTensor` exactly once.
 
 ```mermaid
 graph TD
     subgraph "Engine Core (EXE)"
-        A["RegistrySlot::s_Value"] -->|"StaticGuard → Bake"| B["CapabilityTensor"]
+        A["UniversalAnchor::s_Value"] -->|"StaticGuard → Bake"| B["CapabilityTensor"]
     end
 
     subgraph "Module A (DLL)"
@@ -152,7 +152,7 @@ The `demo/` folder contains 12 stages, each building on the previous:
 | Stage     | Concept                                            |
 | :-------- | :------------------------------------------------- |
 | `stage00` | God Registry — the problem                         |
-| `stage01` | Intrusive Infrastructure (NodeList + RegistrySlot) |
+| `stage01` | Intrusive Infrastructure (NodeList + UniversalAnchor) |
 | `stage02` | Opaque Transport (ModelShell)                      |
 | `stage03` | Traversal Lookup                                   |
 | `stage04` | Identity Decoupling (CapabilityBinding)            |

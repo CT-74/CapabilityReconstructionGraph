@@ -26,7 +26,7 @@
 #define CRG_DLL_ENABLED 0
 #endif
 
-template<class T> struct RegistrySlot {
+template<class T> struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -35,17 +35,17 @@ template<class T> struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = RegistrySlot<const TNode*>::s_Value;
-        RegistrySlot<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::s_Value;
+        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
     }
 };
 
@@ -188,11 +188,11 @@ struct IRegistryNode {
 };
 
 using RegistryVector = std::vector<const IRegistryNode*>;
-CRG_DEFINE_SLOT(RegistryVector)
+CRG_DEFINE_UNIVERSAL_ANCHOR(RegistryVector)
 
 struct IAssembler { virtual void Assemble(RegistryVector& registry) const = 0; };
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_DEFINE_SLOT(const IBindingNode*)
+CRG_DEFINE_UNIVERSAL_ANCHOR(const IBindingNode*)
 
 template<auto... V> struct At {};
 
@@ -267,8 +267,8 @@ public: // Made public to allow ModelRouter synchronization[cite: 11]
         static StaticGuard s_Guard;
     } 
     static void Bake() {
-        RegistrySlot<RegistryVector>::s_Value.clear();
-        for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Assemble(RegistrySlot<RegistryVector>::s_Value);
+        UniversalAnchor<RegistryVector>::s_Value.clear();
+        for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Assemble(UniversalAnchor<RegistryVector>::s_Value);
     }
 
     template<class InterfaceT, typename... TArgs>
@@ -282,7 +282,7 @@ public: // Made public to allow ModelRouter synchronization[cite: 11]
         // Broadphase O(1) via variadic Enum extraction
         std::size_t offset = TSpace::ComputeOffset(args...); 
 
-        for (const auto* node : RegistrySlot<RegistryVector>::s_Value) {
+        for (const auto* node : UniversalAnchor<RegistryVector>::s_Value) {
             if (node->GetTargetModelID() == modelID) {
                 if (const void* data = node->Resolve(typeid(InterfaceT).hash_code())) {
                     const auto& cell = static_cast<const DispatchCell<InterfaceT>*>(data)[offset];

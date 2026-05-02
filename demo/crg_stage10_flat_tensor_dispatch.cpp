@@ -27,7 +27,7 @@
 #define CRG_DLL_ENABLED 0 
 #endif
 
-template<class T> struct RegistrySlot {
+template<class T> struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -36,17 +36,17 @@ template<class T> struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = RegistrySlot<const TNode*>::s_Value;
-        RegistrySlot<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::s_Value;
+        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
     }
 };
 
@@ -183,7 +183,7 @@ struct Capability<TInterface, void> : public TInterface {
 
 struct IAssembler { virtual void Bake() const = 0; };
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_DEFINE_SLOT(const IBindingNode*)
+CRG_DEFINE_UNIVERSAL_ANCHOR(const IBindingNode*)
 
 template<auto... V> struct At {};
 template<class TSpace, std::size_t Index, class IdxSeq = std::make_index_sequence<TSpace::Dimensions>> struct MakeAt;
@@ -202,7 +202,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
     using ContextT = ContextTypeOf<Intf>;
 
     void FillArena(std::size_t slot) const {
-        auto& arena = RegistrySlot<TensorArena<Intf>>::s_Value;
+        auto& arena = UniversalAnchor<TensorArena<Intf>>::s_Value;
         std::size_t baseIdx = slot * TSpace::Volume;
         if (arena.size() < baseIdx + TSpace::Volume) arena.resize(baseIdx + TSpace::Volume);
 
@@ -231,7 +231,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID id = TypeIDOf<TModel>::Get();
-        auto& map = RegistrySlot<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
+        auto& map = UniversalAnchor<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
         if (map.find(id) == map.end()) map[id] = map.size();
         m_unit.Fill(map[id]);
     }
@@ -255,13 +255,13 @@ public: // Made public to allow ModelRouter synchronization[cite: 6]
         struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
         static StaticGuard s_Guard;
     } 
-    static void Bake() { for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
+    static void Bake() { for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
 
     template<class InterfaceT, typename... TArgs>
     static const InterfaceT* Find(ModelTypeID modelID, const TArgs&... args) {
         EnsureBaked();
 
-        auto& map = RegistrySlot<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
+        auto& map = UniversalAnchor<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
         auto it = map.find(modelID); if (it == map.end()) return nullptr;
 
         using TTraits = CapabilityRoutingTraits<InterfaceT>;
@@ -269,7 +269,7 @@ public: // Made public to allow ModelRouter synchronization[cite: 6]
         using TFullCtx = ContextTypeOf<InterfaceT>;
 
         std::size_t idx = (it->second * TSpace::Volume) + TSpace::ComputeOffset(args...);
-        const auto& cell = RegistrySlot<TensorArena<InterfaceT>>::s_Value[idx];
+        const auto& cell = UniversalAnchor<TensorArena<InterfaceT>>::s_Value[idx];
 
         // MVP Fix: Explicit assignment prevents Most Vexing Parse[cite: 6]
         TFullCtx ctx = TFullCtx(args...); 

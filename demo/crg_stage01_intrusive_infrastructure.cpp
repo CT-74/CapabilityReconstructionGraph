@@ -26,7 +26,7 @@
 #endif
 
 template<class T>
-struct RegistrySlot {
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -35,16 +35,16 @@ struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
 // =============================================================================
 // 2. THE MIXIN (Intrusive Auto-Registration)
 // =============================================================================
 template<class TNode>
-using NodeListAnchor = RegistrySlot<const TNode*>;
+using NodeListAnchor = UniversalAnchor<const TNode*>;
 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
@@ -69,7 +69,7 @@ struct IBehavior {
 struct BehaviorNode : public NodeList<BehaviorNode, IBehavior> {};
 
 // In DLL mode, this would live in BehaviorNode.cpp
-CRG_DEFINE_SLOT(const BehaviorNode*)
+CRG_DEFINE_UNIVERSAL_ANCHOR(const BehaviorNode*)
 
 struct DroneBehavior : public BehaviorNode { 
     void Execute() const override { std::cout << "Drone: Scanning area.\n"; } 

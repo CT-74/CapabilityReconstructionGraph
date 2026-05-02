@@ -37,8 +37,8 @@
 #define CRG_DLL_ENABLED 0 // Switch Monolith / DLL mode
 #endif
 
-// RegistrySlot: Ensures unique global state across module boundaries.
-template<class T> struct RegistrySlot {
+// UniversalAnchor: Ensures unique global state across module boundaries.
+template<class T> struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -47,9 +47,9 @@ template<class T> struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
 using ModelTypeID = std::size_t; 
@@ -69,7 +69,7 @@ struct DenseModelID {
 };
 
 using ModelMap = std::unordered_map<ModelTypeID, std::size_t>; 
-CRG_DEFINE_SLOT(ModelMap)
+CRG_DEFINE_UNIVERSAL_ANCHOR(ModelMap)
 
 class CapabilityRouter; // Forward declaration
 
@@ -81,7 +81,7 @@ struct ModelHandle {
 };
 
 // NodeList: Static chaining for automatic Binding discovery.
-template<class TNode> using NodeListAnchor = RegistrySlot<const TNode*>; 
+template<class TNode> using NodeListAnchor = UniversalAnchor<const TNode*>; 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
@@ -212,7 +212,7 @@ struct DispatchCell {
     bool                         hasFallback = false;
 };
 
-template<class TContract> using TensorArena = RegistrySlot<std::vector<DispatchCell<TContract>>>; 
+template<class TContract> using TensorArena = UniversalAnchor<std::vector<DispatchCell<TContract>>>; 
 
 template<class TContract, class TConfig = void> 
 struct Capability { using InterfaceType = TContract; using ConfigType = TConfig; TConfig config; };
@@ -229,7 +229,7 @@ template<typename T> struct HasConfigType<T, std::void_t<typename T::ConfigType>
 template<typename... Ts> struct TypeList {}; 
 struct IAssembler { virtual void Bake() const = 0; };
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_DEFINE_SLOT(const IBindingNode*) 
+CRG_DEFINE_UNIVERSAL_ANCHOR(const IBindingNode*) 
 
 template<class TModel, template<class, class> class Cap, class TIdxSeq> 
 struct CapabilityNode;
@@ -274,7 +274,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID hash = TypeIDOf<TModel>::Get();
-        auto& map = RegistrySlot<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::s_Value;
         if (map.find(hash) == map.end()) map[hash] = map.size();
         m_unit.Fill(DenseModelID(map[hash]));
     }
@@ -401,7 +401,7 @@ struct ActiveCapability<T, true> {
 
 inline ModelHandle::ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
     CapabilityRouter::EnsureBaked(); 
-    const auto& map = RegistrySlot<ModelMap>::s_Value;
+    const auto& map = UniversalAnchor<ModelMap>::s_Value;
     auto it = map.find(hash);
     if (it != map.end()) denseID = DenseModelID(it->second);
 }

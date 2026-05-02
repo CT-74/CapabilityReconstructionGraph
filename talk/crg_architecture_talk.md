@@ -57,12 +57,12 @@ You touch a header. One bool. You hit build. 38 minutes later, you're still wait
 ## FR
 Vous touchez un header. Un seul bool. Vous lancez le build. Vous allez chercher un café. Vous revenez. Ça compile encore. Vous allez déjeuner. Ça finit pendant que vous mangez. 38 minutes. Pour un bool. C'est l'Include Hell. Et voilà le truc — ça ne ressemble pas à un problème de performance. Ça ressemble à un problème de moral. Un problème de communication. 'Qui a encore touché ConfigManager.h ?' Mais ce n'est pas ça. C'est un problème d'architecture. Tout est couplé au moment de la compilation. Le CRG résout ce problème. L'objectif de l'Acte I est simple : comment faire en sorte que les comportements se découvrent mutuellement au moment du link, sans aucun header partagé ?
 
-# SLIDE: 02 - THE INTRUSIVE BACKBONE (NodeList + RegistrySlot)
+# SLIDE: 02 - THE INTRUSIVE BACKBONE (NodeList + UniversalAnchor)
 ## Code
 ```cpp
-// RegistrySlot: Anchored definition in engine core
-#define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
-CRG_DEFINE_SLOT(const BehaviorNode*)
+// UniversalAnchor: Anchored definition in engine core
+#define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+CRG_DEFINE_UNIVERSAL_ANCHOR(const BehaviorNode*)
 
 // MODULE A: Zero dependencies on core internals
 struct DroneBehavior : NodeList<BehaviorNode, IBehavior> {
@@ -74,7 +74,7 @@ static DroneBehavior g_drone; // OS loads DLL, constructor fires.
 ```mermaid
 graph TD
     subgraph "Engine Core (.exe)"
-        Slot["RegistrySlot Anchor"]
+        Slot["UniversalAnchor Anchor"]
     end
     subgraph "DLL Module A"
         Drone["DroneBehavior"] -- "Linker" --> Slot
@@ -84,9 +84,9 @@ graph TD
     end
 ```
 ## EN
-In production, you have modules registering capabilities without the core knowing they exist. CRG_DEFINE_SLOT anchors the registry in the core, allowing DLLs to resolve to a single address via the linker. Define a struct, instantiate it as a static, and the OS fires the constructor on load. It's a fully functional plugin system obtained for free.
+In production, you have modules registering capabilities without the core knowing they exist. CRG_DEFINE_UNIVERSAL_ANCHOR anchors the registry in the core, allowing DLLs to resolve to a single address via the linker. Define a struct, instantiate it as a static, and the OS fires the constructor on load. It's a fully functional plugin system obtained for free.
 ## FR
-En production, vous n'avez jamais un seul binaire. Vous avez le core, une DLL réseau, une DLL outils, une DLL robotique — et chacune doit pouvoir enregistrer ses capabilities sans que le core ait à la connaître. L'approche naïve, c'est le static inline partout. Mais en développement, on veut du hot-reload et des plugins. C'est là que le mode DLL entre en jeu. CRG_DEFINE_SLOT déplace la définition vers l'exécutable core — une spécialisation de template explicite que chaque DLL résout via le linker. L'API de découverte est identique : définissez une struct, instanciez-la en statique, et l'OS déclenche le constructeur au chargement. Aucun Init(), aucun registre central, aucun include du core. Vous déposez un fichier dans une DLL. Il s'enregistre lui-même. C'est tout.
+En production, vous n'avez jamais un seul binaire. Vous avez le core, une DLL réseau, une DLL outils, une DLL robotique — et chacune doit pouvoir enregistrer ses capabilities sans que le core ait à la connaître. L'approche naïve, c'est le static inline partout. Mais en développement, on veut du hot-reload et des plugins. C'est là que le mode DLL entre en jeu. CRG_DEFINE_UNIVERSAL_ANCHOR déplace la définition vers l'exécutable core — une spécialisation de template explicite que chaque DLL résout via le linker. L'API de découverte est identique : définissez une struct, instanciez-la en statique, et l'OS déclenche le constructeur au chargement. Aucun Init(), aucun registre central, aucun include du core. Vous déposez un fichier dans une DLL. Il s'enregistre lui-même. C'est tout.
 
 # SLIDE: 03 - THE BAKING (Taking Back Control)
 ## Code
@@ -502,7 +502,7 @@ Le CRG est un framework de dispatch piloté par le linker pour tout système C++
 ## Code
 ```cpp
 // Q: "Isn't static inline ODR-unsafe across DLLs?"
-// A: Yes. That's why RegistrySlot exists.
+// A: Yes. That's why UniversalAnchor exists.
 ```
 ## Mermaid
 ```mermaid
@@ -511,9 +511,9 @@ graph LR
     DLL2["Plugin DLL"] -- "Linker" --> Core
 ```
 ## EN
-Exactly right — that's precisely why RegistrySlot exists. In monolithic builds, static inline is perfectly safe: one binary, one definition, ODR guaranteed. The moment you cross a DLL boundary, each module gets its own copy of the static and your list fragments. CRG_DEFINE_SLOT solves this by forcing one explicit template specialization in the engine core, which the linker resolves as a single address across all modules.
+Exactly right — that's precisely why UniversalAnchor exists. In monolithic builds, static inline is perfectly safe: one binary, one definition, ODR guaranteed. The moment you cross a DLL boundary, each module gets its own copy of the static and your list fragments. CRG_DEFINE_UNIVERSAL_ANCHOR solves this by forcing one explicit template specialization in the engine core, which the linker resolves as a single address across all modules.
 ## FR
-Exactement — c'est précisément pour cela que RegistrySlot existe. En build monolithique, le static inline est parfaitement sûr. Dès qu'on traverse une DLL, chaque module obtient sa propre copie du statique et la liste se fragmente. CRG_DEFINE_SLOT résout cela en forçant une spécialisation explicite dans le core de l'engine, que le linker résout à une adresse unique à travers tous les modules.
+Exactement — c'est précisément pour cela que UniversalAnchor existe. En build monolithique, le static inline est parfaitement sûr. Dès qu'on traverse une DLL, chaque module obtient sa propre copie du statique et la liste se fragmente. CRG_DEFINE_UNIVERSAL_ANCHOR résout cela en forçant une spécialisation explicite dans le core de l'engine, que le linker résout à une adresse unique à travers tous les modules.
 
 # SLIDE: 21 - Q&A: Live++ Integration [BACKUP]
 ## Code

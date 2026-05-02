@@ -29,8 +29,8 @@
 #define CRG_DLL_ENABLED 0
 #endif
 
-// RegistrySlot: Ensures unique global state across module boundaries.
-template<class T> struct RegistrySlot {
+// UniversalAnchor: Ensures unique global state across module boundaries.
+template<class T> struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -39,9 +39,9 @@ template<class T> struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
 // NodeList: Static chaining for automatic Binding discovery.
@@ -49,8 +49,8 @@ template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = RegistrySlot<const TNode*>::s_Value;
-        RegistrySlot<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::s_Value;
+        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
     }
 };
 
@@ -72,13 +72,13 @@ struct DenseModelID {
 };
 
 using ModelMap = std::unordered_map<ModelTypeID, std::size_t>; 
-CRG_DEFINE_SLOT(ModelMap)
+CRG_DEFINE_UNIVERSAL_ANCHOR(ModelMap)
 
 // ModelHandle: Resolved once, stored in ECS components for hot-path lookup.
 struct ModelHandle {
     DenseModelID denseID;
     explicit ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
-        auto& map = RegistrySlot<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::s_Value;
         auto it = map.find(hash);
         if (it != map.end()) denseID = DenseModelID(it->second);
     }
@@ -180,7 +180,7 @@ struct DispatchCell {
     bool                          hasFallback = false;
 };
 
-template<class InterfaceT> using TensorArena = RegistrySlot<std::vector<DispatchCell<InterfaceT>>>; 
+template<class InterfaceT> using TensorArena = UniversalAnchor<std::vector<DispatchCell<InterfaceT>>>; 
 
 template<class TInterface, class TConfig = void> 
 struct Capability : public TInterface { 
@@ -201,7 +201,7 @@ struct Capability<TInterface, void> : public TInterface {
 
 struct IAssembler { virtual void Bake() const = 0; };
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_DEFINE_SLOT(const IBindingNode*)
+CRG_DEFINE_UNIVERSAL_ANCHOR(const IBindingNode*)
 
 template<class TSpace, std::size_t Index, class IdxSeq = std::make_index_sequence<TSpace::Dimensions>> struct MakeAt;
 template<class TSpace, std::size_t Index, std::size_t... DimIs>
@@ -253,7 +253,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID hash = TypeIDOf<TModel>::Get();
-        auto& map = RegistrySlot<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::s_Value;
         if (map.find(hash) == map.end()) map[hash] = map.size();
         m_unit.Fill(DenseModelID(map[hash]));
     }
@@ -278,7 +278,7 @@ public:
         static StaticGuard s_Guard;
     } 
 
-    static void Bake() { for (auto* b = RegistrySlot<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
+    static void Bake() { for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
 
     template<class InterfaceT, typename... TArgs>
     static const ModelBinding<InterfaceT>* Find(ModelHandle handle, const TArgs&... args) {

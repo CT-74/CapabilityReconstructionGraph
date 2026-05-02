@@ -31,7 +31,7 @@
 #endif
 
 template<class T>
-struct RegistrySlot {
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -40,13 +40,13 @@ struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
 template<class TNode>
-using NodeListAnchor = RegistrySlot<const TNode*>;
+using NodeListAnchor = UniversalAnchor<const TNode*>;
 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
@@ -82,8 +82,8 @@ struct IRegistryNode {
 };
 
 using RegistryVector = std::vector<const IRegistryNode*>;
-using RouterSlot = RegistrySlot<RegistryVector>;
-CRG_DEFINE_SLOT(RegistryVector)
+using RouterSlot = UniversalAnchor<RegistryVector>;
+CRG_DEFINE_UNIVERSAL_ANCHOR(RegistryVector)
 
 struct IAssembler {
     virtual ~IAssembler() = default;
@@ -91,7 +91,7 @@ struct IAssembler {
 };
 
 struct IBindingNode : public NodeList<IBindingNode, IAssembler> {};
-CRG_DEFINE_SLOT(const IBindingNode*)
+CRG_DEFINE_UNIVERSAL_ANCHOR(const IBindingNode*)
 
 // =============================================================================
 // 3. THE BAKER CORE (Variadic Aggregation)

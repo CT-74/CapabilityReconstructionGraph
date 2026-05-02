@@ -34,7 +34,7 @@ template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).
 #endif
 
 template<class T>
-struct RegistrySlot {
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
     static inline T s_Value{}; 
 #else
@@ -43,12 +43,12 @@ struct RegistrySlot {
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_SLOT(T) template<> T RegistrySlot<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
 #else
-    #define CRG_DEFINE_SLOT(T) 
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
 
-template<class TNode> using NodeListAnchor = RegistrySlot<const TNode*>;
+template<class TNode> using NodeListAnchor = UniversalAnchor<const TNode*>;
 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
