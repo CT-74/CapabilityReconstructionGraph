@@ -144,6 +144,11 @@
             text-align: center;
             transition: all 0.2s ease;
             position: relative;
+            cursor: pointer; /* Indicates clickability */
+        }
+        .array-slot:hover:not(.active) {
+            border-color: #8b949e;
+            background-color: #21262d;
         }
         .array-slot.active {
             background-color: rgba(31, 111, 235, 0.2);
@@ -279,12 +284,30 @@
         let plotInitialized = false; 
         const plotDiv = document.getElementById('plot3d');
 
-        // Init 1D Grid UI
+        // Init 1D Grid UI and handle two-way bindings
         mappings.forEach((text, i) => {
             const slot = document.createElement('div');
             slot.className = 'array-slot';
             slot.id = `slot-${i}`;
             slot.innerHTML = `<div class="slot-index">[${i}]</div><div class="slot-content">${text}</div>`;
+            
+            // Interaction: Click on a 1D tensor slot
+            slot.addEventListener('click', () => {
+                // Reverse Horner's method to find coordinates from offset
+                const m = Math.floor(i / 6);
+                const remainder = i % 6;
+                const w = Math.floor(remainder / 2);
+                const t = remainder % 2;
+                
+                // Update dropdowns
+                selects[0].value = m;
+                selects[1].value = w;
+                selects[2].value = t;
+                
+                // Trigger global update (Math, 3D Plot, UI Highlights)
+                updateRouting();
+            });
+
             tensorArray.appendChild(slot);
         });
 
