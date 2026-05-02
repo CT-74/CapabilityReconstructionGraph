@@ -249,7 +249,7 @@ Manual registration doesn't scale. The Binding fixes this by expanding a TypeLis
 ## FR
 L'enregistrement manuel ne passe pas à l'échelle. Ajoutez un modèle : deux lignes de plus. Ajoutez une capability : trois lignes de plus. Le Binding résout ça. DiagCapability devient un template sur TModel. Ensuite, une seule ligne CapabilityBinding expand la TypeList. Trois modèles, deux capabilities : un seul statique, six entrées dans la matrice. Et la décentralisation est préservée. Ajoutez un modèle à la TypeList ? Chaque capability se propage. Ajoutez une capability ? Chaque modèle en bénéficie. La matrice se construit seule.
 
-# SLIDE: 09 - THE PRICE OF FREEDOM (O(N) Search)
+# SLIDE: 09 - THE PRICE OF FREEDOM (O(N) Search) [OPTIONAL]
 ## Code
 ```cpp
 // Current Find() bottleneck:
@@ -294,7 +294,7 @@ ModelTypeIDs are arbitrary hashes scattered across a 4-billion slot space. You c
 ## FR
 Nos ModelTypeIDs viennent de typeid().hash_code(). Scout hash à un virgule deux milliards. Ce sont des valeurs size_t arbitraires éparpillées sur un spectre de quatre milliards de slots. Si j'essaie de les utiliser comme index, ma table a besoin de seize gigaoctets juste pour des pointeurs. Le seul chemin vers un accès direct O(1) est de réduire cet espace épars en entiers consécutifs. Zéro, un, deux, trois. C'est DenseTypeID. Chaque type obtient un local statique qui incrémente un compteur global une seule fois. Maintenant s_CapabilityTensor[0] c'est la capability de Scout. Un accès tableau. Une instruction.
 
-# SLIDE: 11 - THE DENSE INDEXER (Collapse in Action)
+# SLIDE: 11 - THE DENSE INDEXER (Collapse in Action) [OPTIONAL]
 ## Code
 ```cpp
 // THE FLAT TENSOR: Rows = DenseID, Columns = Offset
@@ -470,9 +470,9 @@ graph LR
 ## EN
 This is the physical reality of the Memory Wall. At a 10% mutation rate, traditional ECS architectures drop to 19 Gi/s because the CPU is busy moving memory instead of executing logic. CRG sustains over 30 Gi/s because the topology is immutable. Note the QR code on the right: you can scan it now to access the live simulator and verify these performance metrics on your own device during the Q&A.
 ## FR
-Deux graphiques, deux questions. À gauche : quel est le coût des transitions d'état selon le taux de mutation ? À 1%, les deux systèmes sont pratiquement identiques — c'est visible sur le graphique. À 10%, l'ECS est 30% plus lent. Le CRG ne donne pas de performance supérieure en isolation — il donne de la stabilité. Un coût identique quel que soit le taux de mutation. Si votre taux de mutation est faible et que vous êtes content de votre ECS, le CRG n'est peut-être pas pour vous. Si vous frappez des murs de performance sous forte mutation — c'est exactement le problème que le CRG résout. À droite : le coût par entité à mesure que le dataset dépasse le L3. La ligne ECS monte. La ligne CRG ne bouge pas. Notez le QR code : vous pouvez scanner dès maintenant pour accéder au simulateur live sur votre propre appareil.
+Ces deux graphiques répondent à deux questions différentes. À gauche : quel est le coût des transitions d'état selon le taux de mutation ? À 1%, les deux systèmes sont pratiquement identiques — c'est visible sur le graphique. À 10%, l'ECS est 30% plus lent. Le CRG ne donne pas de performance supérieure en isolation — il donne de la stabilité. Un coût identique quel que soit le taux de mutation. Si votre taux de mutation est faible et que vous êtes content de votre ECS, le CRG n'est peut-être pas pour vous. Si vous frappez des murs de performance sous forte mutation — c'est exactement le problème que le CRG résout. À droite : le coût par entité à mesure que le dataset dépasse le L3. La ligne ECS monte. La ligne CRG ne bouge pas. Notez le QR code : vous pouvez scanner dès maintenant pour accéder au simulateur live sur votre propre appareil.
 
-# SLIDE: 18 - THE DECISION MATRIX (ECS vs CRG)
+# SLIDE: 18 - THE DECISION MATRIX (ECS vs CRG) [OPTIONAL]
 ## Code
 ```cpp
 // The Mathematical Break-Even Point:

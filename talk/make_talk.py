@@ -95,14 +95,14 @@ class PPTXGenerator:
             slide.background.fill.fore_color.rgb = DARK_GREY
             
             # --- HIDDEN SLIDE LOGIC (Q&A / BACKUP) ---
-            if "[BACKUP]" in data['title'] or "[HIDDEN]" in data['title']:
+            if "[BACKUP]" in data['title'] or "[HIDDEN]" in data['title'] or "[OPTIONAL]" in data['title']:
                 # Modifying the underlying XML element to hide the slide in Presentation Mode
                 slide._element.set('show', '0')
 
             # Title Formatting
             title = slide.shapes.title
             # Clean up the title tag for display
-            display_title = data['title'].replace("[BACKUP]", "").replace("[HIDDEN]", "").strip()
+            display_title = data['title'].replace("[BACKUP]", "").replace("[HIDDEN]", "").replace("[OPTIONAL]", "").strip()
             title.text = display_title
             p = title.text_frame.paragraphs[0]
             p.font.color.rgb = CPP_BLUE
