@@ -358,7 +358,6 @@ static const CapabilityBinding<Drone, NormalAI, LowPowerAI> g_DroneBinding{};
 // =============================================================================
 
 int main() {
-    CapabilityRouter::Bake();
     auto id = TypeIDOf<Drone>::Get();
 
     std::cout << "--- CRG STAGE 9: DYNAMIC RULES + MODEL ROUTER ---\n\n";
