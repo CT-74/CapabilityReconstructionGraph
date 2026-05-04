@@ -22,20 +22,27 @@
 // 1. THE ANCHOR (Hybrid Linkage Manager)
 // =============================================================================
 #ifndef CRG_DLL_ENABLED
-#define CRG_DLL_ENABLED 1
+#define CRG_DLL_ENABLED 0
 #endif
 
 template<class T>
 struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value;
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -52,8 +59,8 @@ struct NodeList : public TInterface {
 
     NodeList() {
         const TNode* derivedThis = static_cast<const TNode*>(this);
-        m_Next = NodeListAnchor<TNode>::s_Value;
-        NodeListAnchor<TNode>::s_Value = derivedThis;
+        m_Next = NodeListAnchor<TNode>::Get();
+        NodeListAnchor<TNode>::Get() = derivedThis;
     }
 };
 
@@ -89,7 +96,7 @@ int main() {
     TankBehavior b; 
 
     // We iterate through the Anchor, proving the infrastructure works.
-    for (const BehaviorNode* n = NodeListAnchor<BehaviorNode>::s_Value; n; n = n->m_Next) {
+    for (const BehaviorNode* n = NodeListAnchor<BehaviorNode>::Get(); n; n = n->m_Next) {
         n->Execute();
     }
 

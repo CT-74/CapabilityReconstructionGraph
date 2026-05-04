@@ -61,7 +61,7 @@ Vous touchez un header. Un seul bool. Vous lancez le build. Vous allez chercher 
 ## Code
 ```cpp
 // UniversalAnchor: Anchored definition in engine core
-#define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+#define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::Get(){};
 CRG_DEFINE_UNIVERSAL_ANCHOR(const BehaviorNode*)
 
 // MODULE A: Zero dependencies on core internals
@@ -92,7 +92,7 @@ En production, vous n'avez jamais un seul binaire. Vous avez le core, une DLL r�
 ## Code
 ```cpp
 // DISCOVERY: Linked list traversal (Cache Miss)
-for (auto* n = Anchor::s_Value; n; n = n->m_Next) {
+for (auto* n = Anchor::Get(); n; n = n->m_Next) {
     if (n->GetID() == modelID) return n; 
 }
 
@@ -253,7 +253,7 @@ L'enregistrement manuel ne passe pas à l'échelle. Ajoutez un modèle : deux li
 ## Code
 ```cpp
 // Current Find() bottleneck:
-for (const auto* node : RouterSlot::s_Value) {
+for (const auto* node : RouterSlot::Get()) {
     if (node->GetID() == modelID) // comparison
         return node->Resolve(iid);
 }

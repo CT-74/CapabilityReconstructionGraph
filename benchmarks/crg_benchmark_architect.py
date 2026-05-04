@@ -1,6 +1,6 @@
 import subprocess, os, platform, csv, matplotlib.pyplot as plt
 
-# Paths configuration[cite: 14]
+# Paths configuration
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.join(CURRENT_DIR, "bin")
 DATA_DIR = os.path.join(CURRENT_DIR, "data")
@@ -19,15 +19,15 @@ def run_suite():
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(IMG_DIR, exist_ok=True)
     
-    # Compilation[cite: 14]
+    # Compilation
     print(f"Compiling {os.path.basename(SOURCE)}...")
     subprocess.run(["clang++", "-O3", "-march=native", "-std=c++17", SOURCE, "-o", EXE], check=True)
     
-    # Execution: C++ writes directly to data/crg_benchmark_architect.csv[cite: 4]
+    # Execution: C++ writes directly to data/crg_benchmark_architect.csv
     print("Running Architect Benchmark...")
     subprocess.run([EXE], check=True, cwd=CURRENT_DIR)
 
-    # Visualization[cite: 14]
+    # Visualization
     n, ecs, crg = [], [], []
     with open(CSV, 'r') as f:
         reader = csv.reader(f)

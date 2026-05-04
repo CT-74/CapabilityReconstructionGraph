@@ -5,9 +5,9 @@
 // CAPABILITY ROUTING GATEWAY (CRG) - STAGE 10: CAPABILITY TENSOR DISPATCH (DOD)
 // =============================================================================
 // @intent:
-// Flatten the N-D Hypercube into a single contiguous memory arena (Tensor)[cite: 4].
-// - Broad Phase: O(1) Indexing via ModelSlot and Cartesian offset[cite: 4].
-// - Narrow Phase: O(K) Flat rule scan inside DispatchCells[cite: 4].
+// Flatten the N-D Hypercube into a single contiguous memory arena (Tensor).
+// - Broad Phase: O(1) Indexing via ModelSlot and Cartesian offset.
+// - Narrow Phase: O(K) Flat rule scan inside DispatchCells.
 // - ModelRouter: Zero-cost static proxy for strongly-typed context routing.
 // =============================================================================
 
@@ -27,16 +27,24 @@
 #define CRG_DLL_ENABLED 0 
 #endif
 
-template<class T> struct UniversalAnchor {
+template<class T>
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value; 
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -45,8 +53,8 @@ template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = UniversalAnchor<const TNode*>::s_Value;
-        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::Get();
+        UniversalAnchor<const TNode*>::Get() = static_cast<const TNode*>(this);
     }
 };
 
@@ -74,7 +82,7 @@ struct RuleContext {
     template<typename T> constexpr const T& Get() const { return std::get<const T&>(values); }
 };
 
-// Patch: Fallback context for contracts without dynamic rules[cite: 6]
+// Patch: Fallback context for contracts without dynamic rules
 struct NullContext {
     NullContext() = default;
     template<typename... Args> NullContext(const Args&...) {} 
@@ -136,7 +144,7 @@ private:
 
 template<class TInterface> struct CapabilityRoutingTraits;
 
-// Patch: Lazy Context Selector to handle optional FullContext definition[cite: 6]
+// Patch: Lazy Context Selector to handle optional FullContext definition
 template<typename T, typename = void> struct ContextSelector { using Type = NullContext; };
 template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRoutingTraits<T>::FullContext>> {
     using Type = typename CapabilityRoutingTraits<T>::FullContext;
@@ -202,7 +210,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
     using ContextT = ContextTypeOf<Intf>;
 
     void FillArena(std::size_t slot) const {
-        auto& arena = UniversalAnchor<TensorArena<Intf>>::s_Value;
+        auto& arena = UniversalAnchor<TensorArena<Intf>>::Get();
         std::size_t baseIdx = slot * TSpace::Volume;
         if (arena.size() < baseIdx + TSpace::Volume) arena.resize(baseIdx + TSpace::Volume);
 
@@ -231,7 +239,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID id = TypeIDOf<TModel>::Get();
-        auto& map = UniversalAnchor<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
+        auto& map = UniversalAnchor<std::unordered_map<ModelTypeID, std::size_t>>::Get();
         if (map.find(id) == map.end()) map[id] = map.size();
         m_unit.Fill(map[id]);
     }
@@ -250,18 +258,18 @@ struct CapabilityBinding<TypeList<Models...>, TCap...> : public CapabilityBindin
 // =============================================================================
 
 class CapabilityRouter {
-public: // Made public to allow ModelRouter synchronization[cite: 6]
+public: // Made public to allow ModelRouter synchronization
     static void EnsureBaked() {
         struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
         static StaticGuard s_Guard;
     } 
-    static void Bake() { for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
+    static void Bake() { for (auto* b = UniversalAnchor<const IBindingNode*>::Get(); b; b = b->m_Next) b->Bake(); }
 
     template<class InterfaceT, typename... TArgs>
     static const InterfaceT* Find(ModelTypeID modelID, const TArgs&... args) {
         EnsureBaked();
 
-        auto& map = UniversalAnchor<std::unordered_map<ModelTypeID, std::size_t>>::s_Value;
+        auto& map = UniversalAnchor<std::unordered_map<ModelTypeID, std::size_t>>::Get();
         auto it = map.find(modelID); if (it == map.end()) return nullptr;
 
         using TTraits = CapabilityRoutingTraits<InterfaceT>;
@@ -269,9 +277,9 @@ public: // Made public to allow ModelRouter synchronization[cite: 6]
         using TFullCtx = ContextTypeOf<InterfaceT>;
 
         std::size_t idx = (it->second * TSpace::Volume) + TSpace::ComputeOffset(args...);
-        const auto& cell = UniversalAnchor<TensorArena<InterfaceT>>::s_Value[idx];
+        const auto& cell = UniversalAnchor<TensorArena<InterfaceT>>::Get()[idx];
 
-        // MVP Fix: Explicit assignment prevents Most Vexing Parse[cite: 6]
+        // MVP Fix: Explicit assignment prevents Most Vexing Parse
         TFullCtx ctx = TFullCtx(args...); 
         for (const auto& rule : cell.dynamicRules) if (rule.Matches(ctx)) return rule.implementation;
         
@@ -289,7 +297,7 @@ public:
     // Zero-cost static wrapper over CapabilityRouter::Find
     template<class InterfaceT, typename... TArgs>
     static const InterfaceT* Find(const TArgs&... args) {
-        CapabilityRouter::EnsureBaked(); // Order synchronization fix[cite: 6]
+        CapabilityRouter::EnsureBaked(); // Order synchronization fix
         return CapabilityRouter::Find<InterfaceT>(TypeIDOf<ModelT>::Get(), args...);
     }
 };

@@ -40,14 +40,21 @@ private:
 template<class T>
 struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value;
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -61,8 +68,8 @@ struct NodeList : public TInterface {
 
     NodeList() {
         const TNode* derivedThis = static_cast<const TNode*>(this);
-        m_Next = NodeListAnchor<TNode>::s_Value;
-        NodeListAnchor<TNode>::s_Value = derivedThis;
+        m_Next = NodeListAnchor<TNode>::Get();
+        NodeListAnchor<TNode>::Get() = derivedThis;
     }
 };
 
@@ -128,7 +135,7 @@ struct TelemetryCapability : ITelemetry {
 template<class InterfaceT>
 const InterfaceT* FindCapability(const ModelShell& s) {
     const ModelTypeID id = s.GetTypeID();
-    for (auto* n = NodeListAnchor<ICapabilityNode<InterfaceT>>::s_Value; n; n = n->m_Next) {
+    for (auto* n = NodeListAnchor<ICapabilityNode<InterfaceT>>::Get(); n; n = n->m_Next) {
         if (n->GetTargetModelID() == id) return n->GetInterface();
     }
     return nullptr;

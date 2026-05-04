@@ -78,7 +78,7 @@ if __name__ == "__main__":
     ax.axvline(x=l3_boundary, color='#34495e', linestyle=':', linewidth=2.5, zorder=1)
     ax.text(l3_boundary, max_y * 1.40, "L3 Cache Boundary\n(~6.4 MB of Data)", color='#34495e', ha='center', va='center', fontweight='bold', bbox=dict(boxstyle='round', facecolor='#fdfefe', edgecolor='#bdc3c7', alpha=0.9))
 
-    # Annotations and legend[cite: 18]
+    # Annotations and legend
     ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.40), fontsize=11)
     ax.grid(True, which="both", ls="-", alpha=0.2)
     

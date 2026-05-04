@@ -44,7 +44,7 @@ The engine core requires no knowledge of external modules. Capabilities self-reg
 ```mermaid
 graph TD
     subgraph "Engine Core (EXE)"
-        A["UniversalAnchor::s_Value"] -->|"StaticGuard → Bake"| B["CapabilityTensor"]
+        A["UniversalAnchor::Get()"] -->|"StaticGuard → Bake"| B["CapabilityTensor"]
     end
 
     subgraph "Module A (DLL)"

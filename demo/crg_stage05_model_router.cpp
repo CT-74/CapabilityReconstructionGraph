@@ -36,14 +36,21 @@ template<class T> struct TypeIDOf { static ModelTypeID Get() { return typeid(T).
 template<class T>
 struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value;
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -54,8 +61,8 @@ template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = NodeListAnchor<TNode>::s_Value;
-        NodeListAnchor<TNode>::s_Value = static_cast<const TNode*>(this);
+        m_Next = NodeListAnchor<TNode>::Get();
+        NodeListAnchor<TNode>::Get() = static_cast<const TNode*>(this);
     }
 };
 
@@ -93,7 +100,7 @@ class ModelRouter {
 public:
     static const void* Resolve(InterfaceTypeID interfaceID) {
         const ModelTypeID modelID = TypeIDOf<ModelT>::Get();
-        for (auto* n = NodeListAnchor<ICapabilityNode>::s_Value; n; n = n->m_Next) {
+        for (auto* n = NodeListAnchor<ICapabilityNode>::Get(); n; n = n->m_Next) {
             if (n->GetTargetModelID() == modelID && n->GetInterfaceID() == interfaceID) {
                 return n->GetRawInterface();
             }

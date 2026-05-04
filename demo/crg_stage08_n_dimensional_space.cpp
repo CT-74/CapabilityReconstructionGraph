@@ -24,16 +24,24 @@
 #define CRG_DLL_ENABLED 0
 #endif
 
-template<class T> struct UniversalAnchor {
+template<class T>
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value; 
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -42,8 +50,8 @@ template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = UniversalAnchor<const TNode*>::s_Value;
-        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::Get();
+        UniversalAnchor<const TNode*>::Get() = static_cast<const TNode*>(this);
     }
 };
 
@@ -150,7 +158,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
 };
 
 template<class TModel, template<class, class> class... TCap>
-class CapabilitySpace : public IRegistryNode, 
+class ModelRegistryNode : public IRegistryNode, 
     public CapabilityNode<TModel, TCap, std::make_index_sequence<CapabilityRoutingTraits<typename TCap<TModel, At<>>::InterfaceType>::SpaceType::Volume>>... 
 {
 public:
@@ -165,7 +173,7 @@ public:
 
 template<class TModel, template<class, class> class... TCapabilities>
 struct CapabilityBinding : public IBindingNode {
-    CapabilitySpace<TModel, TCapabilities...> m_unit;
+    ModelRegistryNode<TModel, TCapabilities...> m_unit;
     void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
 };
 
@@ -186,9 +194,9 @@ private:
     } 
 public:
     static void Bake() {
-        UniversalAnchor<RegistryVector>::s_Value.clear();
-        for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) {
-            b->Assemble(UniversalAnchor<RegistryVector>::s_Value);
+        UniversalAnchor<RegistryVector>::Get().clear();
+        for (auto* b = UniversalAnchor<const IBindingNode*>::Get(); b; b = b->m_Next) {
+            b->Assemble(UniversalAnchor<RegistryVector>::Get());
         }
     }
 
@@ -202,7 +210,7 @@ public:
         // O(1) mathematical offset resolution
         std::size_t offset = TSpace::ComputeOffset(axes...); 
 
-        for (const auto* node : UniversalAnchor<RegistryVector>::s_Value) {
+        for (const auto* node : UniversalAnchor<RegistryVector>::Get()) {
             if (node->GetTargetModelID() == modelID) {
                 if (const void* ptr = node->ResolveSpanRaw(TypeIDOf<InterfaceT>::Get())) {
                     return static_cast<const InterfaceT* const*>(ptr)[offset];

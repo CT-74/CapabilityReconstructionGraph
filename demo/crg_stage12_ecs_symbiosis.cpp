@@ -29,16 +29,24 @@
 #define CRG_DLL_ENABLED 0
 #endif
 
-template<class T> struct UniversalAnchor {
+template<class T>
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value; 
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -61,7 +69,7 @@ CRG_DEFINE_UNIVERSAL_ANCHOR(ModelMap)
 struct ModelHandle {
     DenseModelID denseID;
     explicit ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
-        const auto& map = UniversalAnchor<ModelMap>::s_Value;
+        const auto& map = UniversalAnchor<ModelMap>::Get();
         auto it = map.find(hash);
         if (it != map.end()) denseID = DenseModelID(it->second);
     }
@@ -71,8 +79,8 @@ struct ModelHandle {
 template<class TNode, class TInterface> struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = UniversalAnchor<const TNode*>::s_Value;
-        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::Get();
+        UniversalAnchor<const TNode*>::Get() = static_cast<const TNode*>(this);
     }
 };
 
@@ -223,7 +231,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
     using ContextT = ContextTypeOf<ContractT>;
 
     void FillArena(DenseModelID denseID) const {
-        auto& arena = TensorArena<ContractT>::s_Value;
+        auto& arena = TensorArena<ContractT>::Get();
         std::size_t baseIdx = denseID.index * TSpace::Volume;
         if (arena.size() < baseIdx + TSpace::Volume) arena.resize(baseIdx + TSpace::Volume);
 
@@ -258,7 +266,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID hash = TypeIDOf<TModel>::Get();
-        auto& map = UniversalAnchor<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::Get();
         if (map.find(hash) == map.end()) map[hash] = map.size();
         m_unit.Fill(DenseModelID(map[hash]));
     }
@@ -278,7 +286,7 @@ public:
     static void EnsureBaked() {
         static struct StaticGuard {
             StaticGuard() {
-                for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake();
+                for (auto* b = UniversalAnchor<const IBindingNode*>::Get(); b; b = b->m_Next) b->Bake();
             }
         } s_guard;
     } 
@@ -288,7 +296,7 @@ public:
         EnsureBaked();
         if (!handle.denseID.IsValid()) return nullptr;
 
-        const auto& arena = TensorArena<TContract>::s_Value; 
+        const auto& arena = TensorArena<TContract>::Get(); 
         using TSpace = typename CapabilityRoutingTraits<TContract>::SpaceType;
         using TFullCtx = ContextTypeOf<TContract>;
         
@@ -359,28 +367,50 @@ struct ActiveCapability<T, false> {
 // =========================================================================
 // DOD SPECIALIZATION (High-Performance Contracts)
 // =========================================================================
+/**
+ * @brief High-performance component for ECS Symbiosis.
+ * Caches the result of the "Brain" phase to be executed by the "Muscle".
+ * Optimization: Stores the raw function address to achieve a single-jump execution.
+ */
 template<class T>
 struct ActiveCapability<T, true> {
-    const DODDescriptor<T>* resolvedPtr = nullptr;
+    // Directly store the static function address from the DOD contract.
+    // This removes the need to dereference the DODDescriptor during hot-loops.
+    void (*pfnResolved)(typename T::Params&) = nullptr; 
 
-    inline ActiveCapability& operator=(const DODDescriptor<T>* ptr) {
-        resolvedPtr = ptr;
+    /**
+     * @brief Assignment operator used by the "Brain" (Resolution Phase).
+     * Extracts the execution address from the descriptor found in the Tensor Arena.
+     */
+    inline ActiveCapability& operator=(const DODDescriptor<T>* desc) {
+        pfnResolved = desc ? desc->pfnExecute : nullptr; 
         return *this;
     }
 
-    // -- Method 1: DOD-constrained Invoke strictly bound to T::Params
+    /**
+     * @brief Method 1: DOD-constrained Invoke.
+     * Performs a direct jump to the static logic function.
+     */
     inline void Invoke(typename T::Params& params) const {
-        if (resolvedPtr) {
-            resolvedPtr->Execute(params);
+        if (pfnResolved) {
+            pfnResolved(params); 
         }
     }
 
-    // -- Method 2: DOD-constrained operator() strictly delegates to Invoke
+    /**
+     * @brief Method 2: DOD-constrained operator().
+     * Strictly delegates to Invoke for clean syntax in ECS systems.
+     */
     inline void operator()(typename T::Params& params) const {
         Invoke(params); 
     }
 
-    inline explicit operator bool() const { return resolvedPtr != nullptr; }
+    /**
+     * @brief Boolean check to verify if a capability is currently resolved.
+     */
+    inline explicit operator bool() const { 
+        return pfnResolved != nullptr; 
+    }
 };
 
 // =============================================================================

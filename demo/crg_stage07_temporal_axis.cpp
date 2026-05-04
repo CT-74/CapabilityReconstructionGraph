@@ -25,16 +25,24 @@
 #define CRG_DLL_ENABLED 1
 #endif
 
-template<class T> struct UniversalAnchor {
+template<class T>
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value;
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -46,8 +54,8 @@ struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
         const TNode* derivedThis = static_cast<const TNode*>(this);
-        m_Next = NodeListAnchor<TNode>::s_Value;
-        NodeListAnchor<TNode>::s_Value = derivedThis;
+        m_Next = NodeListAnchor<TNode>::Get();
+        NodeListAnchor<TNode>::Get() = derivedThis;
     }
 };
 
@@ -170,9 +178,9 @@ private:
     }
 public:
     static void Bake() {
-        auto& registry = RouterSlot::s_Value;
+        auto& registry = RouterSlot::Get();
         registry.clear();
-        for (auto* b = NodeListAnchor<IBindingNode>::s_Value; b; b = b->m_Next) {
+        for (auto* b = NodeListAnchor<IBindingNode>::Get(); b; b = b->m_Next) {
             b->Assemble(registry);
         }
     }
@@ -180,7 +188,7 @@ public:
     template<class InterfaceT>
     static const InterfaceT* Find(ModelTypeID modelID, typename CapabilityRoutingTraits<InterfaceT>::AxisType coord = {}) {
         EnsureBaked();
-        for (const auto* node : RouterSlot::s_Value) {
+        for (const auto* node : RouterSlot::Get()) {
             if (node->GetTargetModelID() == modelID) {
                 if (const void* ptr = node->ResolveSpanRaw(TypeIDOf<InterfaceT>::Get())) {
                     return static_cast<const InterfaceT* const*>(ptr)[static_cast<std::size_t>(coord)];

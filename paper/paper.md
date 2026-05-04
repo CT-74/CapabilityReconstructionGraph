@@ -20,20 +20,6 @@ CRG relocates Inversion of Control (IoC) to the linker level to eliminate the bu
 
 * **Zero-Include Registration:** Modules self-register via a `NodeList` pattern. A feature or plugin is added to the system simply by linking its binary, with zero modifications required to core headers or source code.
 * **Linker-Resolved Plugins:** This architecture provides a fully functional plugin system as a side effect. Define a struct, instantiate it as a static—the OS wires the capability before `main()`, and the gateway discovers it only when requested, without the core ever needing to know the module exists.
-```mermaid
-graph TD
-    subgraph "External Modules (Independent & Blind)"
-        B[Module B] -->|NodeList| Anchor
-        A[Module A] -->|NodeList| Anchor
-    end
-    subgraph "CRG Engine Core"
-        Anchor[UniversalAnchor]
-        Binding[Binding]
-        Tensor[CapabilityTensor Matrix]
-    end
-    Anchor -->|First Find triggers Binding| Binding
-    Binding -->|Flattening| Tensor
-```
 
 ---
 
@@ -53,40 +39,12 @@ The **ModelShell** is the vehicle for high-performance data transport across dec
 * **Identity without Logic:** The shell carries only data and identity. It breaks the "Virtual Deadlock" where C++ forbids virtual template methods. One virtual jump identifies the type; one static_cast recovers the data.
 * **Hardware Symmetry:** By using Small Buffer Optimization (SBO) and cache-line alignment, the `ModelShell` ensures that data transport mirrors the physical requirements of the CPU prefetcher.
 * **The OOP Illusion:** In the cold path, `ModelShell` provides `Invoke` and `TryInvoke` APIs. These analyze method pointers at compile-time to resolve interfaces automatically, offering a clean OOP syntax without the architectural tax.
-```mermaid
-classDiagram
-    class ModelShell {
-        - unique_ptr~Concept~ m_ptr
-        + GetID() ModelTypeID
-        + Get~T~() const T&
-        + Invoke~MethodPtr~(...) void
-        + TryInvoke~MethodPtr~(...) optional
-    }
-    class Concept {
-        <<interface>>
-        + GetID() ModelTypeID*
-    }
-    class Model~T~ {
-        + T value
-        + GetID() ModelTypeID
-    }
-    ModelShell *-- Concept
-    Concept <|-- Model~T~
-    class PureDataStruct {
-        <<Your Model (e.g., Scout)>>
-        + std::string name
-        + int health
-    }
-    Model~T~ o-- PureDataStruct : T = PureDataStruct
-```
 
 ---
 
 ## 5. Pillar IV: N-Dimensional Behavioral Projection
 
 Behavioral resolution is modeled as a coordinate lookup within an **N-Dimensional Tensor** (CapabilitySpace).
-
-![N-Dimensional Behavior Tensor Resolution](../img/tensor_routing.png)
 
 * **Pure Arithmetic Dispatch:** Contextual axes (State, Zone, Authority) are resolved via Horner’s method into a flat offset. Complexity is free: whether you have one or ten dimensions, the lookup remains two array accesses.
 * **Immutable Topology:** Behavior transitions are coordinate updates, not structural rewirings. The memory addresses of the logic never shift, allowing the prefetcher to maintain a perfect stream.
@@ -97,27 +55,10 @@ Behavioral resolution is modeled as a coordinate lookup within an **N-Dimensiona
 
 When applied to ECS architectures, CRG decouples the "Decision" (Logic Projection) from the "Execution" (Data Pipeline).
 
-* **The Brain (Decision):** A low-frequency system evaluates the context and performs the O(1) tensor lookup. The result is cached inside the entity using an `ActiveCapability` component.
-* **The Muscle (Execution):** A high-frequency system iterates contiguous arrays and calls the cached result directly via function pointer. 
+* **The Brain (Decision):** A low-frequency system (e.g., 5 Hz) evaluates the context and performs the O(1) tensor lookup. The result is cached inside the entity using an `ActiveCapability` component.
+* **The Muscle (Execution):** A high-frequency system (60 Hz) iterates contiguous arrays and calls the cached result.
+* **Direct Function Pointer (Stage 12):** To reach the hardware limit, `ActiveCapability` now stores the raw function address (`pfnResolved`) instead of a descriptor pointer. This reduces hot-loop execution to a single-jump call, eliminating an additional memory dereference and maximizing prefetcher efficiency.
 * **Bulletproof Contracts:** The `ActiveCapability` uses strict SFINAE (IsDODContract) to ensure that high-performance static dispatch cannot be accidentally confused with polymorphic OOP interfaces.
-```mermaid
-sequenceDiagram
-    participant Brain as Brain System (5 Hz)
-    participant Router as CapabilityRouter
-    participant Entity as ActiveCapability
-    participant Muscle as Muscle System (60 Hz)
-
-    Note over Brain, Router: Decision Phase
-    Brain->>Router: Find
-    Router-->>Brain: Resolved Logic
-    Brain->>Entity: Cache Pointer
-
-    Note over Muscle, Entity: Execution Phase (Hot Loop)
-    loop Every Frame
-        Muscle->>Entity: cap(params)
-        Note right of Entity: Direct Static Call (Zero Search)
-    end
-```
 
 ---
 
@@ -127,9 +68,7 @@ CRG reaches the hardware limit by ensuring **Structural Immunity**: data never m
 
 * **Level 1 (OOP / vtable):** ~20 ns/entity.
 * **Level 2 (ModelShell Invoke):** ~7 ns/entity (Cold path routing).
-* **Level 3 (ActiveCapability):** Zero-overhead static dispatch. The only cost is a pure C-style function pointer jump.
-
-By avoiding memory fragmentation and cache-thrashing `Swap & Pop` operations during behavioral shifts, CRG effectively doubles memory throughput in volatile environments. The following benchmark compares a traditional ECS to CRG under a **10% structural mutation rate** (where 10% of entities change their behavior state per frame):
+* **Level 3 (ActiveCapability Stage 12):** Zero-overhead single-jump dispatch. The CPU reads the function address directly from the entity component and jumps, bypassing all intermediate structures and saturating memory bandwidth.
 
 | Dataset Size          | Implementation     | Throughput     | Overhead vs CRG |
 | :-------------------- | :----------------- | :------------- | :-------------- |
@@ -144,10 +83,8 @@ By avoiding memory fragmentation and cache-thrashing `Swap & Pop` operations dur
 
 CRG does not deprecate ECS; it complements it. The architectural decision between traditional ECS archetype migration and CRG pointer caching depends on two variables: **Entity Size** (Data Payload) and **Structural Mutation Rate** (State Volatility).
 
-![ECS vs CRG Break-Even Analysis](../img/breakeven_curve.png)
-
 * **ECS Supremacy (Static Loops & Micro-Entities):** For data payloads strictly under 64-bytes exhibiting highly static behavior (< 4% mutation rate), ECS archetype processing is mathematically optimal. The occasional `memcpy` penalty is offset by zero-indirection loops.
-* **CRG Supremacy (Zero-Migration & Heavy Logic):** Once an entity exceeds the 64-byte L1 cache-line threshold, or if state volatility exceeds 4%, the memory-wall constraints dominate CPU performance. By caching a `DODDescriptor` rather than migrating data structures, CRG preserves prefetcher momentum and linear memory access, effectively decoupling logical state from physical memory location.
+* **CRG Supremacy (Zero-Migration & Heavy Logic):** Once an entity exceeds the 64-byte L1 cache-line threshold, or if state volatility exceeds 4%, the memory-wall constraints dominate CPU performance. By caching a raw function pointer rather than migrating data structures, CRG preserves prefetcher momentum and linear memory access.
 
 ---
 

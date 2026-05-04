@@ -11,9 +11,7 @@
 // - UP/DOWN: Adjust the mutation rate (how many entities change state per frame).
 // - W: Spawn 500 more entities.
 // - I: Toggle immortality (visual test for the Panic/Flee capability).
-// - ModelRouter: Integrated zero-cost proxy for cold-path access.
-// - ActiveCapability: ECS Symbiosis for Brain (Resolution) & Muscle (Execution).
-// - Time-Slicing: The Brain runs at 5Hz smoothly distributed over 60 FPS.
+// - S: Toggle Global Swarm Strategy (Formation / Scatter).
 // =============================================================================
 
 #include "raylib.h"
@@ -34,20 +32,27 @@
 // =============================================================================
 
 #ifndef CRG_DLL_ENABLED
-#define CRG_DLL_ENABLED 0 // Switch Monolith / DLL mode
+#define CRG_DLL_ENABLED 0 
 #endif
 
-// UniversalAnchor: Ensures unique global state across module boundaries.
-template<class T> struct UniversalAnchor {
+template<class T>
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value; 
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -59,7 +64,6 @@ struct TypeIDOf {
     static ModelTypeID Get() { return typeid(T).hash_code(); } 
 };
 
-// Physical dense index for O(1) Tensor access.
 struct DenseModelID {
     std::size_t index;
     explicit DenseModelID(std::size_t i) : index(i) {}
@@ -71,23 +75,21 @@ struct DenseModelID {
 using ModelMap = std::unordered_map<ModelTypeID, std::size_t>; 
 CRG_DEFINE_UNIVERSAL_ANCHOR(ModelMap)
 
-class CapabilityRouter; // Forward declaration
+class CapabilityRouter; 
 
-// ModelHandle: Stored in the ECS Component for hot-path O(1) lookups.
 struct ModelHandle {
     DenseModelID denseID;
     explicit ModelHandle(ModelTypeID hash);
     template<class T> static ModelHandle FromType() { return ModelHandle(TypeIDOf<T>::Get()); }
 };
 
-// NodeList: Static chaining for automatic Binding discovery.
 template<class TNode> using NodeListAnchor = UniversalAnchor<const TNode*>; 
 template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = NodeListAnchor<TNode>::s_Value;
-        NodeListAnchor<TNode>::s_Value = static_cast<const TNode*>(this);
+        m_Next = NodeListAnchor<TNode>::Get();
+        NodeListAnchor<TNode>::Get() = static_cast<const TNode*>(this);
     }
 };
 
@@ -103,8 +105,6 @@ template<class... TAxes>
 struct CapabilitySpace {
     using AxisTuple = std::tuple<TAxes...>;
     static constexpr std::size_t Dimensions = sizeof...(TAxes);
-    
-    // Safely handles 0D space (no axes provided)
     static constexpr std::size_t Volume = (Dimensions == 0) ? 1 : (EnumTraits<TAxes>::Count * ... * 1);
 
     template<std::size_t DimIdx>
@@ -127,7 +127,6 @@ struct CapabilitySpace {
         }
     }
 
-    // Zero-copy variadic to tuple internal packing
     template<typename... TArgs>
     static constexpr std::size_t ComputeOffset(const TArgs&... args) {
         if constexpr (Dimensions == 0) return 0;
@@ -148,7 +147,6 @@ private:
 template<class TContract> struct CapabilityRoutingTraits { using SpaceType = CapabilitySpace<GlobalState>; }; 
 template<auto... Values> struct At {};
 
-// Variadic index sequence expansion for axes coordinates.
 template<class TSpace, std::size_t Index, class IdxSeq> struct MakeAt;
 template<class TSpace, std::size_t Index, std::size_t... DimIs>
 struct MakeAt<TSpace, Index, std::index_sequence<DimIs...>> {
@@ -166,7 +164,6 @@ struct NullContext {
     template<typename... Args> NullContext(const Args&...) {} 
 };
 
-// LAZY CONTEXT SELECTOR: Fixes the substitution error for contracts without RuleContext.
 template<typename T, typename = void> struct ContextSelector { using Type = NullContext; };
 template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRoutingTraits<T>::RuleContext>> {
     using Type = typename CapabilityRoutingTraits<T>::RuleContext;
@@ -174,9 +171,6 @@ template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRo
 
 template<typename T> using ContextTypeOf = typename ContextSelector<T>::Type;
 
-// =========================================================================
-// STRICT DOD CONTRACT VALIDATOR
-// =========================================================================
 template<typename T, typename = void> 
 struct IsDODContract : std::false_type {};
 
@@ -184,7 +178,6 @@ template<typename T>
 struct IsDODContract<T, std::void_t<typename T::Params>> 
     : std::bool_constant<!std::is_polymorphic_v<T>> {};
 
-// DODDescriptor: The structural wrapper holding the raw static function pointer.
 template<class TContract>
 struct DODDescriptor {
     using ParamsT = typename TContract::Params;
@@ -198,7 +191,7 @@ struct Rule {
     using PredicatePtr = bool (*)(const void*, const ContextT&);
 
     DODDescriptor<TContract> descriptor; 
-    const void*              configData;
+    const void* configData;
     PredicatePtr             predicate;
     int                      priority;
 
@@ -243,7 +236,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
     using ContextT = ContextTypeOf<ContractT>;
 
     void FillArena(DenseModelID denseID) const {
-        auto& arena = TensorArena<ContractT>::s_Value;
+        auto& arena = TensorArena<ContractT>::Get();
         std::size_t baseIdx = denseID.index * TSpace::Volume;
         if (arena.size() < baseIdx + TSpace::Volume) arena.resize(baseIdx + TSpace::Volume);
 
@@ -274,7 +267,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID hash = TypeIDOf<TModel>::Get();
-        auto& map = UniversalAnchor<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::Get();
         if (map.find(hash) == map.end()) map[hash] = map.size();
         m_unit.Fill(DenseModelID(map[hash]));
     }
@@ -293,7 +286,7 @@ class CapabilityRouter {
 public:
     static void EnsureBaked() {
         static struct StaticGuard { 
-            StaticGuard() { for (auto* b = NodeListAnchor<IBindingNode>::s_Value; b; b = b->m_Next) b->Bake(); } 
+            StaticGuard() { for (auto* b = NodeListAnchor<IBindingNode>::Get(); b; b = b->m_Next) b->Bake(); } 
         } s_guard;
     } 
 
@@ -302,7 +295,7 @@ public:
         EnsureBaked();
         if (!handle.denseID.IsValid()) return nullptr;
 
-        const auto& arena = TensorArena<TContract>::s_Value; 
+        const auto& arena = TensorArena<TContract>::Get(); 
         using TSpace = typename CapabilityRoutingTraits<TContract>::SpaceType;
         using TFullCtx = ContextTypeOf<TContract>;
         
@@ -338,70 +331,28 @@ public:
 template<class T, bool IsDOD = IsDODContract<T>::value>
 struct ActiveCapability;
 
-// =========================================================================
-// OOP SPECIALIZATION (Classic Interfaces)
-// =========================================================================
 template<class T>
 struct ActiveCapability<T, false> {
     const T* resolvedPtr = nullptr;
-
-    inline ActiveCapability& operator=(const T* ptr) {
-        resolvedPtr = ptr;
-        return *this;
-    }
-
-    template<auto FuncPtr, class... TArgs>
-    inline void Invoke(TArgs&&... args) const {
-        if (resolvedPtr) {
-            (resolvedPtr->*FuncPtr)(std::forward<TArgs>(args)...);
-        }
-    }
-
-    template<class... TArgs, 
-             typename = decltype(std::declval<const T&>()(std::declval<TArgs>()...))>
-    inline void operator()(TArgs&&... args) const {
-        if (resolvedPtr) {
-            (*resolvedPtr)(std::forward<TArgs>(args)...);
-        }
-    }
-
+    inline ActiveCapability& operator=(const T* ptr) { resolvedPtr = ptr; return *this; }
+    template<auto FuncPtr, class... TArgs> inline void Invoke(TArgs&&... args) const { if (resolvedPtr) (resolvedPtr->*FuncPtr)(std::forward<TArgs>(args)...); }
+    template<class... TArgs, typename = decltype(std::declval<const T&>()(std::declval<TArgs>()...))>
+    inline void operator()(TArgs&&... args) const { if (resolvedPtr) (*resolvedPtr)(std::forward<TArgs>(args)...); }
     inline explicit operator bool() const { return resolvedPtr != nullptr; }
 };
 
-// =========================================================================
-// DOD SPECIALIZATION (High-Performance Contracts)
-// =========================================================================
 template<class T>
 struct ActiveCapability<T, true> {
-    const DODDescriptor<T>* resolvedPtr = nullptr;
-
-    inline ActiveCapability& operator=(const DODDescriptor<T>* ptr) {
-        resolvedPtr = ptr;
-        return *this;
-    }
-
-    // -- Method 1: DOD-constrained Invoke
-    inline void Invoke(typename T::Params& params) const {
-        if (resolvedPtr) {
-            resolvedPtr->Execute(params);
-        }
-    }
-
-    // -- Method 2: DOD-constrained operator() strictly delegates to Invoke
-    inline void operator()(typename T::Params& params) const {
-        Invoke(params); 
-    }
-
-    inline explicit operator bool() const { return resolvedPtr != nullptr; }
+    void (*pfnResolved)(typename T::Params&) = nullptr; 
+    inline ActiveCapability& operator=(const DODDescriptor<T>* desc) { pfnResolved = desc ? desc->pfnExecute : nullptr; return *this; }
+    inline void Invoke(typename T::Params& params) const { if (pfnResolved) pfnResolved(params); }
+    inline void operator()(typename T::Params& params) const { Invoke(params); }
+    inline explicit operator bool() const { return pfnResolved != nullptr; }
 };
-
-// =============================================================================
-// [ ENGINE CORE ] 8. LAZY INITIALIZATION RESOLVER
-// =============================================================================
 
 inline ModelHandle::ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
     CapabilityRouter::EnsureBaked(); 
-    const auto& map = UniversalAnchor<ModelMap>::s_Value;
+    const auto& map = UniversalAnchor<ModelMap>::Get();
     auto it = map.find(hash);
     if (it != map.end()) denseID = DenseModelID(it->second);
 }
@@ -410,12 +361,7 @@ inline ModelHandle::ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invali
 // [ GAMEPLAY ] 1. DATA & PROFILING (ECS COMPONENTS)
 // =============================================================================
 
-struct ProfileResult {
-    double physics_ms = 0;
-    double ai_ms = 0;
-    double struct_ms = 0;
-};
-
+struct ProfileResult { double physics_ms = 0; double ai_ms = 0; double struct_ms = 0; };
 struct Body { Vector2 pos; Vector2 vel; };
 struct Weapon { float cooldown; float fire_rate; };
 struct Health { float current = 100.0f; bool is_dead = false; };
@@ -426,12 +372,21 @@ struct Projectile { float lifespan = 1.5f; };
 enum class CombatState { Idle, Aggressive };
 template<> struct EnumTraits<CombatState> { static constexpr std::size_t Count = 2; };
 
+enum class PerceptionRange { Melee, Ranged, Safe };
+template<> struct EnumTraits<PerceptionRange> { static constexpr std::size_t Count = 3; };
+
+enum class GroupStrategy { Formation, Scatter };
+template<> struct EnumTraits<GroupStrategy> { static constexpr std::size_t Count = 2; };
+
 struct CRGIdentity { 
     CombatState current_state = CombatState::Idle; 
+    PerceptionRange current_perception = PerceptionRange::Safe;
+    GroupStrategy current_strategy = GroupStrategy::Formation;
     ModelHandle handle = ModelHandle(TypeIDOf<void>::Get()); 
 };
 
 struct AggressiveTag {}; 
+struct CommanderTag {}; // Identifying the leader
 
 // =============================================================================
 // [ GAMEPLAY ] 2. CONTRACTS & TRAITS
@@ -443,7 +398,7 @@ struct UnitAIContract {
 };
 
 template<> struct CapabilityRoutingTraits<UnitAIContract> { 
-    using SpaceType = CapabilitySpace<CombatState>; 
+    using SpaceType = CapabilitySpace<CombatState, PerceptionRange, GroupStrategy>; 
     using RuleContext = UnitAIContract::RuleContext;
 };
 
@@ -451,6 +406,7 @@ template<> struct CapabilityRoutingTraits<UnitAIContract> {
 // [ GAMEPLAY ] 3. LOGIC IMPLEMENTATION (GPP POV)
 // =============================================================================
 
+// --- GENERIC SCOUT LOGIC ---
 template<class T, class TAt = At<>>
 struct DroneLogic : Capability<UnitAIContract> {
     static void Execute(UnitAIContract::Params& p) {
@@ -459,8 +415,9 @@ struct DroneLogic : Capability<UnitAIContract> {
     }
 };
 
+// Attack Logic
 template<class T, auto... R>
-struct DroneLogic<T, At<CombatState::Aggressive, R...>> : Capability<UnitAIContract> {
+struct DroneLogic<T, At<CombatState::Aggressive, PerceptionRange::Ranged, R...>> : Capability<UnitAIContract> {
     static void Execute(UnitAIContract::Params& p) {
         p.r.color = WHITE;
         if (p.w.cooldown <= 0) {
@@ -472,6 +429,25 @@ struct DroneLogic<T, At<CombatState::Aggressive, R...>> : Capability<UnitAIContr
             p.reg.emplace<Renderable>(proj, YELLOW, 2.0f); 
         }
         if (p.w.cooldown > 0) p.w.cooldown -= p.dt;
+    }
+};
+
+// Scatter Logic Override
+template<class T, auto... R>
+struct DroneLogic<T, At<GroupStrategy::Scatter, R...>> : Capability<UnitAIContract> {
+    static void Execute(UnitAIContract::Params& p) {
+        p.r.color = VIOLET;
+        p.b.pos.x += p.b.vel.x * p.dt * 2.0f; // Rapid movement when scattering
+        p.b.pos.y += p.b.vel.y * p.dt * 2.0f;
+    }
+};
+
+// --- COMMANDER LOGIC ---
+template<class T, class TAt = At<>>
+struct CommanderLogic : Capability<UnitAIContract> {
+    static void Execute(UnitAIContract::Params& p) {
+        p.r.color = GOLD;
+        p.r.size = 6.0f; // Bigger visual profile
     }
 };
 
@@ -490,8 +466,10 @@ struct DroneFlee : Capability<UnitAIContract, PanicConfig> {
 };
 
 struct Drone {};
+struct Commander {};
 using DroneFleet = TypeList<Drone>;
 static const CapabilityBinding<DroneFleet, DroneLogic, DroneFlee> g_DroneBinding{};
+static const CapabilityBinding<Commander, CommanderLogic> g_CommanderBinding{};
 
 // =============================================================================
 // [ GAMEPLAY ] 4. BATTLEFIELD ENGINE & BENCHMARK
@@ -500,10 +478,25 @@ static const CapabilityBinding<DroneFleet, DroneLogic, DroneFlee> g_DroneBinding
 class BattlefieldEngine {
     entt::registry reg;
     float mutation_rate = 5.0f;
-    size_t frame_count = 0; // Needed for time-slicing
+    size_t frame_count = 0; 
+    GroupStrategy global_strategy = GroupStrategy::Formation;
+    entt::entity commander_entity = entt::null;
     
 public:
-    void Init() { AddWave(1000); }
+    void Init() { 
+        AddWave(1000); 
+        DesignateCommander();
+    }
+
+    void DesignateCommander() {
+        auto scouts = reg.view<CRGIdentity>();
+        if (!scouts.empty()) {
+            commander_entity = scouts.front();
+            auto& id = reg.get<CRGIdentity>(commander_entity);
+            id.handle = ModelHandle::FromType<Commander>();
+            reg.emplace_or_replace<CommanderTag>(commander_entity);
+        }
+    }
 
     void AddWave(size_t count) {
         for(size_t i = 0; i < count; i++) {
@@ -513,11 +506,10 @@ public:
             CRGIdentity id;
             id.handle = ModelHandle::FromType<Drone>();
             id.current_state = CombatState::Idle;
+            id.current_perception = PerceptionRange::Safe;
+            id.current_strategy = global_strategy;
             reg.emplace<CRGIdentity>(e, id);
-            
-            // Explicitly add our ActiveCapability cache component
             reg.emplace<ActiveCapability<UnitAIContract>>(e);
-            
             reg.emplace<Health>(e, 100.0f);
             reg.emplace<BehaviorSettings>(e, 25.0f);
             reg.emplace<Renderable>(e, SKYBLUE, 3.0f);
@@ -530,6 +522,7 @@ public:
         ProfileResult p;
         frame_count++;
 
+        // Physics
         auto t0 = std::chrono::high_resolution_clock::now();
         reg.view<Body>().each([dt](auto& b) {
             b.pos.x += b.vel.x * dt; b.pos.y += b.vel.y * dt;
@@ -541,6 +534,7 @@ public:
         });
         p.physics_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t0).count();
 
+        // Structural mutations
         auto t2 = std::chrono::high_resolution_clock::now();
         size_t total = reg.storage<entt::entity>().size();
         size_t to_mutate = static_cast<size_t>(total * (mutation_rate / 100.0f));
@@ -555,42 +549,54 @@ public:
                 }
             }
         });
+        
+        // GLOBAL STRATEGY RESOLUTION (Commander input or S key)
+        if (IsKeyPressed(KEY_S)) {
+            global_strategy = (global_strategy == GroupStrategy::Formation) ? GroupStrategy::Scatter : GroupStrategy::Formation;
+        }
+
         p.struct_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t2).count();
 
+        // AI LOGIC
         auto t4 = std::chrono::high_resolution_clock::now();
         if (use_crg) {
-            // Time-Slicing Math: Spread 5Hz logic updates over a 60 FPS loop
-            const size_t TARGET_FPS = 60;
-            const size_t LOGIC_HZ = 5;
-            const size_t TOTAL_SLICES = TARGET_FPS / LOGIC_HZ; // 12 slices
+            const size_t TOTAL_SLICES = 12;
             const size_t current_slice = frame_count % TOTAL_SLICES;
 
-            // THE BRAIN - Time-Sliced Resolution
-            reg.view<CRGIdentity, Health, ActiveCapability<UnitAIContract>>().each([&](auto entity, auto& id, auto& h, auto& cap) {
-                // We only perform the routing lookup for 1/12th of the entities this frame
+            reg.view<CRGIdentity, Body, Health, ActiveCapability<UnitAIContract>>().each([&](auto entity, auto& id, auto& b, auto& h, auto& cap) {
                 if ((static_cast<uint32_t>(entity) % TOTAL_SLICES) == current_slice) {
+                    // Update Strategy from swarm global state
+                    id.current_strategy = global_strategy;
+
+                    // Update Perception
+                    float distSq = Vector2LengthSqr(Vector2Subtract(b.pos, Vector2{640, 360}));
+                    if (distSq < 10000.0f) id.current_perception = PerceptionRange::Melee;
+                    else if (distSq < 90000.0f) id.current_perception = PerceptionRange::Ranged;
+                    else id.current_perception = PerceptionRange::Safe;
+
                     UnitAIContract::RuleContext ctx { h };
-                    cap = CapabilityRouter::Find<UnitAIContract>(id.handle, ctx, id.current_state);
+                    cap = CapabilityRouter::Find<UnitAIContract>(id.handle, ctx, id.current_state, id.current_perception, id.current_strategy);
                 }
             });
 
-            // THE MUSCLE - Pure DOD Execution (runs for 100% of entities at 60Hz)
             reg.view<ActiveCapability<UnitAIContract>, Body, Weapon, Renderable, BehaviorSettings>().each([&](auto entity, auto& cap, auto& b, auto& w, auto& r, auto& s) {
                 UnitAIContract::Params params { reg, entity, b, w, r, s, dt };
                 cap(params); 
             });
-        } else {
-            reg.view<AggressiveTag, Body, Weapon, Renderable, BehaviorSettings>().each([&](auto entity, auto& b, auto& w, auto& r, auto& s) {
-                r.color = WHITE;
-                if (w.cooldown <= 0) w.cooldown = w.fire_rate; 
-                if (w.cooldown > 0) w.cooldown -= dt;
-            });
         }
         p.ai_ms = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t4).count();
 
+        // HEALTH & SUCCESSION
         if (!immortal) {
             reg.view<Health>().each([dt](auto& h) { h.current -= 5.0f * dt; });
-            for(auto [entity, h] : reg.view<Health>().each()) if (h.current <= 0) reg.destroy(entity);
+            for(auto [entity, h] : reg.view<Health>().each()) {
+                if (h.current <= 0) {
+                    if (entity == commander_entity) commander_entity = entt::null;
+                    reg.destroy(entity);
+                }
+            }
+            // If commander is dead, designate a new one immediately
+            if (commander_entity == entt::null || !reg.valid(commander_entity)) DesignateCommander();
         } else reg.view<Health>().each([](auto& h) { h.current = 100.0f; });
 
         return p;
@@ -598,26 +604,36 @@ public:
 
     void Render(ProfileResult p, bool crg, bool immortal) {
         BeginDrawing(); ClearBackground(Color{5, 5, 10, 255});
-        reg.view<Body, Renderable, Health>().each([](const Body& b, const Renderable& r, const Health& h) {
+        
+        Vector2 leaderPos = {0,0};
+        if (reg.valid(commander_entity)) leaderPos = reg.get<Body>(commander_entity).pos;
+
+        reg.view<Body, Renderable, Health, CRGIdentity>().each([&](auto entity, const Body& b, const Renderable& r, const Health& h, const CRGIdentity& id) {
             DrawCircleV(b.pos, r.size, Fade(r.color, std::max(0.2f, h.current / 100.0f)));
+            // Visual Swarm Links
+            if (crg && reg.valid(commander_entity) && entity != commander_entity) {
+                if (id.current_strategy == GroupStrategy::Formation)
+                    DrawLineV(b.pos, leaderPos, Fade(GOLD, 0.05f));
+            }
         });
-        DrawRectangle(0, 0, 520, 280, Fade(BLACK, 0.8f));
+
+        DrawRectangle(0, 0, 520, 310, Fade(BLACK, 0.8f));
         size_t entity_count = reg.storage<entt::entity>().size();
-        double displayed_tax = crg ? (double)entity_count * 0.000001 : p.struct_ms;
-        DrawText(TextFormat("PHYSICS & COLLISION: %.2f ms", p.physics_ms), 10, 10, 20, LIGHTGRAY); 
-        DrawText(TextFormat("AI LOGIC (DOD PROJECTION): %.2f ms", p.ai_ms), 10, 40, 20, GREEN);
-        DrawText(TextFormat("ARCHETYPE TAX: %.2f ms", displayed_tax), 10, 70, 24, (crg ? LIGHTGRAY : RED));     
-        DrawText(TextFormat("ROUTING MODE: %s", crg ? "CRG (Stateless)" : "ECS (Structural Mutation)"), 10, 120, 20, RAYWHITE);
-        DrawText(TextFormat("MUTATION RATE: %.1f %%", mutation_rate), 10, 150, 20, SKYBLUE);        
-        DrawText(TextFormat("TOTAL ENTITIES: %zu", entity_count), 10, 180, 20, RAYWHITE); 
-        DrawText(TextFormat("IMMORTALITY (PRESS I): %s", immortal ? "ON" : "OFF"), 10, 210, 20, immortal ? GREEN : ORANGE); 
-        DrawText("CONTROLS: [SPACE] Mode | [UP/DOWN] Mutation | [W] +500 | [I] Immortality", 10, 250, 10, LIGHTGRAY);
+        DrawText(TextFormat("PHYSICS: %.2f ms", p.physics_ms), 10, 10, 20, LIGHTGRAY); 
+        DrawText(TextFormat("AI LOGIC: %.2f ms", p.ai_ms), 10, 40, 20, GREEN);
+        DrawText(TextFormat("STRAT: %s", global_strategy == GroupStrategy::Formation ? "FORMATION" : "SCATTER"), 10, 70, 20, VIOLET);
+        DrawText(TextFormat("ROUTING: %s", crg ? "CRG (Stateless)" : "ECS (Structural)"), 10, 100, 20, RAYWHITE);
+        DrawText(TextFormat("MUTATION: %.1f %%", mutation_rate), 10, 130, 20, SKYBLUE);        
+        DrawText(TextFormat("ENTITIES: %zu", entity_count), 10, 160, 20, RAYWHITE); 
+        DrawText(TextFormat("IMMORTALITY: %s", immortal ? "ON" : "OFF"), 10, 190, 20, immortal ? GREEN : ORANGE); 
+        DrawText("CONTROLS: [SPACE] Mode | [S] Strategy | [UP/DOWN] Mut | [W] +500", 10, 230, 15, LIGHTGRAY);
+        DrawCircle(15, 275, 6, GOLD); DrawText("LEADER (Commander)", 30, 265, 18, GOLD);
         EndDrawing();
     }
 };
 
 int main() {
-    InitWindow(1280, 720, "CRG BATTLEFIELD - UNIFIED ROUTING GATEWAY");
+    InitWindow(1280, 720, "CRG BATTLEFIELD - STAGE 17 SWARM");
     SetTargetFPS(60); 
     BattlefieldEngine engine; engine.Init();
     bool use_crg = true; bool immortal = false; float m_rate = 5.0f;

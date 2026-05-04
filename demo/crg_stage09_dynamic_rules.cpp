@@ -26,16 +26,24 @@
 #define CRG_DLL_ENABLED 0
 #endif
 
-template<class T> struct UniversalAnchor {
+template<class T>
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value; 
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -44,8 +52,8 @@ template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = UniversalAnchor<const TNode*>::s_Value;
-        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::Get();
+        UniversalAnchor<const TNode*>::Get() = static_cast<const TNode*>(this);
     }
 };
 
@@ -76,7 +84,7 @@ struct RuleContext {
     template<typename T> constexpr const T& Get() const { return std::get<const T&>(values); }
 };
 
-// Patch: Fallback context for contracts without dynamic rules[cite: 11]
+// Patch: Fallback context for contracts without dynamic rules
 struct NullContext {
     NullContext() = default;
     template<typename... Args> NullContext(const Args&...) {} 
@@ -138,7 +146,7 @@ private:
 
 template<class TInterface> struct CapabilityRoutingTraits;
 
-// Patch: Lazy Context Selector to handle optional FullContext definition[cite: 11]
+// Patch: Lazy Context Selector to handle optional FullContext definition
 template<typename T, typename = void> struct ContextSelector { using Type = NullContext; };
 template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRoutingTraits<T>::FullContext>> {
     using Type = typename CapabilityRoutingTraits<T>::FullContext;
@@ -230,7 +238,7 @@ struct CapabilityNode<TModel, Cap, std::index_sequence<Is...>>
 };
 
 template<class TModel, template<class, class> class... TCap>
-class CapabilitySpace : public IRegistryNode, 
+class ModelRegistryNode : public IRegistryNode, 
     public CapabilityNode<TModel, TCap, std::make_index_sequence<CapabilityRoutingTraits<typename TCap<TModel, At<>>::InterfaceType>::SpaceType::Volume>>... 
 {
 public:
@@ -245,7 +253,7 @@ public:
 
 template<class TModel, template<class, class> class... TCapabilities>
 struct CapabilityBinding : public IBindingNode {
-    CapabilitySpace<TModel, TCapabilities...> m_unit;
+    ModelRegistryNode<TModel, TCapabilities...> m_unit;
     void Assemble(RegistryVector& registry) const override { registry.push_back(&m_unit); }
 };
 
@@ -261,14 +269,14 @@ struct CapabilityBinding<TypeList<Models...>, TCapabilities...> : public Capabil
 // =============================================================================
 
 class CapabilityRouter {
-public: // Made public to allow ModelRouter synchronization[cite: 11]
+public: // Made public to allow ModelRouter synchronization
     static void EnsureBaked() {
         struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
         static StaticGuard s_Guard;
     } 
     static void Bake() {
-        UniversalAnchor<RegistryVector>::s_Value.clear();
-        for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Assemble(UniversalAnchor<RegistryVector>::s_Value);
+        UniversalAnchor<RegistryVector>::Get().clear();
+        for (auto* b = UniversalAnchor<const IBindingNode*>::Get(); b; b = b->m_Next) b->Assemble(UniversalAnchor<RegistryVector>::Get());
     }
 
     template<class InterfaceT, typename... TArgs>
@@ -282,12 +290,12 @@ public: // Made public to allow ModelRouter synchronization[cite: 11]
         // Broadphase O(1) via variadic Enum extraction
         std::size_t offset = TSpace::ComputeOffset(args...); 
 
-        for (const auto* node : UniversalAnchor<RegistryVector>::s_Value) {
+        for (const auto* node : UniversalAnchor<RegistryVector>::Get()) {
             if (node->GetTargetModelID() == modelID) {
                 if (const void* data = node->Resolve(typeid(InterfaceT).hash_code())) {
                     const auto& cell = static_cast<const DispatchCell<InterfaceT>*>(data)[offset];
                     
-                    // Patch: MVP Fix - explicit assignment prevents function declaration ambiguity[cite: 11]
+                    // Patch: MVP Fix - explicit assignment prevents function declaration ambiguity
                     TFullCtx ctx = TFullCtx(args...); 
                     for (const auto& rule : cell.dynamicRules) {
                         if (rule.Matches(ctx)) return rule.implementation;
@@ -311,7 +319,7 @@ public:
     // Zero-cost static wrapper over CapabilityRouter::Find
     template<class InterfaceT, typename... TArgs>
     static const InterfaceT* Find(const TArgs&... args) {
-        CapabilityRouter::EnsureBaked(); // Patch: Synchronization for evaluation order[cite: 11]
+        CapabilityRouter::EnsureBaked(); // Patch: Synchronization for evaluation order
         return CapabilityRouter::Find<InterfaceT>(TypeIDOf<ModelT>::Get(), args...);
     }
 };

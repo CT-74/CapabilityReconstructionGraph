@@ -29,17 +29,24 @@
 #define CRG_DLL_ENABLED 0
 #endif
 
-// UniversalAnchor: Ensures unique global state across module boundaries.
-template<class T> struct UniversalAnchor {
+template<class T>
+struct UniversalAnchor {
 #if !CRG_DLL_ENABLED
-    static inline T s_Value{}; 
+    static T& Get() {
+        static T s_Value{};
+        return s_Value;
+    }
 #else
-    static T s_Value; 
+    static T& Get();
 #endif
 };
 
 #if CRG_DLL_ENABLED
-    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) template<> T UniversalAnchor<T>::s_Value{};
+    #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) \
+        template<> T& UniversalAnchor<T>::Get() { \
+            static T s_Value{}; \
+            return s_Value; \
+        }
 #else
     #define CRG_DEFINE_UNIVERSAL_ANCHOR(T) 
 #endif
@@ -49,8 +56,8 @@ template<class TNode, class TInterface>
 struct NodeList : public TInterface {
     const TNode* m_Next = nullptr;
     NodeList() {
-        m_Next = UniversalAnchor<const TNode*>::s_Value;
-        UniversalAnchor<const TNode*>::s_Value = static_cast<const TNode*>(this);
+        m_Next = UniversalAnchor<const TNode*>::Get();
+        UniversalAnchor<const TNode*>::Get() = static_cast<const TNode*>(this);
     }
 };
 
@@ -78,7 +85,7 @@ CRG_DEFINE_UNIVERSAL_ANCHOR(ModelMap)
 struct ModelHandle {
     DenseModelID denseID;
     explicit ModelHandle(ModelTypeID hash) : denseID(DenseModelID::Invalid) {
-        auto& map = UniversalAnchor<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::Get();
         auto it = map.find(hash);
         if (it != map.end()) denseID = DenseModelID(it->second);
     }
@@ -144,13 +151,13 @@ private:
 template<class TInterface> struct CapabilityRoutingTraits;
 template<auto... Values> struct At {};
 
-// Patch: Fallback context for contracts without dynamic rules[cite: 13].
+// Patch: Fallback context for contracts without dynamic rules.
 struct NullContext {
     NullContext() = default;
     template<typename... Args> NullContext(const Args&...) {} 
 };
 
-// Patch: Lazy Context Selector (Fixes 'no type named FullContext' error)[cite: 13].
+// Patch: Lazy Context Selector (Fixes 'no type named FullContext' error).
 template<typename T, typename = void> struct ContextSelector { using Type = NullContext; };
 template<typename T> struct ContextSelector<T, std::void_t<typename CapabilityRoutingTraits<T>::FullContext>> {
     using Type = typename CapabilityRoutingTraits<T>::FullContext;
@@ -162,7 +169,7 @@ template<class InterfaceT> struct ModelBinding : public InterfaceT {};
 
 template<class InterfaceT>
 struct Rule {
-    using ContextT = ContextTypeOf<InterfaceT>; // Use patched lazy selector[cite: 13].
+    using ContextT = ContextTypeOf<InterfaceT>; // Use patched lazy selector.
     using PredicatePtr = bool (*)(const void*, const ContextT&);
 
     ModelBinding<InterfaceT> binding; 
@@ -217,10 +224,10 @@ struct CapabilityNode<TModel, Cap, std::integer_sequence<std::size_t, Is...>>
 {
     using Intf = typename Cap<TModel, At<>>::InterfaceType;
     using TSpace = typename CapabilityRoutingTraits<Intf>::SpaceType;
-    using ContextT = ContextTypeOf<Intf>; // Use patched lazy selector[cite: 13].
+    using ContextT = ContextTypeOf<Intf>; // Use patched lazy selector.
 
     void FillArena(DenseModelID denseID) const {
-        auto& arena = TensorArena<Intf>::s_Value;
+        auto& arena = TensorArena<Intf>::Get();
         std::size_t baseIdx = denseID.index * TSpace::Volume;
         if (arena.size() < baseIdx + TSpace::Volume) arena.resize(baseIdx + TSpace::Volume);
 
@@ -253,7 +260,7 @@ struct CapabilityBinding : public IBindingNode {
 
     void Bake() const override {
         ModelTypeID hash = TypeIDOf<TModel>::Get();
-        auto& map = UniversalAnchor<ModelMap>::s_Value;
+        auto& map = UniversalAnchor<ModelMap>::Get();
         if (map.find(hash) == map.end()) map[hash] = map.size();
         m_unit.Fill(DenseModelID(map[hash]));
     }
@@ -272,29 +279,29 @@ struct CapabilityBinding<TypeList<Models...>, TCap...> : public CapabilityBindin
 
 class CapabilityRouter {
 public:
-    // Made public so ModelRouter can guarantee evaluation order[cite: 13].
+    // Made public so ModelRouter can guarantee evaluation order.
     static void EnsureBaked() {
         struct StaticGuard { StaticGuard() { CapabilityRouter::Bake(); } };
         static StaticGuard s_Guard;
     } 
 
-    static void Bake() { for (auto* b = UniversalAnchor<const IBindingNode*>::s_Value; b; b = b->m_Next) b->Bake(); }
+    static void Bake() { for (auto* b = UniversalAnchor<const IBindingNode*>::Get(); b; b = b->m_Next) b->Bake(); }
 
     template<class InterfaceT, typename... TArgs>
     static const ModelBinding<InterfaceT>* Find(ModelHandle handle, const TArgs&... args) {
         EnsureBaked();
         if (!handle.denseID.IsValid()) return nullptr;
 
-        const auto& arena = TensorArena<InterfaceT>::s_Value; 
+        const auto& arena = TensorArena<InterfaceT>::Get(); 
         using TTraits = CapabilityRoutingTraits<InterfaceT>;
         using TSpace = typename TTraits::SpaceType;
-        using TFullCtx = ContextTypeOf<InterfaceT>; // Use patched lazy selector[cite: 13].
+        using TFullCtx = ContextTypeOf<InterfaceT>; // Use patched lazy selector.
         
         std::size_t idx = (handle.denseID.index * TSpace::Volume) + TSpace::ComputeOffset(args...);
         if (idx >= arena.size()) return nullptr;
         const auto& cell = arena[idx];
 
-        // Patch: MVP Fix - explicit assignment prevents function declaration ambiguity[cite: 13].
+        // Patch: MVP Fix - explicit assignment prevents function declaration ambiguity.
         TFullCtx ctx = TFullCtx(args...); 
         for (const auto& rule : cell.dynamicRules) if (rule.Matches(ctx)) return &rule.binding;
         return cell.hasFallback ? &cell.fallback : nullptr;
@@ -308,17 +315,17 @@ public:
 template<class ModelT>
 class ModelRouter {
 public:
-    // Zero-cost static wrapper over CapabilityRouter::Find[cite: 13].
+    // Zero-cost static wrapper over CapabilityRouter::Find.
     template<class InterfaceT, typename... TArgs>
     static const ModelBinding<InterfaceT>* Find(const TArgs&... args) {
-        // Patch: Synchronization for evaluation order[cite: 13].
+        // Patch: Synchronization for evaluation order.
         CapabilityRouter::EnsureBaked(); 
         return CapabilityRouter::Find<InterfaceT>(ModelHandle::FromType<ModelT>(), args...);
     }
 };
 
 // =============================================================================
-// 8. GPP IMPLEMENTATION[cite: 13]
+// 8. GPP IMPLEMENTATION
 // =============================================================================
 
 enum class OpState { Normal, Alert };
@@ -362,7 +369,7 @@ struct Scout {};
 static const CapabilityBinding<Scout, Scan, Overdrive> g_ScoutBinding{};
 
 // =============================================================================
-// 9. MAIN[cite: 13]
+// 9. MAIN
 // =============================================================================
 
 int main() {
@@ -383,7 +390,7 @@ int main() {
     }
     
     std::cout << "\n[ COLD PATH: Via Strongly-Typed ModelRouter ]\n";
-    // ModelRouter handles EnsureBaked internally before creating the handle[cite: 13].
+    // ModelRouter handles EnsureBaked internally before creating the handle.
     EnergyContext ctxNormal { 80.0f }; // Triggers Standard Scan
     std::cout << "OpState::Normal, 80% Batt -> ";
     if (const auto* binding = ModelRouter<Scout>::Find<ITask>(OpState::Normal, ctxNormal)) {
